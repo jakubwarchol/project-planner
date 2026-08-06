@@ -1,0 +1,21 @@
+[
+  { "id": "p01", "name": "Website Redesign", "category": "Category 1", "estimate": "L" },
+  { "id": "p02", "name": "Mobile App Launch", "category": "Category 3", "estimate": "XXL" },
+  { "id": "p03", "name": "Customer Portal", "category": "Category 1", "estimate": "XL" },
+  { "id": "p04", "name": "API Gateway Migration", "category": "Category 2", "estimate": "L" },
+  { "id": "p05", "name": "Data Warehouse Upgrade", "category": "Category 2", "estimate": "XL" },
+  { "id": "p06", "name": "Internal Analytics Dashboard", "category": "Category 2", "estimate": "M" },
+  { "id": "p07", "name": "Payment System Overhaul", "category": "Category 3", "estimate": "XXL" },
+  { "id": "p08", "name": "Marketing Campaign Q3", "category": "Category 3", "estimate": "S" },
+  { "id": "p09", "name": "Brand Guidelines Update", "category": "Category 3", "estimate": "S" },
+  { "id": "p10", "name": "Content Calendar Automation", "category": "Category 3", "estimate": "M" },
+  { "id": "p11", "name": "Office Relocation", "category": "Category 4", "estimate": "L" },
+  { "id": "p12", "name": "Employee Onboarding Revamp", "category": "Category 4", "estimate": "M" },
+  { "id": "p13", "name": "Vendor Contract Review", "category": "Category 4", "estimate": "S" },
+  { "id": "p14", "name": "Security Audit", "category": "Category 2", "estimate": "S" },
+  { "id": "p15", "name": "Support Ticket Triage", "category": "Category 1", "estimate": "S" },
+  { "id": "p16", "name": "Enterprise CRM Rollout", "category": "Category 3", "estimate": "XXL" },
+  { "id": "p17", "name": "Regional Expansion Program", "category": "Category 3", "estimate": "XL" },
+  { "id": "p18", "name": "Facilities Compliance Review", "category": "Category 4", "estimate": "M" },
+  { "id": "p19", "name": "Supplier Audit Program", "category": "Category 4", "estimate": "S" }
+]
