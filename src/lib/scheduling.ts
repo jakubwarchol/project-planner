@@ -23,6 +23,30 @@ export interface ScheduledProject {
   isImpossible: boolean;
 }
 
+// A stretch where the category's pool is bigger than the sum of what the
+// running projects asked for, so `idlePeople` have nothing to do.
+export interface IdleSegment {
+  startMonths: number;
+  endMonths: number;
+  idlePeople: number;
+}
+
+// People released by a finishing project and picked up by one that was still
+// short of its target — `atMonths` is both the moment the first ends and the
+// point on the receiver's bar where the extra people land.
+export interface CapacityTransfer {
+  atMonths: number;
+  fromProjectId: string;
+  toProjectId: string;
+  people: number;
+}
+
+export interface GradedSchedule {
+  scheduled: ScheduledProject[];
+  idleSegments: IdleSegment[];
+  transfers: CapacityTransfer[];
+}
+
 const EPS = 1e-9;
 
 // Priority-based variable-rate allocation: every graded project competes for
@@ -34,14 +58,19 @@ const EPS = 1e-9;
 export function simulateGradedSchedule(
   gradedProjects: { project: Project; target: number }[],
   totalPeople: number,
-): ScheduledProject[] {
+): GradedSchedule {
   const n = gradedProjects.length;
   const remainingDays = gradedProjects.map((g) => effortDays(g.project));
   const rawSegments: ScheduleSegment[][] = gradedProjects.map(() => []);
+  const rawIdle: IdleSegment[] = [];
+  const transfers: CapacityTransfer[] = [];
   const finished = new Array(n).fill(false);
   let currentTime = 0;
   let finishedCount = 0;
   const maxIterations = n * 4 + 10;
+  let prevAllocations = new Array(n).fill(0);
+  // Who wrapped up at `currentTime`, and how many people they let go.
+  let freedLastSlice: { index: number; people: number }[] = [];
 
   for (let iteration = 0; finishedCount < n && iteration < maxIterations; iteration++) {
     let poolLeft = totalPeople;
@@ -53,6 +82,41 @@ export function simulateGradedSchedule(
       poolLeft -= alloc;
     }
 
+    // Hand the people just freed to whoever ramped up this slice, in priority
+    // order. A project only ramps up if it was short of its target, so every
+    // transfer recorded here lands on an under-staffed project.
+    if (freedLastSlice.length > 0) {
+      const pool = freedLastSlice.map((f) => ({ ...f }));
+      for (let i = 0; i < n; i++) {
+        if (finished[i]) continue;
+        let gained = allocations[i] - prevAllocations[i];
+        if (gained <= EPS) continue;
+
+        // A project going straight from nothing to its full headcount is just
+        // the next one starting, not people topping up a short-handed run —
+        // still draw from the pool so the rest is attributed correctly, but
+        // don't report it as a hand-off.
+        const startsAtFullStrength =
+          prevAllocations[i] <= EPS && allocations[i] >= gradedProjects[i].target - EPS;
+
+        for (const source of pool) {
+          if (gained <= EPS) break;
+          if (source.people <= EPS) continue;
+          const moved = Math.min(gained, source.people);
+          if (!startsAtFullStrength) {
+            transfers.push({
+              atMonths: currentTime,
+              fromProjectId: gradedProjects[source.index].project.id,
+              toProjectId: gradedProjects[i].project.id,
+              people: moved,
+            });
+          }
+          source.people -= moved;
+          gained -= moved;
+        }
+      }
+    }
+
     let dt = Infinity;
     for (let i = 0; i < n; i++) {
       if (finished[i] || allocations[i] <= 0) continue;
@@ -61,6 +125,13 @@ export function simulateGradedSchedule(
     }
     if (!Number.isFinite(dt)) break; // nobody has any allocation — stuck for good
 
+    // Capacity nobody claimed this slice: every unfinished project is already
+    // at its target, so the leftover people sit idle until a target is raised.
+    if (poolLeft > EPS) {
+      rawIdle.push({ startMonths: currentTime, endMonths: currentTime + dt, idlePeople: poolLeft });
+    }
+
+    const finishedNow: { index: number; people: number }[] = [];
     for (let i = 0; i < n; i++) {
       if (finished[i] || allocations[i] <= 0) continue;
       const rate = allocations[i] * EFFECTIVE_DAYS_PER_PERSON_PER_MONTH;
@@ -74,12 +145,15 @@ export function simulateGradedSchedule(
       if (remainingDays[i] <= EPS) {
         finished[i] = true;
         finishedCount++;
+        finishedNow.push({ index: i, people: allocations[i] });
       }
     }
+    freedLastSlice = finishedNow;
+    prevAllocations = allocations;
     currentTime += dt;
   }
 
-  return gradedProjects.map((g, i) => {
+  const scheduled = gradedProjects.map((g, i) => {
     const segments = mergeAdjacentSegments(rawSegments[i]);
     return {
       project: g.project,
@@ -90,6 +164,25 @@ export function simulateGradedSchedule(
       isImpossible: g.target > totalPeople,
     };
   });
+
+  return { scheduled, idleSegments: mergeIdleSegments(rawIdle), transfers };
+}
+
+function mergeIdleSegments(segments: IdleSegment[]): IdleSegment[] {
+  const merged: IdleSegment[] = [];
+  for (const seg of segments) {
+    const last = merged[merged.length - 1];
+    if (
+      last &&
+      Math.abs(last.idlePeople - seg.idlePeople) < EPS &&
+      Math.abs(last.endMonths - seg.startMonths) < EPS
+    ) {
+      last.endMonths = seg.endMonths;
+    } else {
+      merged.push({ ...seg });
+    }
+  }
+  return merged;
 }
 
 function mergeAdjacentSegments(segments: ScheduleSegment[]): ScheduleSegment[] {
@@ -115,31 +208,18 @@ export interface LaneAssigned {
   lane: number;
 }
 
-// Greedy interval coloring — the classic "minimum meeting rooms" algorithm.
-// Earliest-starting items claim the lowest free lane; a lane is free once its
-// last-placed item has ended.
-export function assignLanes<T extends { startMonths: number; endMonths: number }>(
-  items: T[],
-): (T & { lane: number })[] {
-  const order = items
+// One lane per item, never shared: items are ranked by start time (ties keep
+// their original order) and the rank *is* the lane. Returns lanes parallel to
+// the input array.
+export function assignOwnLanes(items: { startMonths: number }[]): number[] {
+  const laneByIndex = new Array<number>(items.length);
+  items
     .map((item, index) => ({ item, index }))
-    .sort((a, b) => a.item.startMonths - b.item.startMonths || a.index - b.index);
-
-  const laneEndTimes: number[] = [];
-  const laneByIndex = new Array(items.length);
-
-  for (const { item, index } of order) {
-    let lane = laneEndTimes.findIndex((end) => end <= item.startMonths + EPS);
-    if (lane === -1) {
-      lane = laneEndTimes.length;
-      laneEndTimes.push(item.endMonths);
-    } else {
-      laneEndTimes[lane] = item.endMonths;
-    }
-    laneByIndex[index] = lane;
-  }
-
-  return items.map((item, index) => ({ ...item, lane: laneByIndex[index] }));
+    .sort((a, b) => a.item.startMonths - b.item.startMonths || a.index - b.index)
+    .forEach(({ index }, rank) => {
+      laneByIndex[index] = rank;
+    });
+  return laneByIndex;
 }
 
 export interface CategorySchedule {
@@ -147,6 +227,8 @@ export interface CategorySchedule {
   graded: (ScheduledProject & { lane: number })[];
   tail: (TimelineBar & { lane: number })[];
   pendingIds: Set<string>;
+  idleSegments: IdleSegment[];
+  transfers: CapacityTransfer[];
 }
 
 // A category only gets the advanced multi-lane treatment once it has a
@@ -170,27 +252,32 @@ export function computeCategorySchedule(
     .map((project) => ({ project, target: assignments[project.id]! }));
   const tailProjects = categoryProjects.slice(prefixEnd);
 
-  const scheduled = simulateGradedSchedule(gradedInput, totalPeople);
+  const { scheduled, idleSegments, transfers } = simulateGradedSchedule(gradedInput, totalPeople);
   const gradedEnd = scheduled.reduce((max, s) => Math.max(max, s.endMonths), 0);
-  const graded = assignLanes(scheduled);
-  const gradedLaneCount = graded.reduce((max, g) => Math.max(max, g.lane + 1), 1);
 
   const capacityPerMonth = categoryCapacityPerMonth(totalPeople);
-  const tail = buildCategoryBars(tailProjects, capacityPerMonth).map((bar) => ({
+  const tailBars = buildCategoryBars(tailProjects, capacityPerMonth).map((bar) => ({
     ...bar,
     startMonths: bar.startMonths + gradedEnd,
     endMonths: bar.endMonths + gradedEnd,
-    lane: gradedLaneCount,
   }));
+
+  // Graded and tail projects share one ordering: every project gets its own
+  // lane, top to bottom by whichever starts first.
+  const laneByIndex = assignOwnLanes([...scheduled, ...tailBars]);
+  const graded = scheduled.map((s, i) => ({ ...s, lane: laneByIndex[i] }));
+  const tail = tailBars.map((bar, i) => ({ ...bar, lane: laneByIndex[scheduled.length + i] }));
 
   const pendingIds = new Set(
     tailProjects.filter((p) => assignments[p.id] != null).map((p) => p.id),
   );
 
   return {
-    laneCount: gradedLaneCount + (tail.length > 0 ? 1 : 0),
+    laneCount: graded.length + tail.length,
     graded,
     tail,
     pendingIds,
+    idleSegments,
+    transfers,
   };
 }

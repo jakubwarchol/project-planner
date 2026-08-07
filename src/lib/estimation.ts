@@ -31,7 +31,8 @@ export interface TeamVariant {
   people: Record<string, number>;
 }
 
-export const TEAM_VARIANTS: TeamVariant[] = [
+// Seed set — the live list is user-editable and persisted, see useTeamVariants.
+export const DEFAULT_TEAM_VARIANTS: TeamVariant[] = [
   {
     id: "variant-1",
     label: "Variant 1",
