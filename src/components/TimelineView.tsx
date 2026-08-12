@@ -1,14 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
-import type { Project } from "../types";
+import { X } from "lucide-react";
+import type { TeamVariantsApi } from "../hooks/useTeamVariants";
 import {
-  CATEGORY_ORDER,
-  EFFECTIVE_DAYS_PER_PERSON_PER_MONTH,
+  CAPABILITY_LABELS,
+  CAPABILITY_ORDER,
+  effectiveDaysByCapability,
+  isIncludedInPlan,
   monthsNeeded,
-  totalEffortDaysByCategory,
+  totalCapabilityEffortDays,
   type TeamVariant,
 } from "../lib/estimation";
-import type { TeamVariantsApi } from "../hooks/useTeamVariants";
-import { AdvancedTimeline } from "./AdvancedTimeline";
+import { simulateCapabilitySchedule } from "../lib/scheduling";
+import { usePlanner } from "../state/plannerContext";
+import type { Project } from "../types";
+import { useZoomGesture } from "../hooks/useZoomGesture";
 import { VariantEditor } from "./VariantEditor";
 import {
   DENSITIES,
@@ -17,6 +22,7 @@ import {
   buildAxis,
   fmt,
   monthLabel,
+  plCount,
   variantCaption,
   soft,
   solid,
@@ -30,26 +36,24 @@ interface TimelineViewProps {
   variantsApi: TeamVariantsApi;
   onVariantChange: (id: string) => void;
   theme: "auto" | "light" | "dark";
-  onCycleTheme: () => void;
   onClose: () => void;
 }
 
-const WHOLE_PLAN = "All work";
+const WHOLE_PLAN = "Cała praca";
 
 interface VariantRow {
   variant: TeamVariant;
   hue: number;
-  people: number;
+  fte: number;
   /** Infinity when nobody is on it. */
   months: number;
   isBaseline: boolean;
 }
 
 interface CompareBand {
-  category: string;
-  personMonths: number;
+  label: string;
+  fteMonths: number;
   rows: VariantRow[];
-  maxPeople: number;
   isWholePlan: boolean;
 }
 
@@ -59,21 +63,22 @@ export function TimelineView({
   variantsApi,
   onVariantChange,
   theme,
-  onCycleTheme,
   onClose,
 }: TimelineViewProps) {
   const { variants } = variantsApi;
+  const { cells, people, settings } = usePlanner();
+  // Every FTE figure in this view is headcount; productivity is in the rate,
+  // and each capability's rate is its own people's.
+  const edpm = useMemo(() => effectiveDaysByCapability(people, settings), [people, settings]);
   const baseline: TeamVariant = variants.find((v) => v.id === variantId) ?? variants[0];
 
-  const [advancedMode, setAdvancedMode] = useState(false);
-  const [zoomId, setZoomId] = useState("m");
+  const { ppm, setPpm, scrollRef } = useZoomGesture(ZOOMS[1].ppm);
   const [densityId, setDensityId] = useState("m");
   const [keyOpen, setKeyOpen] = useState(true);
   const [hover, setHover] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
 
   useEffect(() => {
-    if (advancedMode) return;
     function onKey(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
       if (editorOpen) setEditorOpen(false);
@@ -81,7 +86,7 @@ export function TimelineView({
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [editorOpen, onClose, advancedMode]);
+  }, [editorOpen, onClose]);
 
   const hueByVariant = useMemo(() => {
     const map: Record<string, number> = {};
@@ -91,58 +96,69 @@ export function TimelineView({
     return map;
   }, [variants]);
 
-  const totalsByCategory = useMemo(() => totalEffortDaysByCategory(projects), [projects]);
+  const plannedProjects = useMemo(() => projects.filter(isIncludedInPlan), [projects]);
+  const totalsByCapability = useMemo(
+    () => totalCapabilityEffortDays(plannedProjects, cells),
+    [plannedProjects, cells],
+  );
 
-  // One band per category plus a whole-plan band. Categories draw from separate
-  // pools, so the plan lands when the slowest category does.
+  // A whole-plan month count run through the real phase-gated simulation for
+  // each variant — cheap (three sims of ~47 projects) and the only honest way
+  // to account for phase gating and pool contention across capabilities.
+  const wholePlanMonthsByVariant = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const v of variants) {
+      const schedule = simulateCapabilitySchedule({
+        projects: plannedProjects,
+        cells,
+        pools: v.fte,
+        effectiveDaysPerMonth: edpm,
+        minStaffingFraction: settings.minStaffingFraction,
+      });
+      const anyImpossible = schedule.scheduled.some((s) => s.isImpossible);
+      map[v.id] = anyImpossible ? Infinity : schedule.horizonMonths;
+    }
+    return map;
+  }, [variants, plannedProjects, cells, edpm, settings.minStaffingFraction]);
+
   const bands: CompareBand[] = useMemo(() => {
-    const categoryBands = CATEGORY_ORDER.map((category) => {
-      const days = totalsByCategory[category] ?? 0;
+    const capabilityBands = CAPABILITY_ORDER.map((capability) => {
+      const days = totalsByCapability[capability] ?? 0;
       const rows: VariantRow[] = variants.map((v) => {
-        const people = v.people[category] ?? 0;
+        const fte = v.fte[capability] ?? 0;
         return {
           variant: v,
           hue: hueByVariant[v.id] ?? HUES[0],
-          people,
-          months: days === 0 ? 0 : monthsNeeded(days, people),
+          fte,
+          months: days === 0 ? 0 : monthsNeeded(days, fte, edpm[capability]),
           isBaseline: v.id === baseline.id,
         };
       });
       return {
-        category,
-        personMonths: days / EFFECTIVE_DAYS_PER_PERSON_PER_MONTH,
+        label: CAPABILITY_LABELS[capability],
+        fteMonths: edpm[capability] > 0 ? days / edpm[capability] : 0,
         rows,
-        maxPeople: rows.reduce((m, r) => Math.max(m, r.people), 0),
         isWholePlan: false,
       };
     });
 
     const wholePlan: CompareBand = {
-      category: WHOLE_PLAN,
-      personMonths: categoryBands.reduce((sum, b) => sum + b.personMonths, 0),
-      rows: variants.map((v) => {
-        const months = categoryBands.reduce((max, band) => {
-          const row = band.rows.find((r) => r.variant.id === v.id);
-          return row ? Math.max(max, row.months) : max;
-        }, 0);
-        return {
-          variant: v,
-          hue: hueByVariant[v.id] ?? HUES[0],
-          people: CATEGORY_ORDER.reduce((sum, c) => sum + (v.people[c] ?? 0), 0),
-          months,
-          isBaseline: v.id === baseline.id,
-        };
-      }),
-      maxPeople: 0,
+      label: WHOLE_PLAN,
+      fteMonths: capabilityBands.reduce((sum, b) => sum + b.fteMonths, 0),
+      rows: variants.map((v) => ({
+        variant: v,
+        hue: hueByVariant[v.id] ?? HUES[0],
+        fte: CAPABILITY_ORDER.reduce((sum, c) => sum + (v.fte[c] ?? 0), 0),
+        months: wholePlanMonthsByVariant[v.id] ?? Infinity,
+        isBaseline: v.id === baseline.id,
+      })),
       isWholePlan: true,
     };
-    wholePlan.maxPeople = wholePlan.rows.reduce((m, r) => Math.max(m, r.people), 0);
 
-    return [wholePlan, ...categoryBands];
-  }, [variants, totalsByCategory, hueByVariant, baseline.id]);
+    return [wholePlan, ...capabilityBands];
+  }, [variants, totalsByCapability, hueByVariant, baseline.id, wholePlanMonthsByVariant, edpm]);
 
   const D = DENSITIES.find((d) => d.id === densityId) ?? DENSITIES[1];
-  const ppm = (ZOOMS.find((z) => z.id === zoomId) ?? ZOOMS[1]).ppm;
   const nameW = D.name;
   const barTop = Math.round((D.row - D.bar) / 2);
 
@@ -177,11 +193,11 @@ export function TimelineView({
     if (!base || row.isBaseline) return null;
     if (!Number.isFinite(row.months) || !Number.isFinite(base.months)) return null;
     const diff = base.months - row.months;
-    if (Math.abs(diff) < 0.05) return { text: "same", color: "var(--ink-3)" };
+    if (Math.abs(diff) < 0.05) return { text: "tak samo", color: "var(--ink-3)" };
     const pct = base.months > 0 ? Math.abs(diff) / base.months : 0;
     const faster = diff > 0;
     return {
-      text: `${faster ? "−" : "+"}${fmt(Math.abs(diff))} mo · ${Math.round(pct * 100)}% ${faster ? "faster" : "slower"}`,
+      text: `${faster ? "−" : "+"}${fmt(Math.abs(diff))} mies. · ${Math.round(pct * 100)}% ${faster ? "szybciej" : "wolniej"}`,
       color: faster ? "var(--accent)" : "var(--warn)",
     };
   }
@@ -190,8 +206,8 @@ export function TimelineView({
     const hovered = hover === row.variant.id;
     const base = band.rows.find((r) => r.isBaseline);
     const delta = deltaAgainstBaseline(row, band);
-    const noPeople = row.people <= 0 && band.personMonths > 0;
-    const noWork = band.personMonths === 0;
+    const noPeople = row.fte <= 0 && band.fteMonths > 0;
+    const noWork = band.fteMonths === 0;
 
     const width = noPeople || noWork ? 0 : Math.max(4, Math.round(row.months * ppm));
     const height = D.bar;
@@ -199,9 +215,9 @@ export function TimelineView({
       base && !row.isBaseline && Number.isFinite(base.months) ? Math.round(base.months * ppm) : null;
 
     const outParts: { text: string; color: string }[] = [];
-    if (noWork) outParts.push({ text: "no work queued", color: "var(--ink-4)" });
-    else if (noPeople) outParts.push({ text: "nobody assigned — never finishes", color: "var(--warn)" });
-    else outParts.push({ text: `${fmt(row.months)} mo`, color: "var(--ink-2)" });
+    if (noWork) outParts.push({ text: "brak zaplanowanej pracy", color: "var(--ink-4)" });
+    else if (noPeople) outParts.push({ text: "nikt nie przypisany — nigdy się nie skończy", color: "var(--warn)" });
+    else outParts.push({ text: `${fmt(row.months)} mies.`, color: "var(--ink-2)" });
     if (delta) outParts.push({ text: delta.text, color: delta.color });
 
     return (
@@ -220,7 +236,7 @@ export function TimelineView({
             background: hovered ? "var(--name-hover)" : "var(--band)",
             cursor: "pointer",
           }}
-          title={`Compare against ${row.variant.label}`}
+          title={`Porównaj z ${row.variant.label}`}
         >
           <span
             className="atl-hue"
@@ -232,9 +248,9 @@ export function TimelineView({
           >
             {row.variant.label}
           </span>
-          {row.isBaseline && <span className="atl-band-badge">baseline</span>}
+          {row.isBaseline && <span className="atl-band-badge">bazowy</span>}
           <span className="atl-row-id" style={{ fontSize: D.fsMono }}>
-            {row.people}p
+            {fmt(row.fte)}
           </span>
         </div>
 
@@ -264,7 +280,7 @@ export function TimelineView({
                     color: row.isBaseline ? "var(--on-bar)" : "var(--ink)",
                   }}
                 >
-                  {row.people}
+                  {fmt(row.fte)}
                 </span>
               )}
             </div>
@@ -316,7 +332,7 @@ export function TimelineView({
         : 0;
 
     return (
-      <section className={`atl-band ${band.isWholePlan ? "atl-band-total" : ""}`} key={band.category}>
+      <section className={`atl-band ${band.isWholePlan ? "atl-band-total" : ""}`} key={band.label}>
         <div className="atl-band-head" style={{ height: D.band }}>
           <div className="atl-band-name" style={{ width: nameW }}>
             <div
@@ -328,20 +344,25 @@ export function TimelineView({
                 opacity: 0.6,
               }}
             />
-            <b>{band.category}</b>
-            <span className="atl-band-people">{fmt(band.personMonths)} person-mo</span>
+            <b>{band.label}</b>
+            <span className="atl-band-people">{fmt(band.fteMonths)} FTE-mies.</span>
           </div>
           <div className="atl-band-track" style={{ width: totalW }}>
             <div className="atl-band-chips" style={{ left: 0, height: D.band }}>
               {best && (
                 <span style={{ color: "var(--ink-2)" }}>
-                  fastest {best.variant.label.toLowerCase()} · {fmt(best.months)} mo
+                  najszybszy {best.variant.label.toLowerCase()} · {fmt(best.months)} mies.
                 </span>
               )}
               {spread > 0 && (
-                <span style={{ color: "var(--accent)" }}>{spread}% between best and worst</span>
+                <span style={{ color: "var(--accent)" }}>{spread}% różnicy między najlepszym i najgorszym</span>
               )}
-              {!best && <span style={{ color: "var(--ink-4)" }}>nothing scheduled</span>}
+              {!best && <span style={{ color: "var(--ink-4)" }}>brak zaplanowanych prac</span>}
+              {band.isWholePlan && (
+                <span style={{ color: "var(--ink-4)" }} title="uwzględnia fazowanie i kolejkowanie zdolności">
+                  z symulacji fazowej
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -351,23 +372,7 @@ export function TimelineView({
     );
   }
 
-  if (advancedMode) {
-    return (
-      <AdvancedTimeline
-        projects={projects}
-        variantId={variantId}
-        variantsApi={variantsApi}
-        onVariantChange={onVariantChange}
-        onExitAdvanced={() => setAdvancedMode(false)}
-        theme={theme}
-        onCycleTheme={onCycleTheme}
-        onClose={onClose}
-      />
-    );
-  }
-
   const planDelta = deltaAgainstBaseline(fastestPlan, bands[0]);
-  const themeLabel = theme === "auto" ? "AUTO" : theme === "dark" ? "DARK" : "LIGHT";
 
   return (
     <div
@@ -375,17 +380,17 @@ export function TimelineView({
       data-theme={theme === "auto" ? undefined : theme}
       role="dialog"
       aria-modal="true"
-      aria-label="Capacity comparison"
+      aria-label="Porównanie pojemności"
     >
       <header className="atl-header" style={{ height: D.hdr }}>
         <div className="atl-title">
-          <b>Capacity timeline</b>
-          <span className="atl-chip">compare</span>
+          <b>Harmonogram pojemności</b>
+          <span className="atl-chip">porównanie</span>
         </div>
 
         <div className="atl-group is-divided">
           <span className="atl-eyebrow" style={{ paddingLeft: 10 }}>
-            baseline
+            bazowy
           </span>
           <div className="atl-seg">
             {variants.map((v) => (
@@ -400,15 +405,15 @@ export function TimelineView({
             ))}
           </div>
           <button type="button" className="atl-btn" onClick={() => setEditorOpen(true)}>
-            Edit…
+            Edytuj…
           </button>
         </div>
 
         <div className="atl-spacer" />
 
         <div className="atl-group">
-          <span className="atl-eyebrow" title="row density">
-            den
+          <span className="atl-eyebrow" title="gęstość wierszy">
+            gęstość
           </span>
           <div className="atl-seg">
             {DENSITIES.map((d) => (
@@ -422,7 +427,7 @@ export function TimelineView({
               </button>
             ))}
           </div>
-          <span className="atl-eyebrow" title="months per screen" style={{ paddingLeft: 3 }}>
+          <span className="atl-eyebrow" title="miesięcy na ekran" style={{ paddingLeft: 3 }}>
             zoom
           </span>
           <div className="atl-seg">
@@ -430,8 +435,8 @@ export function TimelineView({
               <button
                 key={z.id}
                 type="button"
-                className={`atl-seg-icon ${z.id === zoomId ? "is-active" : ""}`}
-                onClick={() => setZoomId(z.id)}
+                className={`atl-seg-icon ${Math.abs(z.ppm - ppm) < 0.5 ? "is-active" : ""}`}
+                onClick={() => setPpm(z.ppm)}
               >
                 {z.label}
               </button>
@@ -442,21 +447,11 @@ export function TimelineView({
             className={`atl-btn ${keyOpen ? "is-on" : ""}`}
             onClick={() => setKeyOpen((v) => !v)}
           >
-            Key
-          </button>
-          <button
-            type="button"
-            className="atl-btn is-mono"
-            onClick={onCycleTheme}
-          >
-            {themeLabel}
-          </button>
-          <button type="button" className="atl-btn" onClick={() => setAdvancedMode(true)}>
-            Advanced
+            Legenda
           </button>
           <div className="atl-rule" />
-          <button type="button" className="atl-close" onClick={onClose} aria-label="Close timeline">
-            ×
+          <button type="button" className="atl-close" onClick={onClose} aria-label="Zamknij harmonogram">
+            <X size={16} />
           </button>
         </div>
       </header>
@@ -467,7 +462,7 @@ export function TimelineView({
             <div className="atl-key-bar" style={{ borderStyle: "solid", borderColor: "var(--line-strong)" }}>
               <i style={{ left: 0, width: 20, height: 13, background: "var(--accent)", borderRadius: 1 }} />
             </div>
-            <span>one row per variant · length = time to clear the category · number = people on it</span>
+            <span>jeden wiersz na wariant · długość = czas na daną kompetencję · liczba = FTE w puli</span>
           </div>
           <div className="atl-key-item">
             <div
@@ -476,25 +471,25 @@ export function TimelineView({
             >
               <span style={{ borderLeft: "1px dashed var(--accent)", height: 15, marginLeft: 16 }} />
             </div>
-            <span>where the baseline variant lands</span>
+            <span>gdzie kończy wariant bazowy</span>
           </div>
           <div className="atl-key-item">
             <span className="atl-key-num" style={{ color: "var(--accent)" }}>
-              −2 mo · 30% faster
+              −2 mies. · 30% szybciej
             </span>
-            <span>against the baseline, per category</span>
+            <span>względem wariantu bazowego, dla każdej kompetencji</span>
           </div>
           <div className="atl-key-item">
-            <span className="atl-key-num">click</span>
-            <span>a row to make that variant the baseline</span>
+            <span className="atl-key-num">kliknij</span>
+            <span>wiersz, aby ustawić ten wariant jako bazowy</span>
           </div>
         </div>
       )}
 
-      <div className="atl-scroll">
+      <div className="atl-scroll" ref={scrollRef}>
         <div className="atl-axis" style={{ height: D.axis }}>
           <div className="atl-axis-corner" style={{ width: nameW }}>
-            <span className="atl-eyebrow">variant</span>
+            <span className="atl-eyebrow">wariant</span>
           </div>
           <div className="atl-track" style={{ width: totalW, height: D.axis }}>
             {ticks.map((t, i) => (
@@ -527,22 +522,24 @@ export function TimelineView({
       </div>
 
       <footer className="atl-footer" style={{ height: D.foot }}>
-        <span>baseline · {variantCaption(baseline.label)}</span>
+        <span>bazowy · {variantCaption(baseline.label)}</span>
         <span>
-          {fmt(bands[0].personMonths)} person-months of work · {CATEGORY_ORDER.length} categories
+          {fmt(bands[0].fteMonths)} FTE-mies. pracy ·{" "}
+          {plCount(CAPABILITY_ORDER.length, "kompetencja", "kompetencje", "kompetencji")}
         </span>
         <span>
-          lands {Number.isFinite(baselinePlan.months) ? monthLabel(startYear, startMonth, baselinePlan.months) : "never"}
+          kończy się{" "}
+          {Number.isFinite(baselinePlan.months) ? monthLabel(startYear, startMonth, baselinePlan.months) : "nigdy"}
         </span>
         {planDelta ? (
           <span style={{ color: planDelta.color }}>
-            best {fastestPlan.variant.label.toLowerCase()} · {planDelta.text}
+            najlepszy {fastestPlan.variant.label.toLowerCase()} · {planDelta.text}
           </span>
         ) : (
-          <span style={{ color: "var(--accent)" }}>baseline is the fastest</span>
+          <span style={{ color: "var(--accent)" }}>wariant bazowy jest najszybszy</span>
         )}
         <span style={{ flex: 1 }} />
-        <span>click a row to rebase · esc closes variants · then view</span>
+        <span>kliknij wiersz, aby zmienić punkt odniesienia · esc zamyka warianty · potem widok</span>
       </footer>
 
       {editorOpen && (

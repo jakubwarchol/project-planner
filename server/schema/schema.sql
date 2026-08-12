@@ -1,6 +1,6 @@
 -- Schema v1.
--- This runs against sql.js in the browser today and against the same SQLite
--- file on the server later, so keep it portable: no browser-only assumptions.
+-- Runs against the SQLite file the API server owns (`data/planner.sqlite`).
+-- Keep it portable plain SQLite — no driver-specific syntax.
 
 CREATE TABLE projects (
   id       TEXT PRIMARY KEY,

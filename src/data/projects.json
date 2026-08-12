@@ -1,21 +1,329 @@
 [
-  { "id": "p01", "name": "Website Redesign", "category": "Category 1", "estimate": "L" },
-  { "id": "p02", "name": "Mobile App Launch", "category": "Category 3", "estimate": "XXL" },
-  { "id": "p03", "name": "Customer Portal", "category": "Category 1", "estimate": "XL" },
-  { "id": "p04", "name": "API Gateway Migration", "category": "Category 2", "estimate": "L" },
-  { "id": "p05", "name": "Data Warehouse Upgrade", "category": "Category 2", "estimate": "XL" },
-  { "id": "p06", "name": "Internal Analytics Dashboard", "category": "Category 2", "estimate": "M" },
-  { "id": "p07", "name": "Payment System Overhaul", "category": "Category 3", "estimate": "XXL" },
-  { "id": "p08", "name": "Marketing Campaign Q3", "category": "Category 3", "estimate": "S" },
-  { "id": "p09", "name": "Brand Guidelines Update", "category": "Category 3", "estimate": "S" },
-  { "id": "p10", "name": "Content Calendar Automation", "category": "Category 3", "estimate": "M" },
-  { "id": "p11", "name": "Office Relocation", "category": "Category 4", "estimate": "L" },
-  { "id": "p12", "name": "Employee Onboarding Revamp", "category": "Category 4", "estimate": "M" },
-  { "id": "p13", "name": "Vendor Contract Review", "category": "Category 4", "estimate": "S" },
-  { "id": "p14", "name": "Security Audit", "category": "Category 2", "estimate": "S" },
-  { "id": "p15", "name": "Support Ticket Triage", "category": "Category 1", "estimate": "S" },
-  { "id": "p16", "name": "Enterprise CRM Rollout", "category": "Category 3", "estimate": "XXL" },
-  { "id": "p17", "name": "Regional Expansion Program", "category": "Category 3", "estimate": "XL" },
-  { "id": "p18", "name": "Facilities Compliance Review", "category": "Category 4", "estimate": "M" },
-  { "id": "p19", "name": "Supplier Audit Program", "category": "Category 4", "estimate": "S" }
+  {
+    "id": "p01",
+    "name": "ACMS 2.0",
+    "category": "Projekty",
+    "estimate": "XXL",
+    "description": "Stworzenie nowego ACMS"
+  },
+  {
+    "id": "p02",
+    "name": "rozwój Sowy + mikroserwisy",
+    "category": "Projekty",
+    "estimate": "M",
+    "description": "Rozbudowa systemu i migracja do mikroserwisów"
+  },
+  {
+    "id": "p03",
+    "name": "30 kreatywnych - utrzymanie",
+    "category": "Projekty",
+    "estimate": "S",
+    "description": "Aktualizacja obecnego szablonu do edukacji 2027"
+  },
+  {
+    "id": "p04",
+    "name": "30 kreatywnych - nowy projekt",
+    "category": "Projekty",
+    "estimate": "M",
+    "description": "Nowy landing 30 kreatywnych na SULU"
+  },
+  {
+    "id": "p05",
+    "name": "Budżet Wrocławia - utrzymanie",
+    "category": "Projekty",
+    "estimate": "S",
+    "description": "Aktualizacja obecnego szablonu do edukacji 2027"
+  },
+  {
+    "id": "p06",
+    "name": "Budżet Wrocławia - nowy projekt",
+    "category": "Projekty",
+    "estimate": "M",
+    "description": "Nowy landing Budżet Wrocławia na SULU"
+  },
+  {
+    "id": "p07",
+    "name": "WBO 2027 - utrzymanie",
+    "category": "Projekty",
+    "estimate": "S",
+    "description": "WBO 2027 - odpalenie nowej edycji"
+  },
+  {
+    "id": "p08",
+    "name": "WTR + rozkłady jazdy",
+    "category": "Projekty",
+    "estimate": "XL",
+    "description": "Wskazania - Aglomeracja Wrocławska + nowe rozkłady"
+  },
+  {
+    "id": "p09",
+    "name": "panel GO bez FREAM",
+    "category": "Projekty",
+    "estimate": "XL",
+    "description": "Przepisanie panelu GO"
+  },
+  {
+    "id": "p10",
+    "name": "Wrocław.go (nowy design)",
+    "category": "Projekty",
+    "estimate": "M",
+    "description": "Redesign portalu i wdrożenie AI"
+  },
+  {
+    "id": "p11",
+    "name": "Poradnik Mieszkańca wyszukiwarka AI z bazy BIP",
+    "category": "Projekty",
+    "estimate": "S",
+    "description": "Wdrożenie wyszukiwarki AI dla poradnika"
+  },
+  {
+    "id": "p12",
+    "name": "katalog E-usług",
+    "category": "Projekty",
+    "estimate": "L",
+    "description": "Stworzenie katalogu e-usług w Poradniku Mieszkańca"
+  },
+  {
+    "id": "p13",
+    "name": "Fundusz Osiedlowy (nowy)",
+    "category": "Projekty",
+    "estimate": "XL",
+    "description": "Wskazanie - Fundusz Osiedlowy ala WBO Admin"
+  },
+  {
+    "id": "p14",
+    "name": "SULU (Invest, araw.pl, zmienpiec.pl) - per projekt",
+    "category": "Projekty",
+    "estimate": "L",
+    "description": "Migracja Landing Pagów do SULU"
+  },
+  {
+    "id": "p15",
+    "name": "nowy design www.wroclaw.pl",
+    "category": "Projekty",
+    "estimate": "XXL",
+    "description": "Odświeżenie wyglądu portalu"
+  },
+  {
+    "id": "p16",
+    "name": "postawienie wroclawpl na dockerze na produkcji",
+    "category": "Projekty",
+    "estimate": "XL",
+    "description": "Migracja na Dockera"
+  },
+  {
+    "id": "p17",
+    "name": "refactoring wroclawpl (Front) - podział backend i frontend",
+    "category": "Projekty",
+    "estimate": "XL",
+    "description": "Podział kodu na backend i frontend"
+  },
+  {
+    "id": "p18",
+    "name": "przerobienie środowiska deweloperskiego/stg (kubernetes)",
+    "category": "Projekty",
+    "estimate": "L",
+    "description": "Wdrożenie Kubernetesa na dev/stg"
+  },
+  {
+    "id": "p19",
+    "name": "ARAW ERP (wdrażane modułowo)",
+    "category": "Projekty",
+    "estimate": "XXL",
+    "description": "Budowa i rozwój ARAW ERP"
+  },
+  {
+    "id": "p20",
+    "name": "zgodność NIS2",
+    "category": "Projekty",
+    "estimate": "XXL",
+    "description": "Dostosowanie do dyrektywy NIS2"
+  },
+  {
+    "id": "p21",
+    "name": "wdrożenie Sentry",
+    "category": "Projekty",
+    "estimate": "M",
+    "description": "Wdrożenie frameworku do monitoringu błędów na FE"
+  },
+  {
+    "id": "p22",
+    "name": "Gitlab CI/CD",
+    "category": "Projekty",
+    "estimate": "XXL",
+    "description": "Budowa CI/CD do automatyzacji wdrożeń"
+  },
+  {
+    "id": "p23",
+    "name": "ujednolicenie mapy WBI",
+    "category": "Projekty",
+    "estimate": "L",
+    "description": "Standaryzacja map na portalu"
+  },
+  {
+    "id": "p24",
+    "name": "ujednolicenie wszystkich map (20+)",
+    "category": "Projekty",
+    "estimate": "L",
+    "description": "Standaryzacja map na portalu"
+  },
+  {
+    "id": "p25",
+    "name": "nowy system SSO (rezygnacja z nagłówków)",
+    "category": "Projekty",
+    "estimate": "XL",
+    "description": "Wdrożenie SSO w serwisach IT"
+  },
+  {
+    "id": "p26",
+    "name": "WCAG 2.1 AA na wybranych serwisach",
+    "category": "Projekty",
+    "estimate": "L",
+    "description": "Dostosowanie do standardów dostępności"
+  },
+  {
+    "id": "p27",
+    "name": "posprzątanie w GTM + analytics",
+    "category": "Projekty",
+    "estimate": "S",
+    "description": "Porządki w analityce"
+  },
+  {
+    "id": "p28",
+    "name": "ekrany digital signage?",
+    "category": "Projekty",
+    "estimate": "XL",
+    "description": "Wdrożenie digital signage"
+  },
+  {
+    "id": "p29",
+    "name": "Wdrożenie nowych osób w zespole",
+    "category": "Zespół",
+    "estimate": "M",
+    "description": "Rekrutacja i onboarding"
+  },
+  {
+    "id": "p30",
+    "name": "szkolenia z wykorzystywania AI w zakresie kodowania i procesów",
+    "category": "Zespół",
+    "estimate": "M",
+    "description": "Szkolenia AI dla zespołu"
+  },
+  {
+    "id": "p31",
+    "name": "szkolenia dla pracowników z listy zgłoszonych szkoleń",
+    "category": "Zespół",
+    "estimate": "M",
+    "description": "Szkolenia branżowe"
+  },
+  {
+    "id": "p32",
+    "name": "Zaktualizowana wersja Procedury Wytwarzania Oprogramowania",
+    "category": "Procesy/Procedury",
+    "estimate": "XL",
+    "description": "Aktualizacja procedur"
+  },
+  {
+    "id": "p33",
+    "name": "zaktualizowana Procedura Odtwarzania po Awarii",
+    "category": "Procesy/Procedury",
+    "estimate": "M",
+    "description": "Aktualizacja procedur DRP"
+  },
+  {
+    "id": "p34",
+    "name": "działania związane z NIS2 i ISO",
+    "category": "Procesy/Procedury",
+    "estimate": "XXL",
+    "description": "Audyty i procedury"
+  },
+  {
+    "id": "p35",
+    "name": "matryca kompetencji zespołu",
+    "category": "Procesy/Procedury",
+    "estimate": "M",
+    "description": "Opracowanie matrycy"
+  },
+  {
+    "id": "p36",
+    "name": "proces reportowania IT",
+    "category": "Procesy/Procedury",
+    "estimate": "L",
+    "description": "Wdrożenie procesu raportowania"
+  },
+  {
+    "id": "p37",
+    "name": "matryca decyzyjności",
+    "category": "Procesy/Procedury",
+    "estimate": "S",
+    "description": "Opracowanie matrycy"
+  },
+  {
+    "id": "p38",
+    "name": "onboarding i offboarding",
+    "category": "Procesy/Procedury",
+    "estimate": "XL",
+    "description": "Uporządkowanie procesów HR"
+  },
+  {
+    "id": "p39",
+    "name": "posprzątanie przestrzeni w google drive + confluence. Ograniczenie uprawnień",
+    "category": "Procesy/Procedury",
+    "estimate": "M",
+    "description": "Porządki w dokumentacji"
+  },
+  {
+    "id": "p40",
+    "name": "ścieżki rozwoju kariery",
+    "category": "Procesy/Procedury",
+    "estimate": "M",
+    "description": "Opracowanie ścieżek"
+  },
+  {
+    "id": "p41",
+    "name": "system cyklicznego feedbacku",
+    "category": "Procesy/Procedury",
+    "estimate": "M",
+    "description": "Wdrożenie feedbacku"
+  },
+  {
+    "id": "p42",
+    "name": "szkolenia security",
+    "category": "Procesy/Procedury",
+    "estimate": "M",
+    "description": "Szkolenia bezpieczeństwa"
+  },
+  {
+    "id": "p43",
+    "name": "procesy zarządzania ryzykiem",
+    "category": "Procesy/Procedury",
+    "estimate": "L",
+    "description": "Wdrożenie procesów"
+  },
+  {
+    "id": "p44",
+    "name": "System fakturowania",
+    "category": "AI",
+    "estimate": "M",
+    "description": "Automatyzacja fakturowania z AI"
+  },
+  {
+    "id": "p45",
+    "name": "Code review AI",
+    "category": "AI",
+    "estimate": "S",
+    "description": "Wdrożenie narzędzi AI do CR"
+  },
+  {
+    "id": "p46",
+    "name": "Czatbot na stronie www.wroclaw.pl",
+    "category": "AI",
+    "estimate": "L"
+  },
+  {
+    "id": "p47",
+    "name": "Wrocław.go (wyszukiwarka AI)",
+    "category": "AI",
+    "estimate": "M"
+  }
 ]

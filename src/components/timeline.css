@@ -27,8 +27,24 @@
   --bar-env-l: 58%;
   --bar-env-c: 0.06;
   --on-bar: #ffffff;
+  /* Accent as bare RGB channels so a cell can mix its own alpha into it —
+     `rgb(var(--heat) / a)`. Same colour as --accent, in the one form a
+     variable-alpha wash needs. */
+  --heat: 86 64 158;
+  /* One colour per T-shirt size, cool to warm as the size grows. */
+  --size-s: #4c9a63;
+  --size-m: #c9a227;
+  --size-l: #d9822b;
+  --size-xl: #d9552b;
+  --size-xxl: #cf2b3f;
   --warn: #8f4413;
   --warn-wash: rgba(143, 68, 19, 0.12);
+  /* "Covered" — obsada is the one place with a positive state worth a colour
+     of its own, because everything else in the app is a quantity, not a
+     pass/fail. */
+  --ok: #2f6b4f;
+  --ok-wash: rgba(47, 107, 79, 0.12);
+  --track: #dbe2e8;
   --idle: #4a5560;
   --idle-wash: rgba(74, 85, 96, 0.08);
   --row-hover: #dde5ec;
@@ -65,8 +81,17 @@
     --bar-env-l: 58%;
     --bar-env-c: 0.07;
     --on-bar: #0b0f12;
+    --heat: 176 155 255;
+    --size-s: #5fb87a;
+    --size-m: #e0be3f;
+    --size-l: #eb9a45;
+    --size-xl: #ef7047;
+    --size-xxl: #f0566a;
     --warn: #f0a068;
     --warn-wash: rgba(240, 160, 104, 0.15);
+    --ok: #7bc4a0;
+    --ok-wash: rgba(123, 196, 160, 0.14);
+    --track: #1e262d;
     --idle: #9aa8b5;
     --idle-wash: rgba(154, 168, 181, 0.1);
     --row-hover: #222b33;
@@ -101,8 +126,17 @@
   --bar-env-l: 58%;
   --bar-env-c: 0.07;
   --on-bar: #0b0f12;
+  --heat: 176 155 255;
+  --size-s: #5fb87a;
+  --size-m: #e0be3f;
+  --size-l: #eb9a45;
+  --size-xl: #ef7047;
+  --size-xxl: #f0566a;
   --warn: #f0a068;
   --warn-wash: rgba(240, 160, 104, 0.15);
+  --ok: #7bc4a0;
+  --ok-wash: rgba(123, 196, 160, 0.14);
+  --track: #1e262d;
   --idle: #9aa8b5;
   --idle-wash: rgba(154, 168, 181, 0.1);
   --row-hover: #222b33;
@@ -263,8 +297,9 @@
   color: var(--ink-2);
   width: 26px;
   height: 26px;
-  font-size: 16px;
-  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
 }
 
@@ -318,14 +353,6 @@
   position: absolute;
   bottom: 0;
   display: block;
-}
-
-.atl-key-hatch {
-  width: 34px;
-  height: 15px;
-  background: repeating-linear-gradient(45deg, var(--idle) 0 1px, transparent 1px 5px);
-  border-top: 1px solid var(--idle);
-  border-bottom: 1px solid var(--idle);
 }
 
 .atl-key-warn {
@@ -390,8 +417,9 @@
   border-radius: 2px;
   width: 18px;
   height: 16px;
-  font-size: 9px;
-  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   padding: 0;
 }
@@ -566,6 +594,16 @@
   font-size: 9.5px;
   color: var(--ink-3);
   width: 22px;
+}
+
+/* The row is scheduled from effort that no longer matches its T-shirt size. */
+.atl-size.is-drifted .atl-size-label {
+  color: var(--warn);
+}
+
+.atl-size.is-drifted svg {
+  flex: none;
+  color: var(--warn);
 }
 
 .atl-row-track {
@@ -789,6 +827,268 @@
   color: var(--ink-2);
 }
 
+.atl-pop-cells {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 8px;
+}
+
+.atl-pop-cell {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--ink-2);
+}
+
+.atl-pop-cell i {
+  font-style: normal;
+  color: var(--ink-4);
+}
+
+/* Hover breakdown — faza 1 / faza 2 side by side, with the FTE arithmetic. */
+
+.atl-tip {
+  position: fixed;
+  z-index: 60;
+  pointer-events: none;
+  width: 460px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.32);
+  padding: 10px 12px 9px;
+  color: var(--ink-2);
+}
+
+.atl-tip-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 9px;
+  font-size: 11px;
+  min-width: 0;
+}
+
+.atl-tip-head b {
+  color: var(--ink);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.atl-tip-id {
+  flex: none;
+  font-family: var(--atl-mono);
+  color: var(--ink-3);
+}
+
+.atl-tip-total {
+  flex: none;
+  margin-left: auto;
+  font-family: var(--atl-mono);
+  font-size: 10px;
+  color: var(--ink-3);
+}
+
+.atl-tip-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.atl-tip-col {
+  min-width: 0;
+}
+
+.atl-tip-phase {
+  padding-bottom: 5px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.atl-tip-phase-name {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.atl-tip-phase-name b {
+  color: var(--ink);
+}
+
+.atl-tip-phase-name span {
+  color: var(--ink-4);
+}
+
+.atl-tip-phase-span {
+  margin-top: 2px;
+  font-family: var(--atl-mono);
+  font-size: 10px;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.atl-tip-wait {
+  font-family: var(--atl-mono);
+  font-size: 10px;
+  color: var(--ink-4);
+  padding-bottom: 3px;
+}
+
+.atl-tip table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--atl-mono);
+  font-size: 10.5px;
+}
+
+.atl-tip th {
+  font-weight: 400;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  color: var(--ink-4);
+  text-align: right;
+  padding: 1px 0 3px;
+}
+
+.atl-tip td {
+  text-align: right;
+  padding: 1.5px 0;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.atl-tip th:first-child,
+.atl-tip td:first-child {
+  text-align: left;
+  color: var(--ink);
+}
+
+.atl-tip th + th,
+.atl-tip td + td {
+  padding-left: 7px;
+}
+
+.atl-tip tfoot td {
+  border-top: 1px solid var(--line);
+  padding-top: 3px;
+  color: var(--ink-3);
+}
+
+.atl-tip-star {
+  font-style: normal;
+  color: var(--ink-4);
+}
+
+.atl-tip-short {
+  font-style: normal;
+  color: var(--warn);
+}
+
+.atl-tip-none {
+  font-size: 11px;
+  color: var(--ink-4);
+  padding: 3px 0;
+}
+
+.atl-tip-foot {
+  margin-top: 9px;
+  padding-top: 7px;
+  border-top: 1px solid var(--line);
+  font-size: 10px;
+  line-height: 1.55;
+  color: var(--ink-4);
+}
+
+/* External earliest start: a wall the bar cannot cross, drawn behind it. */
+.atl-earliest {
+  position: absolute;
+  top: 0;
+  width: 0;
+  border-left: 1px dashed var(--ink-4);
+  opacity: 0.75;
+  z-index: 1;
+}
+
+/* Deadline: a marker only — nothing in the scheduler reads it. */
+.atl-deadline {
+  position: absolute;
+  top: 0;
+  width: 0;
+  border-left: 1px solid var(--ink-3);
+  z-index: 3;
+  display: flex;
+  align-items: flex-start;
+  color: var(--ink-3);
+}
+
+.atl-deadline svg {
+  margin-left: 1px;
+  margin-top: 1px;
+}
+
+.atl-deadline.is-missed {
+  border-left-color: var(--warn);
+  color: var(--warn);
+}
+
+/* Planned start: a soft marker, same spirit as the deadline — nothing in the
+ * scheduler reads it. Highlighted only when the computed start slips past it. */
+.atl-planned-start {
+  position: absolute;
+  top: 0;
+  width: 0;
+  border-left: 1px dotted var(--ink-3);
+  z-index: 3;
+  display: flex;
+  align-items: flex-start;
+  color: var(--ink-3);
+}
+
+.atl-planned-start svg {
+  margin-left: 1px;
+  margin-top: 1px;
+}
+
+.atl-planned-start.is-late {
+  border-left-color: var(--warn);
+  color: var(--warn);
+}
+
+/* A project's bar splits visually at the faza 1 / faza 2 boundary. */
+.atl-phase-tick {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 0;
+  border-left: 1.5px solid var(--surface);
+  z-index: 2;
+}
+
+/* Global capability utilisation band at the foot of the advanced timeline. */
+.atl-util-band {
+  border-top: 2px solid var(--line-strong);
+}
+
+.atl-util-used {
+  position: absolute;
+  border-radius: 2px;
+}
+
+.atl-util-idle {
+  position: absolute;
+  bottom: 0;
+  background: repeating-linear-gradient(45deg, var(--idle) 0 1px, transparent 1px 5px);
+  border: 1px solid var(--idle);
+  border-radius: 2px;
+}
+
 
 /* Footer */
 
@@ -979,6 +1279,52 @@
   box-shadow: inset 0 2px 0 var(--accent);
 }
 
+.bv-row.is-linking-target {
+  cursor: pointer;
+}
+
+.bv-rows {
+  position: relative;
+}
+
+.bv-link-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.bv-link-arrow {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.bv-link-arrow-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.4;
+}
+
+.bv-link-arrow:hover .bv-link-arrow-line {
+  stroke-width: 2.2;
+}
+
+.bv-link-arrow-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 10;
+}
+
+.bv-link-arrow-dot {
+  fill: var(--accent);
+}
+
+.bv-link-arrow-head {
+  fill: var(--accent);
+}
+
 .bv-ord {
   width: 22px;
   text-align: right;
@@ -991,8 +1337,7 @@
   width: 14px;
   display: flex;
   align-items: center;
-  font-size: 12px;
-  line-height: 1;
+  justify-content: center;
   color: var(--ink-4);
   cursor: grab;
 }
@@ -1019,6 +1364,34 @@
   gap: 7px;
 }
 
+.bv-colhead-size {
+  width: 78px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  background: transparent;
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+
+.bv-colhead-size svg {
+  flex: none;
+}
+
+.bv-colhead-size:hover {
+  color: var(--ink);
+}
+
+.bv-colhead-size.is-on {
+  color: var(--accent);
+}
+
 .bv-size-ticks {
   display: flex;
   gap: 1.5px;
@@ -1037,15 +1410,18 @@
 }
 
 .bv-row-cat {
-  width: 104px;
+  width: 148px;
   font-family: var(--atl-mono);
   font-size: 10.5px;
   letter-spacing: 0.02em;
   color: var(--ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .bv-move {
-  width: 48px;
+  width: 72px;
   display: flex;
   gap: 4px;
   justify-content: flex-end;
@@ -1055,12 +1431,13 @@
   width: 20px;
   height: 20px;
   padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid var(--line-strong);
   border-radius: 2px;
   background: transparent;
   color: var(--ink-2);
-  font-size: 8px;
-  line-height: 1;
   cursor: pointer;
 }
 
@@ -1072,6 +1449,237 @@
 .bv-move button:disabled {
   color: var(--line-strong);
   cursor: default;
+}
+
+.bv-crud {
+  width: 88px;
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.bv-crud button {
+  width: 26px;
+  height: 20px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.bv-crud .bv-link:hover {
+  color: var(--ink);
+  border-color: var(--accent-line);
+}
+
+.bv-crud .bv-link.is-active {
+  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.bv-crud .bv-edit:hover {
+  color: var(--ink);
+  border-color: var(--accent-line);
+}
+
+.bv-crud .bv-delete:hover {
+  color: var(--warn);
+  border-color: var(--warn);
+}
+
+.bv-crud .bv-delete.is-confirming {
+  width: auto;
+  padding: 0 6px;
+  font-size: 9.5px;
+  letter-spacing: 0.03em;
+  color: #fff;
+  background: var(--warn);
+  border-color: var(--warn);
+}
+
+/* Project editor — a centred modal. Nine fields (name, description, size,
+   category and three calendar months) never fitted across one 40px row; each
+   got squeezed to a width that told you nothing about what it was for. */
+.bv-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.bv-modal {
+  display: flex;
+  flex-direction: column;
+  width: 480px;
+  max-width: 100%;
+  /* Never taller than the window; the fields scroll and the title and buttons
+     stay put, so Zapisz is reachable on a short screen. */
+  max-height: 100%;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.bv-modal-head {
+  flex: none;
+  padding: 13px 16px 11px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.bv-modal-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  padding: 14px 16px;
+}
+
+.bv-modal-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 16px;
+  border-top: 1px solid var(--line);
+}
+
+/* Label above field, so the label can be readable and the field full width —
+   the row layout had to drop labels entirely for want of horizontal space. */
+.bv-pop-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.bv-pop-field > span {
+  font-family: var(--atl-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+}
+
+.bv-pop-field .bv-input,
+.bv-pop-field .bv-select {
+  width: 100%;
+}
+
+.bv-pop-textarea {
+  resize: vertical;
+  min-height: 58px;
+  font-family: inherit;
+}
+
+/* Paired fields that read naturally side by side: size/category, and the two
+   start-related months. */
+.bv-pop-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+}
+
+.bv-pop-cols-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+
+.bv-pop-hint {
+  flex: 1;
+  font-family: var(--atl-mono);
+  font-size: 9.5px;
+  color: var(--ink-4);
+}
+
+/* The row stays put while its editor is open, marked so you can see which one
+   the panel belongs to. */
+.bv-row.is-editing {
+  background: var(--accent-wash);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.bv-input,
+.bv-select {
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 5px 7px;
+}
+
+.bv-input:focus,
+.bv-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.bv-save,
+.bv-cancel {
+  font: inherit;
+  font-size: 11.5px;
+  border-radius: 4px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.bv-save {
+  color: #fff;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+}
+
+.bv-save:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.bv-cancel {
+  color: var(--ink-2);
+  background: transparent;
+  border: 1px solid var(--line);
+}
+
+.bv-cancel:hover {
+  color: var(--ink);
+  border-color: var(--accent-line);
+}
+
+.bv-add-project {
+  margin: 8px 16px 12px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--ink-2);
+  background: transparent;
+  border: 1px dashed var(--line);
+  border-radius: 6px;
+  padding: 7px 10px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.bv-add-project:hover {
+  color: var(--ink);
+  border-color: var(--accent-line);
 }
 
 /* Queue rows */
@@ -1233,14 +1841,14 @@
 }
 
 .ve-close {
-  font: inherit;
-  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: var(--ink-2);
   background: transparent;
   border: none;
   cursor: pointer;
   padding: 0;
-  line-height: 1;
 }
 
 .ve-close:hover {
@@ -1355,6 +1963,31 @@
   text-align: center;
 }
 
+.ve-number-static {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-3);
+  background: var(--surface-2);
+  border-style: dashed;
+}
+
+.ve-copy {
+  font: inherit;
+  font-size: 11.5px;
+  color: var(--ink-2);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+.ve-copy:hover {
+  color: var(--ink);
+  border-color: var(--accent-line);
+}
+
 .ve-rows {
   display: flex;
   flex-direction: column;
@@ -1441,4 +2074,1220 @@
   padding: 6px 10px;
   max-width: 640px;
   overflow-wrap: anywhere;
+}
+
+/* Team / roster view */
+
+/* The header pools are the roster's summary — one strip of joined cells rather
+   than seven loose chips, so the bars underneath read as one comparison
+   against the largest pool instead of seven unrelated meters. */
+.tw-pools {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+
+.tw-pool {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-width: 62px;
+  padding: 6px 9px 5px;
+  border-left: 1px solid var(--line-soft);
+}
+
+.tw-pool:first-child {
+  border-left: 0;
+}
+
+.tw-pool-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tw-pool-label {
+  font-family: var(--atl-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.07em;
+  color: var(--ink-3);
+}
+
+.tw-pool-head b {
+  font-family: var(--atl-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.tw-pool-track {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.tw-pool-fill {
+  display: block;
+  height: 100%;
+}
+
+.tw-scroll {
+  padding: 18px 22px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+.tw-band {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tw-band-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 0 4px 8px;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.tw-band-count {
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.tw-band-fte {
+  font-family: var(--atl-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+}
+
+.tw-colhead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 10px 6px;
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+}
+
+/* One set of widths drives the header and every row — the columns are declared
+   here rather than as inline styles per cell so the two can't drift apart. */
+.tw-c-name {
+  flex: 0 0 190px;
+  width: 190px;
+}
+
+.tw-c-split {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Wide enough for the word "produktywność" in the header — at 88px it
+   overflowed its own column and collided with "razem". */
+.tw-c-prod {
+  flex: 0 0 106px;
+  width: 106px;
+  text-align: right;
+}
+
+.tw-c-total {
+  flex: 0 0 54px;
+  width: 54px;
+  text-align: right;
+}
+
+.tw-c-act {
+  flex: 0 0 82px;
+  width: 82px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.tw-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.tw-row:hover {
+  background: var(--row-hover);
+}
+
+.tw-name {
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 6px 8px;
+}
+
+.tw-name:hover,
+.tw-name:focus {
+  background: var(--surface);
+  border-color: var(--line);
+}
+
+/* Bar and chips share the split column: the bar answers "how is this person
+   divided" at a glance, the chips are where it gets edited. */
+.tw-split-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Fixed-ish width so every row's bar starts and ends on the same pixels —
+   proportions are only comparable down a column if the scale is shared. */
+.tw-split {
+  flex: 0 1 230px;
+  min-width: 140px;
+  display: flex;
+  height: 26px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.tw-split.is-over {
+  border-color: var(--warn);
+}
+
+.tw-split-seg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  border-right: 1px solid var(--surface);
+  font-family: var(--atl-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  /* The label rides on the segment, not on the page, so it follows the
+     bar-contrast token — --ink would vanish into a light bar in dark mode,
+     where the palette deliberately inverts. */
+  color: var(--on-bar);
+}
+
+.tw-split-seg:last-child {
+  border-right: 0;
+}
+
+/* One chip per capability a person splits their time across. Wraps rather
+   than scrolls — someone on three capabilities is unusual enough that a taller
+   row is better than a hidden one. */
+.tw-allocs {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Ties the chip to its slice of the bar beside it. */
+.tw-alloc-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.tw-alloc {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 4px 2px 7px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--surface);
+}
+
+.tw-alloc b {
+  font-family: var(--atl-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--ink-2);
+}
+
+.tw-alloc .ve-num,
+.tw-alloc input {
+  width: 52px;
+}
+
+.tw-alloc-drop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: var(--ink-4);
+  cursor: pointer;
+}
+
+.tw-alloc-drop:hover {
+  color: var(--warn);
+  background: var(--warn-wash);
+}
+
+.tw-alloc-add {
+  height: 26px;
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+/* Number and unit share one framed box so "70" and "%" read as a single
+   value — the % is a label, not a field to tab into. */
+.tw-prod {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  height: 24px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.tw-prod input {
+  width: 52px;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  padding: 0 2px;
+  text-align: right;
+  font-family: var(--atl-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.tw-prod input:focus {
+  outline: none;
+}
+
+/* Anything under full is what the plan actually runs on, so it gets the
+   colour — not as a warning, but because it is the number that explains why a
+   full-time person delivers less than a full-time person's worth. */
+.tw-prod.is-reduced input {
+  color: var(--warn);
+}
+
+.tw-prod-unit {
+  font-family: var(--atl-mono);
+  font-size: 10px;
+  color: var(--ink-4);
+  padding: 0 7px 0 1px;
+}
+
+.tw-total {
+  font-family: var(--atl-mono);
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+/* The one place over-allocation is called out: a person promised to more than
+   one of themselves. Unlike the size/matrix comparison this is not an
+   estimate disagreement — it is arithmetic that cannot hold. */
+.tw-total.is-over {
+  color: var(--warn);
+  font-weight: 600;
+}
+
+.tw-row-form {
+  background: var(--surface-2);
+}
+
+.tw-add {
+  align-self: flex-start;
+  margin: 6px 0 0 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--ink-2);
+  background: transparent;
+  border: 1px dashed var(--line);
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.tw-add:hover {
+  color: var(--ink);
+  border-color: var(--accent-line);
+}
+
+/* Capability matrix — a CSS Grid, not the flexbox-row convention used
+   elsewhere: a sticky header row AND a sticky first column together need
+   per-cell `position: sticky`, which only behaves predictably on grid/table
+   children, not on flex rows duplicating nine widths by hand. */
+
+.cm-scroll {
+  padding: 0;
+}
+
+.cm-grid {
+  display: grid;
+  align-content: start;
+}
+
+.cm-row,
+.cm-group {
+  display: contents;
+}
+
+.cm-cell {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--line-soft);
+  border-right: 1px solid var(--line-soft);
+  font-size: 12.5px;
+  color: var(--ink);
+  background: var(--surface);
+}
+
+/* Two rows pin as you scroll — the column header and, under it, whichever
+   category you are inside. `--cm-head-h` is the offset the second one stops
+   at, so the two can never overlap or leave a gap between them. */
+.cm-grid {
+  --cm-head-h: 40px;
+}
+
+.cm-head {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  height: var(--cm-head-h);
+  justify-content: center;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line-strong);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-4);
+}
+
+.cm-head-name {
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  justify-content: space-between;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.cm-head-total {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Label over total, both centred: the capability's own name and the demand
+   its pool has to absorb read as one unit. */
+.cm-head-cap {
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+}
+
+.cm-head-cap b {
+  font-family: var(--atl-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+}
+
+.cm-head-sum {
+  font-family: var(--atl-mono);
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  color: var(--ink-4);
+  text-transform: none;
+}
+
+.cm-cat-head {
+  grid-column: 1 / -1;
+  position: sticky;
+  top: var(--cm-head-h);
+  z-index: 2;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 14px 6px;
+  background: var(--band-alt);
+  border-bottom: 1px solid var(--line);
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+
+.cm-cat-days {
+  font-family: var(--atl-mono);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  color: var(--ink-4);
+}
+
+/* Reads at a glance in the name column and again in the weights editor, where
+   it labels the row whose number is being changed. */
+.cm-size {
+  flex: none;
+  width: 28px;
+  padding: 1px 0;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  font-family: var(--atl-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-align: center;
+}
+
+.cm-name {
+  position: sticky;
+  left: 0;
+  /* Above the value cells it slides over, below the category band and the
+     column header, which both slide over it. */
+  z-index: 1;
+  gap: 8px;
+  min-height: 38px;
+  padding-left: 10px;
+  justify-content: space-between;
+}
+
+.cm-name-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Sits in the pinned column, so it survives horizontal scroll — the point is
+   that the row's total stays next to the name while the cursor is out in the
+   value cells. Tabular figures so it doesn't jitter as digits change. */
+.cm-row-total {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  font-size: 11.5px;
+  color: var(--ink-2);
+}
+
+.cm-row-total.is-empty {
+  color: var(--ink-4);
+}
+
+/* In the plan but summing to zero — it will quietly never appear on the
+   timeline, which is the one thing here worth interrupting for. */
+.cm-row-total.is-unscheduled {
+  color: var(--warn);
+}
+
+/* No padding: the input fills the cell so the heat wash behind it is a solid
+   block rather than a tile floating in a frame. */
+.cm-input-cell {
+  justify-content: center;
+  padding: 0;
+}
+
+.cm-input-cell.is-flagged {
+  background: var(--warn-wash);
+}
+
+.cm-input-cell.is-disabled {
+  background: var(--band-alt);
+}
+
+.cm-input:disabled {
+  color: var(--ink-4);
+  background: transparent;
+  border-style: dashed;
+  cursor: not-allowed;
+}
+
+.cm-input {
+  width: 100%;
+  text-align: center;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 3px 4px;
+}
+
+/* An unset cell should read as absence, not as the number zero. Most of a
+   seven-column row is empty for most projects, and a wall of identical "0"s
+   buried which capabilities a project actually needs — the shape of the row,
+   which is the thing you scan the matrix for. Empty cells recede; the ones
+   holding a number are the only ones drawn at full strength.
+   Ordering matters: `:focus` below has the same specificity and has to win,
+   so this rule stays above it. */
+.cm-input::placeholder {
+  color: var(--ink-4);
+  opacity: 0.5;
+}
+
+.cm-input:placeholder-shown {
+  border-color: var(--line-soft);
+}
+
+.cm-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* Grid cells only — the settings pane keeps the boxed input above. In here the
+   field has to disappear so the cell's heat reads as one continuous wash;
+   hover and focus bring the frame back where it is actually needed. Ordering
+   matters: these tie with `.cm-input:placeholder-shown` on specificity, so
+   they have to come after it to win. */
+.cm-input-cell .cm-input {
+  height: 100%;
+  border-radius: 0;
+  border-color: transparent;
+  background: transparent;
+  font-family: var(--atl-mono);
+}
+
+.cm-input-cell .cm-input:hover {
+  border-color: var(--line);
+}
+
+.cm-input-cell .cm-input:focus {
+  border-color: var(--accent);
+  background: var(--surface);
+}
+
+/* Sum over the reference it was estimated against, with the proportion drawn
+   underneath. */
+.cm-ref {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cm-ref-nums {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 3px;
+  font-family: var(--atl-mono);
+  font-size: 10.5px;
+}
+
+.cm-ref-nums b {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* A row summing to zero is the one marked state here: it means the project
+   draws from no pool and never reaches the timeline at all. Exceeding the
+   T-shirt size is deliberately *not* marked — the size is a guess made before
+   anyone looked at the detail, and the detail is what gets scheduled. */
+.cm-ref-nums b.is-empty {
+  color: var(--warn);
+}
+
+.cm-ref-of {
+  color: var(--ink-4);
+}
+
+.cm-ref-track {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--band-alt);
+  overflow: hidden;
+}
+
+.cm-ref-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.cm-footer {
+  font-variant-numeric: tabular-nums;
+}
+
+.cm-plan-toggle {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+
+.cm-plan-toggle:hover {
+  color: var(--accent);
+}
+
+/* `.cm-row` is `display: contents` for grid auto-placement, so it has no box
+   of its own to dim — opacity has to land on each cell individually. The
+   name cell (and its toggle) stays undimmed so it's always legible and
+   clickable; only the values that don't currently count are washed out. */
+.cm-row.is-out-of-plan .cm-input-cell,
+.cm-row.is-out-of-plan .cm-ref {
+  opacity: 0.4;
+}
+
+/* The size badge keeps its colour but stops shouting — the row is parked, and
+   a full-strength badge would pull the eye to exactly the rows that don't
+   count. */
+.cm-row.is-out-of-plan .cm-size {
+  opacity: 0.55;
+}
+
+.cm-row.is-out-of-plan .cm-name-text {
+  color: var(--ink-4);
+  text-decoration: line-through;
+  text-decoration-color: var(--line-strong);
+}
+
+.cm-row.is-out-of-plan .cm-plan-toggle {
+  color: var(--ink-4);
+}
+
+.cm-row.is-out-of-plan .cm-plan-toggle:hover {
+  color: var(--warn);
+}
+
+/* Three cards side by side where there's room, stacking as the window
+   narrows. The single 560px column this replaced put "minimalna obsada" below
+   the fold on a laptop, which is where the knob that most changes the
+   schedule should be the last thing to hide. */
+.cm-settings {
+  padding: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 16px;
+  background: var(--bg);
+}
+
+.cm-settings-section {
+  flex: 1 1 330px;
+  min-width: 300px;
+  padding: 14px 16px 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+.cm-settings-section h4 {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.cm-settings-hint {
+  margin: 0 0 14px;
+  font-size: 11.5px;
+  color: var(--ink-3);
+  line-height: 1.5;
+}
+
+.cm-settings-weights {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cm-settings-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cm-settings-row + .cm-settings-row {
+  margin-top: 10px;
+}
+
+.cm-settings-weights .cm-settings-row {
+  margin-top: 0;
+}
+
+.cm-settings-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.cm-settings-row .cm-input {
+  flex: none;
+  width: 76px;
+  height: 24px;
+  text-align: right;
+  font-family: var(--atl-mono);
+  font-size: 11.5px;
+  background: var(--surface-2);
+}
+
+.cm-settings-preview {
+  flex: none;
+  font-family: var(--atl-mono);
+  font-size: 11px;
+  color: var(--ink-4);
+}
+
+/* A hairline under the numbers, so five weights read as a curve rather than
+   five unrelated figures — the scale is convex on purpose. */
+.cm-weight-track {
+  flex: none;
+  width: 96px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--band-alt);
+  overflow: hidden;
+}
+
+.cm-weight-fill {
+  display: block;
+  height: 100%;
+}
+
+/* Trailing prose inside a card, rather than the leading hint the section
+   opens with. */
+.cm-settings-note {
+  margin: 12px 0 0;
+}
+
+/* ── Kompetencje: three numbers per cell ────────────────────────────────
+
+   Effort, its ceiling, and the crew the model actually derived. The third is
+   read-only and the point of the whole stack: seeing `sufit 3` above
+   `załoga 1.25` is the fastest possible explanation of the crew model. Empty
+   cells render only the effort line — 186 of the 329 cells carry nothing, and
+   stacking three rows in each of them would triple the grid for no reason. */
+
+.cm-input-cell {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 0;
+}
+.cm-line {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  height: 22px;
+}
+.cm-line + .cm-line {
+  border-top: 1px solid var(--line-soft);
+}
+.cm-line-k {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding-left: 7px;
+  font-family: var(--atl-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+  user-select: none;
+}
+.cm-input-cell .cm-line .cm-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding-right: 7px;
+  text-align: right;
+}
+
+/* The ceiling is the number that decides duration, so it reads as the loudest
+   thing in the cell — but only where it is actually load-bearing. */
+.cm-line-ceil .cm-input {
+  color: var(--accent);
+  font-weight: 600;
+}
+.cm-line-ceil.is-slack {
+  opacity: 0.5;
+}
+.cm-line-ceil.is-slack:hover,
+.cm-line-ceil.is-slack:focus-within {
+  opacity: 1;
+}
+.cm-line-ceil.is-pace {
+  background: var(--accent-wash);
+}
+.cm-pace {
+  color: var(--accent);
+  font-size: 9px;
+  line-height: 1;
+}
+
+.cm-line-crew {
+  justify-content: space-between;
+  padding-right: 7px;
+  color: var(--ink-3);
+}
+.cm-crew {
+  font-family: var(--atl-mono);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+.cm-burst {
+  color: var(--ink-4);
+  font-size: 10px;
+}
+
+/* ── footer: the consequence, on the screen that causes it ─────────────── */
+
+.cm-horizon {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.cm-horizon b {
+  font-family: var(--atl-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.cm-delta {
+  font-family: var(--atl-mono);
+  font-size: 10.5px;
+  padding: 1px 5px;
+  border-radius: 2px;
+}
+.cm-delta.is-ok {
+  color: var(--ok);
+  background: var(--ok-wash);
+}
+.cm-delta.is-warn {
+  color: var(--warn);
+  background: var(--warn-wash);
+}
+.cm-foot-rule {
+  width: 1px;
+  height: 14px;
+  background: var(--line);
+}
+.cm-pace-tally b {
+  color: var(--accent);
+  font-family: var(--atl-mono);
+}
+.cm-footer b {
+  font-weight: 600;
+}
+.atl-btn.is-on {
+  border-color: var(--accent-line);
+  background: var(--accent-wash);
+  color: var(--accent);
+}
+
+/* ── the proposal drawer ────────────────────────────────────────────────── */
+
+.cp {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  width: 420px;
+  max-width: 100vw;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-left: 1px solid var(--line-strong);
+  box-shadow: var(--shadow);
+}
+.cp-head {
+  flex: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 10px 12px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.cp-head > div {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cp-head b {
+  font-size: 13.5px;
+}
+.cp-sub {
+  font-family: var(--atl-mono);
+  font-size: 10px;
+  color: var(--ink-4);
+}
+.cp-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 16px;
+}
+.cp-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+}
+.cp-intro p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+.cp-muted {
+  color: var(--ink-4) !important;
+}
+.cp-primary {
+  height: 28px;
+  padding: 0 14px;
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+.cp-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.cp-running {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.cp-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--accent-line);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: cp-spin 0.7s linear infinite;
+}
+@keyframes cp-spin {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cp-spinner { animation-duration: 2.4s; }
+}
+
+.cp-summary {
+  flex: none;
+  padding: 12px 16px;
+  background: var(--band);
+  border-bottom: 1px solid var(--line);
+}
+.cp-figures {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+}
+.cp-figures > span {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.cp-figures em {
+  font-family: var(--atl-mono);
+  font-size: 9px;
+  font-style: normal;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+}
+.cp-figures b {
+  font-family: var(--atl-mono);
+  font-size: 19px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.cp-figures b.is-ok { color: var(--ok); }
+.cp-figures b.is-warn { color: var(--warn); }
+.cp-arrow {
+  align-self: center;
+  color: var(--ink-4);
+}
+.cp-delta { margin-left: auto; text-align: right; }
+.cp-delta b { font-size: 15px; }
+.cp-floor {
+  margin: 10px 0 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--ink-3);
+}
+
+.cp-actions-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.cp-link {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-family: var(--atl-mono);
+  font-size: 10px;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+}
+.cp-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cp-move {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface);
+  cursor: pointer;
+}
+.cp-move.is-on {
+  border-color: var(--accent-line);
+  background: var(--accent-wash);
+}
+.cp-move input {
+  margin-top: 2px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.cp-move-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cp-move-top {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.cp-cap {
+  flex: none;
+  font-family: var(--atl-mono);
+  font-size: 9.5px;
+  padding: 1px 5px;
+  border-radius: 2px;
+  border: 1px solid var(--accent-line);
+  color: var(--accent);
+}
+.cp-move-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cp-move-step {
+  flex: none;
+  font-family: var(--atl-mono);
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+.cp-move-step b { color: var(--accent); }
+.cp-move-ask {
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--ink-3);
+}
+.cp-move-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 12px;
+  font-family: var(--atl-mono);
+  font-size: 10px;
+  color: var(--ink-4);
+}
+.cp-move-meta b {
+  color: var(--ok);
+  font-variant-numeric: tabular-nums;
+}
+
+.cp-blocked {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cp-block p {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--ink-3);
+}
+.cp-block b { color: var(--ink); }
+.cp-block-list {
+  margin-top: 3px !important;
+  font-family: var(--atl-mono);
+  font-size: 10px;
+  color: var(--ink-4) !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.cp-note {
+  margin: 14px 0 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--ink-3);
+}
+.cp-none {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+.cp-foot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: var(--surface-2);
+  border-top: 1px solid var(--line);
 }

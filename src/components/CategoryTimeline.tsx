@@ -1,12 +1,8 @@
 import { useMemo } from "react";
 import type { Project } from "../types";
-import {
-  CATEGORY_ORDER,
-  categoryCapacityPerMonth,
-  effortDays,
-  type TeamVariant,
-} from "../lib/estimation";
-import { fmt, solid } from "./timelineChrome";
+import { CATEGORY_ORDER, isIncludedInPlan, type TeamVariant } from "../lib/estimation";
+import { useCapabilitySchedule } from "../hooks/useCapabilitySchedule";
+import { fmt, plCount, solid } from "./timelineChrome";
 
 interface CategoryTimelineProps {
   projects: Project[];
@@ -27,14 +23,37 @@ export function CategoryTimeline({
   hueById,
 }: CategoryTimelineProps) {
   const variant: TeamVariant = variants.find((v) => v.id === variantId) ?? variants[0];
+  const schedule = useCapabilitySchedule(projects, variant.fte);
 
   const { queues, ticks } = useMemo(() => {
+    const byId = new Map(schedule.scheduled.map((sp) => [sp.project.id, sp]));
+
+    // Each category's span is derived from the real, phase-gated schedule —
+    // not a separate per-category queue, since pools are global now.
     const queues = CATEGORY_ORDER.map((name) => {
-      const list = projects.filter((p) => p.category === name);
-      const people = variant.people[name] ?? 0;
-      const capacity = categoryCapacityPerMonth(people);
-      const days = list.reduce((sum, p) => sum + effortDays(p), 0);
-      return { name, list, people, days, months: capacity > 0 ? days / capacity : Infinity };
+      // Segment widths come from the effort the schedule was actually built
+      // from, not from what the T-shirt size implies — otherwise this bar and
+      // the duration beside it would be measuring two different projects.
+      const list = projects
+        .filter((p) => p.category === name && isIncludedInPlan(p))
+        .map((project) => ({ project, days: byId.get(project.id)?.assignedEffortDays ?? 0 }));
+      const days = list.reduce((sum, item) => sum + item.days, 0);
+      let horizon = 0;
+      let anyInfinite = false;
+      let fteMonthsSum = 0;
+      for (const { project } of list) {
+        const sp = byId.get(project.id);
+        if (!sp) continue;
+        fteMonthsSum += sp.fteMonths;
+        if (!Number.isFinite(sp.endMonths)) {
+          anyInfinite = true;
+          continue;
+        }
+        horizon = Math.max(horizon, sp.endMonths);
+      }
+      const months = anyInfinite ? Infinity : horizon;
+      const avgFte = Number.isFinite(months) && months > 0 ? fteMonthsSum / months : 0;
+      return { name, list, days, months, avgFte };
     });
 
     const longest = queues.reduce(
@@ -46,21 +65,21 @@ export function CategoryTimeline({
     const ticks: { pct: number; label: string; atEnd: boolean }[] = [];
     for (let m = 6; m <= horizon; m += 6) {
       const pct = (m / horizon) * 100;
-      ticks.push({ pct, label: `${m}mo`, atEnd: pct >= 99.9 });
+      ticks.push({ pct, label: `${m}mies.`, atEnd: pct >= 99.9 });
     }
 
     return { queues: queues.map((q) => ({ ...q, horizon })), ticks };
-  }, [projects, variant]);
+  }, [projects, schedule]);
 
   return (
     <section className="bv-card">
       <div className="bv-card-head">
         <div className="bv-card-title">
-          <b>Timeline by category</b>
-          <span className="bv-card-sub">one queue per category, end to end</span>
+          <b>Harmonogram według kategorii</b>
+          <span className="bv-card-sub">zakres każdej kategorii, wyliczony z pełnego harmonogramu</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span className="atl-eyebrow">variant</span>
+          <span className="atl-eyebrow">wariant</span>
           <div className="atl-seg">
             {variants.map((v) => (
               <button
@@ -78,9 +97,9 @@ export function CategoryTimeline({
       </div>
 
       <div className="bv-axis">
-        <span style={{ width: LABEL_W, paddingBottom: 6 }}>category</span>
-        <span style={{ width: 78, textAlign: "right", paddingBottom: 6 }}>people</span>
-        <span style={{ width: 60, textAlign: "right", paddingBottom: 6 }}>queue</span>
+        <span style={{ width: LABEL_W, paddingBottom: 6 }}>kategoria</span>
+        <span style={{ width: 78, textAlign: "right", paddingBottom: 6 }}>śr. FTE</span>
+        <span style={{ width: 60, textAlign: "right", paddingBottom: 6 }}>koniec</span>
         <div style={{ position: "relative", flex: 1, height: 30 }}>
           {ticks.map((t) => (
             <div key={t.label}>
@@ -123,10 +142,10 @@ export function CategoryTimeline({
               <span>{queue.name}</span>
             </span>
             <span className="bv-num" style={{ width: 78 }}>
-              {queue.people} {queue.people === 1 ? "person" : "people"}
+              {fmt(queue.avgFte)} FTE
             </span>
             <span className="bv-num" style={{ width: 60 }}>
-              {Number.isFinite(queue.months) ? `${fmt(queue.months)} mo` : "—"}
+              {Number.isFinite(queue.months) ? `${fmt(queue.months)} mies.` : "—"}
             </span>
             <div className="bv-track">
               {ticks.map((t) => (
@@ -143,8 +162,7 @@ export function CategoryTimeline({
                 />
               ))}
               <div className="bv-bar" style={{ width: `${barPct}%` }}>
-                {queue.list.map((project) => {
-                  const days = effortDays(project);
+                {queue.list.map(({ project, days }) => {
                   const share = queue.days ? days / queue.days : 0;
                   return (
                     <div
@@ -159,7 +177,7 @@ export function CategoryTimeline({
                 })}
               </div>
               <span className="bv-tail" style={{ left: `${barPct}%` }}>
-                {queue.list.length} {queue.list.length === 1 ? "project" : "projects"}
+                {plCount(queue.list.length, "projekt", "projekty", "projektów")}
               </span>
             </div>
           </div>

@@ -1,6 +1,9 @@
 import { useState } from "react";
-import { CATEGORY_ORDER, type TeamVariant } from "../lib/estimation";
-import { MAX_PEOPLE_PER_CATEGORY, type TeamVariantsApi } from "../hooks/useTeamVariants";
+import { X } from "lucide-react";
+import { type TeamVariantsApi } from "../hooks/useTeamVariants";
+import { CAPABILITY_LABELS, CAPABILITY_ORDER, type TeamVariant } from "../lib/estimation";
+import { NumberField } from "./NumberField";
+import { fmt } from "./timelineChrome";
 
 interface VariantEditorProps {
   api: TeamVariantsApi;
@@ -11,45 +14,12 @@ interface VariantEditorProps {
   onClose: () => void;
 }
 
-function totalPeople(variant: TeamVariant): number {
-  return CATEGORY_ORDER.reduce((sum, category) => sum + (variant.people[category] ?? 0), 0);
-}
-
-// Digits-only draft kept locally so the field can be emptied while typing
-// without the store snapping it back to "0" mid-edit.
-function PeopleInput({
-  initial,
-  onCommit,
-  label,
-}: {
-  initial: number;
-  onCommit: (value: number) => void;
-  label: string;
-}) {
-  const [draft, setDraft] = useState(String(initial));
-
-  function handleChange(next: string) {
-    if (!/^\d{0,2}$/.test(next)) return;
-    setDraft(next);
-    onCommit(next === "" ? 0 : Number(next));
-  }
-
-  return (
-    <input
-      className="ve-number"
-      type="text"
-      inputMode="numeric"
-      aria-label={label}
-      value={draft}
-      max={MAX_PEOPLE_PER_CATEGORY}
-      onChange={(e) => handleChange(e.target.value)}
-      onBlur={() => draft === "" && setDraft("0")}
-    />
-  );
+function totalFte(variant: TeamVariant): number {
+  return CAPABILITY_ORDER.reduce((sum, capability) => sum + (variant.fte[capability] ?? 0), 0);
 }
 
 export function VariantEditor({ api, activeId, onActivate, onClose }: VariantEditorProps) {
-  const { variants, createVariant, renameVariant, setVariantPeople, deleteVariant } = api;
+  const { variants, createVariant, renameVariant, setVariantFte, copyFromRoster, deleteVariant } = api;
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const selected = variants.find((v) => v.id === activeId) ?? variants[0];
@@ -75,11 +45,11 @@ export function VariantEditor({ api, activeId, onActivate, onClose }: VariantEdi
   return (
     <>
       <div className="ve-backdrop" onClick={onClose} />
-      <div className="ve-dialog" role="dialog" aria-modal="true" aria-label="Edit team variants">
+      <div className="ve-dialog" role="dialog" aria-modal="true" aria-label="Edytuj warianty zespołu">
         <div className="ve-header">
-          <h3>Team variants</h3>
-          <button type="button" className="ve-close" onClick={onClose} aria-label="Close">
-            ✕
+          <h3>Warianty zespołu</h3>
+          <button type="button" className="ve-close" onClick={onClose} aria-label="Zamknij">
+            <X size={14} />
           </button>
         </div>
 
@@ -96,17 +66,17 @@ export function VariantEditor({ api, activeId, onActivate, onClose }: VariantEdi
                 }}
               >
                 <span className="ve-list-name">{v.label}</span>
-                <span className="ve-list-meta">{totalPeople(v)} people</span>
+                <span className="ve-list-meta">{fmt(totalFte(v))} FTE</span>
               </button>
             ))}
             <button type="button" className="ve-add" onClick={handleCreate}>
-              + New variant
+              + Nowy wariant
             </button>
           </div>
 
           <div className="ve-form">
             <label className="ve-field">
-              <span className="ve-field-label">Name</span>
+              <span className="ve-field-label">Nazwa</span>
               <input
                 className="ve-text"
                 type="text"
@@ -115,16 +85,23 @@ export function VariantEditor({ api, activeId, onActivate, onClose }: VariantEdi
               />
             </label>
 
-            <p className="ve-field-label">People per category</p>
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+              <p className="ve-field-label" style={{ margin: 0 }}>
+                FTE na kompetencję
+              </p>
+              <button type="button" className="ve-copy" onClick={() => copyFromRoster(selected.id)}>
+                Skopiuj z obecnego zespołu
+              </button>
+            </div>
             <div className="ve-rows">
-              {CATEGORY_ORDER.map((category) => (
-                <div className="ve-row" key={category}>
-                  <span className="ve-row-label">{category}</span>
-                  <PeopleInput
-                    key={`${selected.id}-${category}`}
-                    initial={selected.people[category] ?? 0}
-                    label={`People in ${category}`}
-                    onCommit={(value) => setVariantPeople(selected.id, category, value)}
+              {CAPABILITY_ORDER.map((capability) => (
+                <div className="ve-row" key={capability}>
+                  <span className="ve-row-label">{CAPABILITY_LABELS[capability]}</span>
+                  <NumberField
+                    key={`${selected.id}-${capability}`}
+                    initial={selected.fte[capability] ?? 0}
+                    label={`FTE dla ${capability}`}
+                    onCommit={(value) => setVariantFte(selected.id, capability, value)}
                   />
                 </div>
               ))}
@@ -136,12 +113,12 @@ export function VariantEditor({ api, activeId, onActivate, onClose }: VariantEdi
                 className={`ve-delete ${confirmingDelete ? "is-confirming" : ""}`}
                 onClick={handleDelete}
                 disabled={!canDelete}
-                title={canDelete ? undefined : "The last variant can't be deleted"}
+                title={canDelete ? undefined : "Nie można usunąć ostatniego wariantu"}
               >
-                {confirmingDelete ? "Confirm delete" : "Delete variant"}
+                {confirmingDelete ? "Potwierdź usunięcie" : "Usuń wariant"}
               </button>
               <button type="button" className="ve-done" onClick={onClose}>
-                Done
+                Gotowe
               </button>
             </div>
           </div>

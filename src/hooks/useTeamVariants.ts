@@ -1,31 +1,28 @@
 import { useCallback } from "react";
-import { CATEGORY_ORDER, type TeamVariant } from "../lib/estimation";
+import { CAPABILITY_ORDER, emptyCapabilityVector, type TeamVariant } from "../lib/estimation";
+import { newId } from "../lib/id";
 import { usePlanner } from "../state/plannerContext";
+import type { Capability } from "../types";
 
-export const MAX_PEOPLE_PER_CATEGORY = 99;
+export const MAX_FTE_PER_CAPABILITY = 99;
 
-export function clampPeople(value: number): number {
+// One decimal place — fine-grained enough for a fraction of a person, coarse
+// enough that the matrix stays readable.
+export function clampFte(value: number): number {
   if (!Number.isFinite(value)) return 0;
-  return Math.min(Math.max(Math.round(value), 0), MAX_PEOPLE_PER_CATEGORY);
+  const rounded = Math.round(value * 10) / 10;
+  return Math.min(Math.max(rounded, 0), MAX_FTE_PER_CAPABILITY);
 }
 
-function newVariantId(): string {
-  const suffix =
-    typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID()
-      : `${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`;
-  return `variant-${suffix}`;
-}
-
-// "Variant 4" for a list that already holds 1..3 — the lowest number that
+// "Wariant 4" for a list that already holds 1..3 — the lowest number that
 // isn't taken, so labels stay tidy after deletes.
 function nextVariantLabel(variants: TeamVariant[]): string {
   const taken = new Set(variants.map((v) => v.label));
   for (let n = 1; n <= variants.length + 1; n += 1) {
-    const label = `Variant ${n}`;
+    const label = `Wariant ${n}`;
     if (!taken.has(label)) return label;
   }
-  return `Variant ${variants.length + 1}`;
+  return `Wariant ${variants.length + 1}`;
 }
 
 export interface TeamVariantsApi {
@@ -33,25 +30,26 @@ export interface TeamVariantsApi {
   /** Copies `seed` (or starts empty) into a new variant and returns its id. */
   createVariant: (seed?: TeamVariant) => string;
   renameVariant: (id: string, label: string) => void;
-  setVariantPeople: (id: string, category: string, people: number) => void;
+  setVariantFte: (id: string, capability: Capability, fte: number) => void;
+  /** Overwrites the variant's capabilities from the live roster. */
+  copyFromRoster: (id: string) => void;
   /** No-op when it would empty the list — there is always at least one variant. */
   deleteVariant: (id: string) => void;
 }
 
 export function useTeamVariants(): TeamVariantsApi {
   const planner = usePlanner();
-  const { variants, addVariant, renameVariant, setVariantPeople, deleteVariant } = planner;
+  const { variants, addVariant, renameVariant, setVariantFte, resetVariantFromRoster, deleteVariant } = planner;
 
   const createVariant = useCallback(
     (seed?: TeamVariant) => {
-      const people: Record<string, number> = {};
-      for (const category of CATEGORY_ORDER) {
-        people[category] = clampPeople(Number(seed?.people[category] ?? 0));
-      }
+      const fte = emptyCapabilityVector();
+      for (const capability of CAPABILITY_ORDER) fte[capability] = clampFte(Number(seed?.fte[capability] ?? 0));
       const variant: TeamVariant = {
-        id: newVariantId(),
+        id: newId("variant"),
         label: nextVariantLabel(variants),
-        people,
+        fte,
+        isRosterDerived: false,
       };
       addVariant(variant);
       return variant.id;
@@ -67,17 +65,17 @@ export function useTeamVariants(): TeamVariantsApi {
     [variants, deleteVariant],
   );
 
-  const setPeople = useCallback(
-    (id: string, category: string, people: number) =>
-      setVariantPeople(id, category, clampPeople(people)),
-    [setVariantPeople],
+  const setFte = useCallback(
+    (id: string, capability: Capability, fte: number) => setVariantFte(id, capability, clampFte(fte)),
+    [setVariantFte],
   );
 
   return {
     variants,
     createVariant,
     renameVariant,
-    setVariantPeople: setPeople,
+    setVariantFte: setFte,
+    copyFromRoster: resetVariantFromRoster,
     deleteVariant: guardedDelete,
   };
 }

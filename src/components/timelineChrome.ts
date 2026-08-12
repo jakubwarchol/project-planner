@@ -1,7 +1,7 @@
 // Shared vocabulary for the two timeline views: the same density and zoom
 // steps, the same colour helpers, the same month formatting.
 
-export const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+export const MON = ["Sty", "Lut", "Mar", "Kwi", "Maj", "Cze", "Lip", "Sie", "Wrz", "Paź", "Lis", "Gru"];
 
 export interface Density {
   id: string;
@@ -31,11 +31,42 @@ export const ZOOMS = [
   { id: "l", label: "L", ppm: 80 },
 ];
 
+// Continuous zoom range for trackpad pinch — presets above are just waypoints in it.
+export const MIN_PPM = 10;
+export const MAX_PPM = 600;
+
+export function clampPpm(ppm: number): number {
+  return Math.min(MAX_PPM, Math.max(MIN_PPM, ppm));
+}
+
+/** Trackpad pinch arrives as a `wheel` event with ctrlKey set (Chrome, Firefox,
+ *  and Safari all report it this way on macOS) — plain two-finger scroll has
+ *  ctrlKey false and must keep scrolling the page, not zooming the chart. */
+export function pinchZoomFactor(event: { ctrlKey: boolean; deltaY: number }): number | null {
+  if (!event.ctrlKey) return null;
+  return Math.exp(-event.deltaY * 0.012);
+}
+
 // One hue per subject — a project in the advanced view, a variant in the
 // comparison view — so colour identifies rather than ranks.
 export const HUES = [
   232, 196, 286, 148, 338, 258, 104, 308, 172, 18, 244, 124, 352, 208, 272, 88, 214, 300, 136,
 ];
+
+// One hue per capability, fixed rather than positional: the roster's split
+// bars have to mean the same colour on every row, and a person's second
+// capability is not "the second colour" — it's BE, or QA, wherever it sits.
+// Spread around the wheel so neighbouring capabilities stay distinguishable
+// at the 3px widths a 0.1 FTE slice gets.
+export const CAPABILITY_HUES: Record<string, number> = {
+  PM: 295,
+  UX: 340,
+  TL: 35,
+  BE: 160,
+  FE: 245,
+  QA: 110,
+  SEC: 70,
+};
 
 // Hue follows a project's identity, not its place in the backlog, so reordering
 // never repaints the chart.
@@ -53,10 +84,18 @@ export const soft = (h: number) => `oklch(var(--bar-soft-l) var(--bar-soft-c) ${
 export const envc = (h: number) => `oklch(var(--bar-env-l) var(--bar-env-c) ${h})`;
 export const wash = (h: number, a: number) => `oklch(var(--bar-l) var(--bar-c) ${h} / ${a})`;
 
-/** Labels are often already called "Variant N" — don't say it twice. */
+/** Labels are often already called "Variant N" / "Wariant N" — don't say it twice. */
 export function variantCaption(label: string): string {
   const lower = label.toLowerCase();
-  return /variant/i.test(label) ? lower : `variant ${lower}`;
+  return /variant|wariant/i.test(label) ? lower : `wariant ${lower}`;
+}
+
+/** Polish plural rule: 1 → one, 2-4 (not 12-14) → few, else → many. */
+export function plCount(n: number, one: string, few: string, many: string): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  const word = n === 1 ? one : mod10 >= 2 && mod10 <= 4 && !(mod100 >= 12 && mod100 <= 14) ? few : many;
+  return `${n} ${word}`;
 }
 
 export function fmt(n: number): string {
@@ -76,12 +115,53 @@ export interface AxisMarks {
   gridlines: number[];
 }
 
+// Below this, months are too narrow on screen for individual days to read —
+// stick to the month/quarter grid. Above it, switch to day ticks.
+const DAY_ZOOM_THRESHOLD = 130;
+
+function daysInMonth(year: number, monthIndex0: number): number {
+  return new Date(year, monthIndex0 + 1, 0).getDate();
+}
+
+// Each month still occupies exactly `ppm` px (matching the uniform-month model
+// bars are positioned in) — days subdivide that width proportionally, so a
+// 28-day February is neither longer nor shorter on screen than a 31-day month.
+function buildDayAxis(months: number, ppm: number, startYear: number, startMonth: number): AxisMarks {
+  const ticks: AxisMarks["ticks"] = [];
+  const tickLabels: AxisMarks["tickLabels"] = [];
+  const gridlines: number[] = [];
+
+  for (let i = 0; i < months; i++) {
+    const abs = startMonth + i;
+    const m = ((abs % 12) + 12) % 12;
+    const y = startYear + Math.floor(abs / 12);
+    const dim = daysInMonth(y, m);
+    const monthX = i * ppm;
+    const dayWidth = ppm / dim;
+    const labelStep = dayWidth >= 30 ? 1 : dayWidth >= 16 ? 2 : dayWidth >= 8 ? 5 : 10;
+
+    ticks.push({ x: monthX, h: 12, color: "var(--line-strong)" });
+    tickLabels.push({ x: monthX, label: `${MON[m]} ${String(y).slice(2)}`, color: "var(--ink-2)" });
+    gridlines.push(monthX);
+
+    for (let d = 1 + labelStep; d < dim; d += labelStep) {
+      const x = monthX + ((d - 1) / dim) * ppm;
+      ticks.push({ x, h: 6, color: "var(--line)" });
+      tickLabels.push({ x, label: String(d), color: "var(--ink-4)" });
+    }
+  }
+  gridlines.push(months * ppm);
+  return { ticks, tickLabels, gridlines };
+}
+
 export function buildAxis(
   months: number,
   ppm: number,
   startYear: number,
   startMonth: number,
 ): AxisMarks {
+  if (ppm >= DAY_ZOOM_THRESHOLD) return buildDayAxis(months, ppm, startYear, startMonth);
+
   const ticks: AxisMarks["ticks"] = [];
   const tickLabels: AxisMarks["tickLabels"] = [];
   const gridlines: number[] = [];
