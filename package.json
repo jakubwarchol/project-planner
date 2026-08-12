@@ -32,5 +32,10 @@
     "typescript": "~6.0.2",
     "vite": "^8.2.0",
     "vitest": "^3.2.4"
+  },
+  "allowScripts": {
+    "better-sqlite3@13.0.3": true,
+    "esbuild@0.28.1": true,
+    "fsevents@2.3.3": true
   }
 }

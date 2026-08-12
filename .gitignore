@@ -24,4 +24,4 @@ dist-ssr
 *.sw?
 
 # Local database — the server's state, never committed
-data/
+/data/

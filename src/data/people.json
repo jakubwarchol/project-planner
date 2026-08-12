@@ -1,0 +1,16 @@
+[
+  { "id": "person-01", "name": "Martin Dzięcielski", "teamId": "ZWO", "capability": "BE", "availability": 1 },
+  { "id": "person-02", "name": "Mateusz Bałaciński", "teamId": "ZWO", "capability": "SEC", "availability": 1 },
+  { "id": "person-03", "name": "Mikołaj Zuchowicz", "teamId": "ZWO", "capability": "TL", "availability": 1 },
+  { "id": "person-04", "name": "Przemysław Tyszer", "teamId": "ZWO", "capability": "BE", "availability": 1 },
+  { "id": "person-05", "name": "Tadeusz Miecierz", "teamId": "ZWO", "capability": "QA", "availability": 1 },
+  { "id": "person-06", "name": "Tomasz Krzyżanowski", "teamId": "ZWO", "capability": "PM", "availability": 1 },
+  { "id": "person-07", "name": "Dagmara Szulik", "teamId": "ZWO", "capability": "FE", "availability": 1 },
+  { "id": "person-08", "name": "Jakub Parol", "teamId": "ZWO", "capability": "FE", "availability": 1 },
+  { "id": "person-09", "name": "Jakub Stelmasiak", "teamId": "ZP", "capability": "PM", "availability": 1 },
+  { "id": "person-10", "name": "Kamil Baranowski", "teamId": "ZP", "capability": "PM", "availability": 1 },
+  { "id": "person-11", "name": "Agnieszka Nieć", "teamId": "ZP", "capability": "PM", "availability": 1 },
+  { "id": "person-12", "name": "Natalia Kilian", "teamId": "ZP", "capability": "UX", "availability": 1 },
+  { "id": "person-13", "name": "Jakub Warchoł", "teamId": "Inni", "capability": "PM", "availability": 1 },
+  { "id": "person-14", "name": "Magdalena Nowowiejska", "teamId": "Inni", "capability": "PM", "availability": 1 }
+]
