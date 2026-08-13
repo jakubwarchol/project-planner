@@ -194,6 +194,12 @@ eksperyment potrzebował drobniej.
   zmiana składu / zaparkowanie projektu / nowy realny termin), każda z ceną
   z diffu dwóch symulacji. Ma sens dopiero, gdy istnieją pojedyncze
   optymalizatory, z których czerpie.
+- **Ostrzeżenie o produktywności obsady** — plan liczy stawkę ze *średniej*
+  produktywności puli, a Obsada przypisuje *konkretnych* ludzi. Gdy ważony
+  focus przypisanych odbiega istotnie od średniej użytej w planie, pokrycie
+  formalnie się zgadza, ale czas trwania jest dla tego projektu zbyt
+  optymistyczny (lub pesymistyczny). Sygnał w Obsadzie, bez ruszania dat —
+  zgodnie z zasadą, że przypisania nie wracają do schedulera.
 
 ## Sugerowana kolejność wdrażania
 
