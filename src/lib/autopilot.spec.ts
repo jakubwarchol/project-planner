@@ -7,7 +7,6 @@ import {
   emptyCapabilityVector,
 } from "./estimation";
 import {
-  capacityFloor,
   createSearch,
   searchResult,
   stepSearch,
@@ -202,27 +201,3 @@ describe("applying accepted moves", () => {
   });
 });
 
-describe("capacityFloor", () => {
-  it("names the capability that no ceiling can rescue", () => {
-    // 240 UX days against one person beats 240 BE days against four.
-    const cells = cellsFor({
-      p1: { BE: { days: 240, maxFte: 9 }, UX: { days: 240, maxFte: 9 } },
-    });
-    const floor = capacityFloor(cells, ["p1"], pools({ BE: 4, UX: 1 }), RATE);
-    expect(floor.capability).toBe("UX");
-    expect(floor.months).toBeCloseTo(240 / EDPM, 6);
-  });
-
-  it("is a floor: the real plan never finishes sooner", () => {
-    const cells = cellsFor({ p1: { BE: { days: 120, maxFte: 4 } } });
-    const i = input([project("p1")], { BE: 4 });
-    const floor = capacityFloor(cells, ["p1"], i.pools, RATE);
-    expect(horizonOf(cells, i)).toBeGreaterThanOrEqual(floor.months - 1e-9);
-  });
-
-  it("ignores capabilities nobody asked for", () => {
-    const cells = cellsFor({ p1: { BE: { days: 120, maxFte: 2 } } });
-    const floor = capacityFloor(cells, ["p1"], pools({ BE: 2, SEC: 0 }), RATE);
-    expect(floor.capability).toBe("BE");
-  });
-});

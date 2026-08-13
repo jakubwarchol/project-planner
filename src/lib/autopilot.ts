@@ -19,7 +19,7 @@
  */
 import { CAPABILITY_ORDER } from "./estimation";
 import { simulateCapabilitySchedule, type SimulateInput } from "./scheduling";
-import type { Capability, CapabilityCell, CapabilityVector } from "../types";
+import type { Capability, CapabilityCell } from "../types";
 
 const EPS = 1e-6;
 
@@ -287,32 +287,4 @@ export function stepSearch(state: SearchState): boolean {
     }
   }
   return false;
-}
-
-/**
- * The shortest schedule the pools could ever produce, ignoring every ceiling,
- * every phase gate and all contention: each capability's whole effort divided
- * by its own pool running flat out. Nothing about ceilings can beat it, which
- * makes it the honest backstop under any proposal — "we got you to 10.5, and
- * 8.2 is a wall made of one UX person".
- */
-export function capacityFloor(
-  cells: Cells,
-  projectIds: string[],
-  pools: CapabilityVector,
-  effectiveDaysPerMonth: CapabilityVector,
-): { months: number; capability: Capability | null } {
-  let months = 0;
-  let capability: Capability | null = null;
-  for (const k of CAPABILITY_ORDER) {
-    const days = projectIds.reduce((sum, id) => sum + (cells[id]?.[k]?.days ?? 0), 0);
-    if (days <= EPS) continue;
-    const rate = pools[k] * effectiveDaysPerMonth[k];
-    const need = rate > EPS ? days / rate : Infinity;
-    if (need > months) {
-      months = need;
-      capability = k;
-    }
-  }
-  return { months, capability };
 }

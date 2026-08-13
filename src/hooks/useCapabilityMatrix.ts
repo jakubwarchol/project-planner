@@ -15,12 +15,21 @@ export function useCapabilityMatrix(): CapabilityMatrixApi {
   // Assigning days to a cell that had none, while its ceiling is still 0,
   // defaults that ceiling to 1.0 — a demanded capability with no ceiling
   // cannot be crewed at all, and the scheduler would condemn the whole
-  // project rather than let it sit there waiting to be discovered.
+  // project rather than let it sit there waiting to be discovered. A patch
+  // that sets the ceiling itself is exempt: restoring a parked cell writes
+  // both numbers at once, and second-guessing its explicit maxFte would
+  // silently rewrite what is being restored.
   const setCell = useCallback(
     (projectId: string, capability: Capability, patch: Partial<CapabilityCell>) => {
       const current = cells[projectId]?.[capability] ?? { days: 0, maxFte: 0 };
       const next = { ...current, ...patch };
-      if (patch.days != null && current.days <= 0 && next.days > 0 && current.maxFte <= 0) {
+      if (
+        patch.days != null &&
+        patch.maxFte == null &&
+        current.days <= 0 &&
+        next.days > 0 &&
+        current.maxFte <= 0
+      ) {
         next.maxFte = 1;
       }
       setProjectCell(projectId, capability, next);

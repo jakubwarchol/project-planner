@@ -1,0 +1,1354 @@
+/* Kompetencje v2 — the matrix as a sticky table: name column pinned left,
+   capability header pinned top, category bands pinned under it. Tokens are
+   scoped to the screen's own root so the design's palette never leaks into
+   the shells around it; the dark set is stated twice — once for the system
+   preference, once for the explicit toggle — because the toggle must win in
+   both directions. */
+
+.cm2 {
+  --bg: #e4e9ee;
+  --surface: #ffffff;
+  --surface-2: #eef2f6;
+  --band: #f7f9fb;
+  --line: #c6cfd8;
+  --line-soft: #d7dee5;
+  --line-strong: #8e9aa5;
+  --ink: #0a0e12;
+  --ink-2: #2c363e;
+  --ink-3: #3e4952;
+  --ink-4: #5a656e;
+  --accent: #4b3691;
+  --accent-line: #7c66cd;
+  --accent-wash: rgba(75, 54, 145, 0.12);
+  --warn: #8a3f10;
+  --warn-wash: rgba(138, 63, 16, 0.14);
+  --ok: #27603c;
+  --ok-wash: rgba(39, 96, 60, 0.14);
+  --track: #d5dde4;
+  --row-hover: #f1f5f9;
+  --off: #e7ebef;
+  --size-s: #3f8a55;
+  --size-m: #a98615;
+  --size-l: #c26f1c;
+  --size-xl: #c44a22;
+  --size-xxl: #bb2436;
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  .cm2:not([data-theme="light"]) {
+    --bg: #0b0f12;
+    --surface: #12171c;
+    --surface-2: #1a2128;
+    --band: #151b21;
+    --line: #333d47;
+    --line-soft: #28313a;
+    --line-strong: #5a6773;
+    --ink: #f4f8fb;
+    --ink-2: #c6d2dc;
+    --ink-3: #b0bec9;
+    --ink-4: #93a1ad;
+    --accent: #bcaaff;
+    --accent-line: #7a68cf;
+    --accent-wash: rgba(188, 170, 255, 0.16);
+    --warn: #f5ab74;
+    --warn-wash: rgba(245, 171, 116, 0.16);
+    --ok: #7fd0a1;
+    --ok-wash: rgba(127, 208, 161, 0.16);
+    --track: #242d35;
+    --row-hover: #1a232a;
+    --off: #1b2228;
+    --size-s: #6cc186;
+    --size-m: #e6c64c;
+    --size-l: #f0a453;
+    --size-xl: #f47b52;
+    --size-xxl: #f56576;
+  }
+}
+
+.cm2[data-theme="dark"] {
+  --bg: #0b0f12;
+  --surface: #12171c;
+  --surface-2: #1a2128;
+  --band: #151b21;
+  --line: #333d47;
+  --line-soft: #28313a;
+  --line-strong: #5a6773;
+  --ink: #f4f8fb;
+  --ink-2: #c6d2dc;
+  --ink-3: #b0bec9;
+  --ink-4: #93a1ad;
+  --accent: #bcaaff;
+  --accent-line: #7a68cf;
+  --accent-wash: rgba(188, 170, 255, 0.16);
+  --warn: #f5ab74;
+  --warn-wash: rgba(245, 171, 116, 0.16);
+  --ok: #7fd0a1;
+  --ok-wash: rgba(127, 208, 161, 0.16);
+  --track: #242d35;
+  --row-hover: #1a232a;
+  --off: #1b2228;
+  --size-s: #6cc186;
+  --size-m: #e6c64c;
+  --size-l: #f0a453;
+  --size-xl: #f47b52;
+  --size-xxl: #f56576;
+}
+
+.cm2 {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  min-height: 640px;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+.cm2 button,
+.cm2 input {
+  font-family: inherit;
+}
+
+.cm2 input[type="text"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* ── header ─────────────────────────────────────────────────────────────── */
+
+.cm2-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 14px;
+  height: 56px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+
+.cm2-title {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.cm2-title b {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.cm2-chip {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid var(--accent-line);
+  border-radius: 2px;
+  padding: 1px 4px;
+}
+
+.cm2-chip.is-muted {
+  color: var(--ink-3);
+  border-color: var(--line);
+}
+
+.cm2-spacer {
+  flex: 1;
+  min-width: 8px;
+}
+
+.cm2-tools {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* The crew toggle is a labelled switch, not a button that looks pressed —
+   showing the model's answer is a reading mode, not an action. */
+.cm2-crew-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 26px;
+  padding: 0 4px 0 2px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 11.5px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.cm2-crew-toggle.is-on {
+  color: var(--ink);
+}
+
+.cm2-switch {
+  position: relative;
+  flex: none;
+  width: 26px;
+  height: 15px;
+  border-radius: 8px;
+  background: var(--track);
+  border: 1px solid var(--line-strong);
+  transition: background 0.12s;
+}
+
+.cm2-crew-toggle.is-on .cm2-switch {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.cm2-switch-knob {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--ink-4);
+  transition: left 0.12s;
+}
+
+.cm2-crew-toggle.is-on .cm2-switch-knob {
+  left: 13px;
+  background: #fff;
+}
+
+.cm2-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 11.5px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.cm2-btn.is-on {
+  border-color: var(--accent-line);
+  background: var(--accent-wash);
+  color: var(--accent);
+}
+
+.cm2-spark {
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.cm2-seg {
+  display: flex;
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.cm2-seg button {
+  border: 0;
+  border-left: 1px solid var(--line-strong);
+  padding: 0 12px;
+  height: 26px;
+  font-size: 11.5px;
+  background: transparent;
+  color: var(--ink-2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.cm2-seg button:first-child {
+  border-left: 0;
+}
+
+.cm2-seg button.is-active {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.cm2-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.cm2-icon-btn.is-on {
+  border-color: var(--accent-line);
+  background: var(--accent-wash);
+  color: var(--accent);
+}
+
+.cm2-rule {
+  width: 1px;
+  height: 22px;
+  background: var(--line);
+}
+
+.cm2-close {
+  border: 0;
+  background: transparent;
+  color: var(--ink-2);
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.cm2-close:hover {
+  color: var(--ink);
+}
+
+/* ── the grid ───────────────────────────────────────────────────────────── */
+
+.cm2-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: var(--surface);
+}
+
+.cm2-canvas {
+  min-width: 1280px;
+  display: flex;
+  flex-direction: column;
+}
+
+.cm2-cols {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: stretch;
+  height: 44px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.cm2-cols-name {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 340px;
+  flex: none;
+  padding: 0 14px 0 34px;
+  background: var(--surface-2);
+  border-right: 1px solid var(--line);
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.cm2-col {
+  width: 118px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 9px;
+  border-left: 1px solid var(--line-soft);
+}
+
+.cm2-col-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.cm2-col-cap {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+}
+
+.cm2-col-months {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  color: var(--ink-3);
+}
+
+.cm2-col-months.is-wall {
+  color: var(--warn);
+}
+
+/* Months of pure demand against the pool, drawn against the heaviest
+   capability — the wall. The plan cannot beat the longest bar here no matter
+   what the ceilings say, which is why the bar wears warn when it is the one. */
+.cm2-pressure {
+  height: 2px;
+  background: var(--track);
+  border-radius: 1px;
+  overflow: hidden;
+}
+
+.cm2-pressure-fill {
+  height: 100%;
+  background: var(--accent-line);
+}
+
+.cm2-pressure-fill.is-wall {
+  background: var(--warn);
+}
+
+.cm2-cols-ref {
+  width: 104px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 14px;
+  border-left: 1px solid var(--line);
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.cm2-band {
+  position: sticky;
+  top: 44px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 30px;
+  padding: 0 14px;
+  background: var(--band);
+  border-bottom: 1px solid var(--line-soft);
+  border-top: 1px solid var(--line-soft);
+}
+
+.cm2-band b {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+}
+
+.cm2-band-meta {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  color: var(--ink-3);
+}
+
+/* ── rows ───────────────────────────────────────────────────────────────── */
+
+.cm2-row {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--line);
+  border-top: 2px solid transparent;
+}
+
+.cm2-row:hover,
+.cm2-row:hover .cm2-name {
+  background: var(--row-hover);
+}
+
+.cm2-row.is-drop-target {
+  border-top-color: var(--accent);
+}
+
+.cm2-row.is-out-of-plan {
+  opacity: 0.5;
+}
+
+.cm2-name {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 340px;
+  flex: none;
+  padding: 0 14px 0 4px;
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+}
+
+.cm2-grip {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 22px;
+  color: var(--ink-4);
+  cursor: grab;
+}
+
+.cm2-plan-toggle {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.cm2-plan-toggle:hover {
+  background: var(--accent-wash);
+}
+
+.cm2-row.is-out-of-plan .cm2-plan-toggle {
+  color: var(--ink-4);
+}
+
+/* The pill's colour comes in per row as `--pill`, so one rule serves the
+   whole S–XXL ramp. */
+.cm2-size {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 48px;
+  height: 19px;
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--pill) 15%, transparent);
+  color: var(--pill);
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.cm2-size-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--pill);
+}
+
+.cm2-name-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── cells ──────────────────────────────────────────────────────────────── */
+
+.cm2-cell {
+  width: 118px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  border-left: 1px solid var(--line-soft);
+}
+
+.cm2-cell.is-flagged {
+  background: var(--warn-wash);
+}
+
+.cm2-cell.is-off {
+  background: var(--off);
+}
+
+.cm2-cell-off {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--ink-4);
+}
+
+.cm2-days {
+  display: flex;
+  align-items: center;
+  height: 24px;
+}
+
+.cm2-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 13px;
+  text-align: right;
+  padding: 0 8px 0 6px;
+}
+
+.cm2-input:hover {
+  border-color: var(--line);
+}
+
+.cm2-input:focus {
+  outline: none;
+  border-color: var(--accent-line);
+  background: var(--surface);
+}
+
+.cm2-input::placeholder {
+  color: var(--ink-4);
+  opacity: 1;
+}
+
+/* The max band keeps its slot even when hidden (visibility, not display), so
+   dni / max / załoga sit on one baseline grid across all seven columns. */
+.cm2-ceil {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.cm2-ceil.is-hidden {
+  visibility: hidden;
+}
+
+.cm2-ceil.is-pace {
+  background: var(--accent-wash);
+}
+
+.cm2-ceil-k {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding-left: 7px;
+  color: var(--ink-3);
+}
+
+.cm2-ceil.is-pace .cm2-ceil-k {
+  color: var(--accent);
+}
+
+.cm2-ceil.is-flagged .cm2-ceil-k {
+  color: var(--warn);
+}
+
+.cm2-ceil-k span {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  user-select: none;
+}
+
+.cm2-ceil .cm2-input {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  padding: 0 8px 0 0;
+}
+
+.cm2-ceil.is-flagged .cm2-input {
+  color: var(--warn);
+}
+
+.cm2-crew {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  height: 24px;
+  padding-right: 8px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.cm2-crew-k {
+  flex: none;
+  padding-left: 7px;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+  user-select: none;
+}
+
+.cm2-crew-v {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.cm2-crew-v.is-pace {
+  color: var(--ink);
+}
+
+/* ── suma / ref ─────────────────────────────────────────────────────────── */
+
+.cm2-ref {
+  width: 104px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 14px;
+  border-left: 1px solid var(--line);
+}
+
+.cm2-ref-nums {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 3px;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.cm2-ref-nums b {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.cm2-ref-nums b.is-warn {
+  color: var(--warn);
+}
+
+.cm2-ref-of {
+  color: var(--ink-3);
+}
+
+.cm2-ref-track {
+  height: 3px;
+  background: var(--track);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.cm2-ref-fill {
+  height: 100%;
+  background: var(--accent);
+}
+
+/* ── settings ───────────────────────────────────────────────────────────── */
+
+.cm2-settings {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 16px;
+  background: var(--bg);
+}
+
+.cm2-card {
+  flex: 1 1 330px;
+  min-width: 300px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 14px 16px 16px;
+}
+
+.cm2-card h4 {
+  margin: 0 0 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.cm2-card-hint {
+  margin: 0 0 12px;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+
+.cm2-card-hint b,
+.cm2-card-note b {
+  color: var(--ink);
+}
+
+.cm2-card-note {
+  margin: 10px 0 0;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+
+.cm2-card-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-top: 1px solid var(--line-soft);
+}
+
+.cm2-card-label {
+  flex: 1;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.cm2-field {
+  width: 76px;
+  height: 24px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--surface-2);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  text-align: right;
+  padding: 0 6px;
+}
+
+.cm2-field:focus {
+  outline: none;
+  border-color: var(--accent-line);
+  background: var(--surface);
+}
+
+.cm2-card-preview {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+/* The scale is convex by design — each tier costs disproportionately more
+   than the last — and five numbers in a column hide that. The bars show it. */
+.cm2-weight-track {
+  width: 96px;
+  height: 4px;
+  background: var(--track);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.cm2-weight-fill {
+  height: 100%;
+  background: var(--pill);
+}
+
+/* ── footer ─────────────────────────────────────────────────────────────── */
+
+.cm2-footer {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 34px;
+  padding: 0 16px;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--ink-2);
+}
+
+.cm2-foot-group {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.cm2-eyebrow {
+  font-size: 9.5px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.cm2-horizon {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.cm2-horizon b {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.cm2-delta {
+  padding: 1px 5px;
+  border-radius: 2px;
+}
+
+.cm2-delta.is-ok {
+  color: var(--ok);
+  background: var(--ok-wash);
+}
+
+.cm2-delta.is-warn {
+  color: var(--warn);
+  background: var(--warn-wash);
+}
+
+.cm2-foot-rule {
+  width: 1px;
+  height: 14px;
+  background: var(--line);
+}
+
+.cm2-tally {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cm2-tally-item {
+  display: flex;
+  align-items: baseline;
+  gap: 1px;
+}
+
+.cm2-tally-item b {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.cm2-tally-item span {
+  color: var(--ink-3);
+}
+
+/* ── drawers: help and proposals ────────────────────────────────────────── */
+
+.cm2-drawer {
+  position: absolute;
+  top: 56px;
+  right: 0;
+  bottom: 34px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-left: 1px solid var(--line);
+  box-shadow: -14px 0 28px rgba(0, 0, 0, 0.12);
+}
+
+.cm2-drawer.is-help {
+  width: 380px;
+  z-index: 6;
+  box-shadow: -14px 0 28px rgba(0, 0, 0, 0.14);
+}
+
+.cm2-drawer.is-proposals {
+  width: 352px;
+}
+
+.cm2-drawer-head {
+  flex: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.cm2-drawer-title {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cm2-drawer-title b {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.cm2-drawer-sub {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+}
+
+.cm2-drawer-close {
+  border: 0;
+  background: transparent;
+  color: var(--ink-2);
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.cm2-drawer-close:hover {
+  color: var(--ink);
+}
+
+.cm2-drawer-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.cm2-help-body {
+  padding: 4px 14px 16px;
+}
+
+.cm2-help-item {
+  display: flex;
+  gap: 11px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.cm2-help-token {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 24px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--surface-2);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.cm2-help-token.is-accent {
+  color: var(--accent);
+}
+
+.cm2-help-token.is-warn {
+  color: var(--warn);
+}
+
+.cm2-help-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.cm2-help-text b {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.cm2-help-text span,
+.cm2-help-outro {
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+
+.cm2-help-outro {
+  margin: 14px 0 0;
+}
+
+.cm2-help-outro b {
+  color: var(--ink);
+}
+
+/* proposals */
+
+.cm2-prop-summary {
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.cm2-prop-fig {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.cm2-prop-fig.is-end {
+  align-items: flex-end;
+}
+
+.cm2-prop-fig b {
+  font-family: var(--mono);
+  font-size: 15px;
+  white-space: nowrap;
+  color: var(--ink);
+}
+
+.cm2-prop-fig b.is-ok {
+  color: var(--ok);
+}
+
+.cm2-prop-arrow {
+  flex: none;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  color: var(--ink-3);
+}
+
+.cm2-prop-intro {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cm2-prop-intro p {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+
+.cm2-prop-intro .is-muted {
+  color: var(--ink-3);
+}
+
+.cm2-spinner {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border: 2px solid var(--accent-line);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: cm2-spin 0.7s linear infinite;
+}
+
+@keyframes cm2-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.cm2-prop-list {
+  padding: 6px 0;
+}
+
+.cm2-prop-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.cm2-prop-row.is-on {
+  background: var(--accent-wash);
+}
+
+.cm2-prop-check {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  background: transparent;
+  color: #fff;
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.cm2-prop-row.is-on .cm2-prop-check {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.cm2-prop-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cm2-prop-name {
+  font-size: 12px;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cm2-prop-move {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--ink-2);
+}
+
+.cm2-prop-move b {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.cm2-prop-note {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-3);
+}
+
+.cm2-prop-gain {
+  flex: none;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--ok);
+}
+
+.cm2-prop-none {
+  margin: 0;
+  padding: 14px;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+
+.cm2-prop-section {
+  padding: 12px 14px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cm2-blocked-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 0;
+  border-top: 1px solid var(--line-soft);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--ink-3);
+}
+
+.cm2-blocked-row b {
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.cm2-blocked-row span {
+  flex: 1;
+}
+
+.cm2-prop-footnote {
+  margin: 0;
+  padding: 8px 14px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-3);
+}
+
+.cm2-prop-stale {
+  margin: 0;
+  padding: 8px 14px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--warn);
+  background: var(--warn-wash);
+}
+
+.cm2-prop-foot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--line);
+}
+
+.cm2-prop-count {
+  flex: 1;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-3);
+}
+
+.cm2-ghost {
+  height: 26px;
+  padding: 0 11px;
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.cm2-primary {
+  height: 26px;
+  padding: 0 12px;
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cm2-primary:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
