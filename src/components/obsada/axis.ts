@@ -69,9 +69,13 @@ export function isoWeek(d: Date): number {
   return 1 + Math.round(((t.getTime() - first.getTime()) / 86_400_000 - 3 + ((first.getUTCDay() + 6) % 7)) / 7);
 }
 
+/** The grid's day-index as a local Date — all of the axis's own stepping goes
+ *  through this one bridge into `days.ts` instead of raw Date arithmetic. */
+const dateAt = (originIso: string, index: number): Date => dateOfIso(isoOfIndex(originIso, index));
+
 /** "12 sie" — the form every tooltip in obsada uses. */
 export function shortDay(originIso: string, index: number): string {
-  const d = dateOfIso(isoOfIndex(originIso, index));
+  const d = dateAt(originIso, index);
   return `${d.getDate()} ${MON_SHORT[d.getMonth()]}`;
 }
 
@@ -87,16 +91,12 @@ interface MonthRun {
 }
 
 function monthRunsIn(window: StaffingWindow): MonthRun[] {
-  const origin = dateOfIso(window.originIso);
   const runs: MonthRun[] = [];
   let i = 0;
   while (i < window.windowDays) {
-    const t = new Date(origin.getFullYear(), origin.getMonth(), origin.getDate() + i);
+    const t = dateAt(window.originIso, i);
     let e = i + 1;
-    while (
-      e < window.windowDays &&
-      new Date(origin.getFullYear(), origin.getMonth(), origin.getDate() + e).getMonth() === t.getMonth()
-    ) {
+    while (e < window.windowDays && dateAt(window.originIso, e).getMonth() === t.getMonth()) {
       e++;
     }
     runs.push({ a: i, b: e, date: t });
@@ -108,8 +108,7 @@ function monthRunsIn(window: StaffingWindow): MonthRun[] {
 export function buildObsadaAxis(window: StaffingWindow, unit: ObsadaUnit): ObsadaAxis {
   const pxPerDay = pxPerDayFor(unit);
   const X = (d: number) => Math.round(d * pxPerDay);
-  const origin = dateOfIso(window.originIso);
-  const dateOf = (i: number) => new Date(origin.getFullYear(), origin.getMonth(), origin.getDate() + i);
+  const dateOf = (i: number) => dateAt(window.originIso, i);
   const N = window.windowDays;
 
   const cells: AxisCell[] = [];

@@ -69,8 +69,6 @@ export function createHttpRepository(baseUrl: string): PlannerRepository {
         `/api/projects/${encodeURIComponent(projectId)}/cells/${encodeURIComponent(capability)}`,
         cell,
       ),
-    setProjectRow: (projectId, row) =>
-      send("PUT", `/api/projects/${encodeURIComponent(projectId)}/cells`, { row }),
 
     updateEstimationSettings: (fields) => send("PATCH", "/api/estimation-settings", fields),
     setEstimateWeight: (estimate, weight) =>

@@ -36,7 +36,6 @@ export type PlannerAction =
   | { type: "updateLeave"; id: string; fields: Omit<Leave, "id"> }
   | { type: "removeLeave"; id: string }
   | { type: "setProjectCell"; projectId: string; capability: Capability; cell: CapabilityCell }
-  | { type: "setProjectRow"; projectId: string; row: Record<Capability, CapabilityCell> }
   | { type: "updateEstimationSettings"; fields: Omit<EstimationSettings, "estimateValues"> }
   | { type: "setEstimateWeight"; estimate: Estimate; weight: number };
 
@@ -221,9 +220,6 @@ function applyAction(state: PlannerSnapshot, action: PlannerAction): PlannerSnap
           [action.projectId]: { ...state.cells[action.projectId], [action.capability]: action.cell },
         },
       };
-
-    case "setProjectRow":
-      return { ...state, cells: { ...state.cells, [action.projectId]: action.row } };
 
     case "updateEstimationSettings":
       return { ...state, settings: { ...state.settings, ...action.fields } };

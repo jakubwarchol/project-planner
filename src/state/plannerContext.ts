@@ -41,7 +41,6 @@ export interface PlannerContextValue extends PlannerSnapshot {
   removeLeave: (id: string) => void;
 
   setProjectCell: (projectId: string, capability: Capability, cell: CapabilityCell) => void;
-  setProjectRow: (projectId: string, row: Record<Capability, CapabilityCell>) => void;
 
   updateEstimationSettings: (fields: Omit<EstimationSettings, "estimateValues">) => void;
   setEstimateWeight: (estimate: Estimate, weight: number) => void;

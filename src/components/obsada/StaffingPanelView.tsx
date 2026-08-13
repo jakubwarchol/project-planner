@@ -24,7 +24,7 @@ import {
 } from "../../lib/staffing";
 import type { Capability, Person, StaffingAssignment } from "../../types";
 import type { StaffingApi } from "../../hooks/useStaffing";
-import { plCount } from "../timelineChrome";
+import { fmt2, plCount } from "../timelineChrome";
 import { longDay, shortDay } from "./axis";
 import type { ObsadaContext } from "./ObsadaWorkspace";
 
@@ -32,10 +32,6 @@ const EPS = 1e-6;
 const MAX_ASSIGN_FTE = 2;
 const MIN_ASSIGN_FTE = 0.1;
 
-function fmt2(n: number): string {
-  const r = Math.round(n * 100) / 100;
-  return Math.abs(r - Math.round(r)) < 0.005 ? String(Math.round(r)) : r.toFixed(2);
-}
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
 const clampFte = (n: number) => Math.min(MAX_ASSIGN_FTE, Math.max(MIN_ASSIGN_FTE, round1(n)));

@@ -25,7 +25,7 @@ const EPS = 1e-6;
 
 /** Half a person. Smaller steps just find the same cells more slowly, and a
  *  ceiling is a judgement about headcount — tenths would be false precision. */
-export const CEILING_STEP = 0.5;
+const CEILING_STEP = 0.5;
 
 /** A runaway search is worse than a short one: every extra move is another
  *  claim a human has to check, and the interesting ones are always first. */
@@ -129,8 +129,8 @@ function endOf(
 }
 
 /**
- * Greedy hill-climb: raise whichever pace-setter buys the most, re-simulate,
- * repeat until nothing helps.
+ * Greedy hill-climb, one round at a time: raise whichever pace-setter buys the
+ * most, re-simulate, repeat until nothing helps.
  *
  * Greedy rather than exhaustive on purpose. The moves interact — raising one
  * ceiling changes which cell is even a candidate next round — so there is no
@@ -139,22 +139,12 @@ function endOf(
  * open, so it queues longer than it builds faster. Those moves come back
  * positive and are reported as `worse` rather than silently skipped, because
  * "adding people here would delay the plan" is worth reading.
- */
-export function proposeCeilings(cells: Cells, input: AutopilotInput): AutopilotResult {
-  const search = createSearch(cells, input);
-  while (!stepSearch(search)) {
-    /* run to completion */
-  }
-  return searchResult(search);
-}
-
-/**
- * The same search, one round at a time.
  *
- * A full proposal is a couple of hundred simulations and takes seconds on a
- * real backlog — long enough that running it in one synchronous burst freezes
- * the tab so hard the spinner never paints. Splitting it per round lets the
- * caller hand the frame back between rounds and show honest progress.
+ * Split per round rather than run in one call: a full proposal is a couple of
+ * hundred simulations and takes seconds on a real backlog — long enough that
+ * one synchronous burst freezes the tab so hard the spinner never paints.
+ * Stepping lets the caller hand the frame back between rounds and show honest
+ * progress.
  */
 export interface SearchState {
   input: AutopilotInput;
@@ -297,18 +287,6 @@ export function stepSearch(state: SearchState): boolean {
     }
   }
   return false;
-}
-
-/** The cells that result from accepting some subset of a proposal — the panel
- *  previews with this, and applies the same thing on confirm, so what you saw
- *  is exactly what gets written. */
-export function applyMoves(cells: Cells, moves: CeilingMove[]): Cells {
-  const next = cloneCells(cells);
-  for (const move of moves) {
-    const cell = next[move.projectId]?.[move.capability];
-    if (cell) cell.maxFte = move.to;
-  }
-  return next;
 }
 
 /**

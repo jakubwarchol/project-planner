@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { CAPABILITY_ORDER } from "./estimation";
-import { DEFAULT_MIN_CREW_FTE, crewSize, deriveCrew } from "./crew";
+import { DEFAULT_MIN_CREW_FTE, deriveCrew } from "./crew";
+
+const totalFte = (fte: number[]) => fte.reduce((total, f) => total + f, 0);
 import type { Capability } from "../types";
 
 const K = Object.fromEntries(CAPABILITY_ORDER.map((c, i) => [c, i])) as Record<Capability, number>;
@@ -36,7 +38,7 @@ describe("deriveCrew", () => {
     expect(crew.fte[K.QA]).toBeCloseTo(1 / 3, 10);
     expect(crew.fte[K.SEC]).toBeCloseTo(8 / 30, 10);
     expect(crew.fte[K.TL]).toBeCloseTo(8 / 30, 10);
-    expect(crewSize(crew)).toBeCloseTo(4.5, 10);
+    expect(totalFte(crew.fte)).toBeCloseTo(4.5, 10);
   });
 
   it("conserves the work — de-rating changes the shape, never the total", () => {
@@ -112,7 +114,7 @@ describe("deriveCrew — edges", () => {
     const crew = deriveCrew(vec({}), vec({}, 1), RATE, DEFAULT_MIN_CREW_FTE);
     expect(crew.months).toBe(0);
     expect(crew.paceIndex).toBe(-1);
-    expect(crewSize(crew)).toBe(0);
+    expect(totalFte(crew.fte)).toBe(0);
   });
 
   it("leaves work with no ceiling uncrewed, for the scheduler to condemn", () => {

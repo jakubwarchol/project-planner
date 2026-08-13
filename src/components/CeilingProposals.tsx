@@ -16,14 +16,10 @@ import type { BlockedCandidate, CeilingMove } from "../lib/autopilot";
 import type { CeilingProposalApi } from "../hooks/useCeilingProposal";
 import { CAPABILITY_LABELS } from "../lib/estimation";
 import type { Project } from "../types";
-import { fmt, plCount } from "./timelineChrome";
+import { fmt, fmt2, plCount } from "./timelineChrome";
 
 const EPS = 1e-6;
 
-function fmt2(n: number): string {
-  const r = Math.round(n * 100) / 100;
-  return Math.abs(r - Math.round(r)) < 0.005 ? String(Math.round(r)) : r.toFixed(2);
-}
 
 const signed = (n: number) => `${n >= 0 ? "+" : "−"}${fmt(Math.abs(n))}`;
 

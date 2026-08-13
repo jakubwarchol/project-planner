@@ -67,8 +67,6 @@ export interface PlannerRepository {
 
   /** Both columns in one write; the grid always knows both values. */
   setProjectCell(projectId: string, capability: Capability, cell: CapabilityCell): Promise<void>;
-  /** Whole row, one transaction — used by paste. */
-  setProjectRow(projectId: string, row: Record<Capability, CapabilityCell>): Promise<void>;
 
   /** Everything but the per-size weights. */
   updateEstimationSettings(fields: Omit<EstimationSettings, "estimateValues">): Promise<void>;

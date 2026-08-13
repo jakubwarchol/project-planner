@@ -12,7 +12,7 @@ import { useMemo, useState } from "react";
 import { CATEGORY_ORDER } from "../../lib/estimation";
 import { buildProjectStaffingRows, type ProjectStaffingRow } from "../../lib/staffing";
 import type { Project } from "../../types";
-import { CAPABILITY_HUES, plCount, solid } from "../timelineChrome";
+import { CAPABILITY_HUES, fmt2, plCount, solid } from "../timelineChrome";
 import { AxisBackdrop, AxisHeader, ObsadaToolbar } from "./ObsadaGrid";
 import { AXIS_H, useTimelineScroll } from "./timelineScroll";
 import { buildObsadaAxis, focusLabel, shortDay, stepTo } from "./axis";
@@ -27,10 +27,6 @@ const GROUP_H = 24;
 const CHIP_H = 15;
 const EPS = 1e-6;
 
-function fmt2(n: number): string {
-  const r = Math.round(n * 100) / 100;
-  return Math.abs(r - Math.round(r)) < 0.005 ? String(Math.round(r)) : r.toFixed(2);
-}
 
 function bandHeight(row: ProjectStaffingRow): number {
   const lanes = Math.max(1, row.laneCount + (row.anyGap ? 1 : 0));

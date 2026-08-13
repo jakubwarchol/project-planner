@@ -474,16 +474,6 @@ export function setProjectCell(
   upsertCell(db, projectId, capability, cell);
 }
 
-export function setProjectRow(
-  db: Db,
-  projectId: string,
-  row: Record<Capability, CapabilityCell>,
-): void {
-  db.transaction(() => {
-    for (const capability of CAPABILITY_ORDER) upsertCell(db, projectId, capability, row[capability]);
-  })();
-}
-
 export function updateEstimationSettings(
   db: Db,
   fields: Omit<EstimationSettings, "estimateValues">,

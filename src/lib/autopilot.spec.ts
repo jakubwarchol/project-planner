@@ -6,7 +6,15 @@ import {
   DEFAULT_PERSON_FOCUS_FACTOR,
   emptyCapabilityVector,
 } from "./estimation";
-import { applyMoves, capacityFloor, proposeCeilings, type AutopilotInput } from "./autopilot";
+import {
+  capacityFloor,
+  createSearch,
+  searchResult,
+  stepSearch,
+  type AutopilotInput,
+  type AutopilotResult,
+  type CeilingMove,
+} from "./autopilot";
 import { simulateCapabilitySchedule } from "./scheduling";
 
 const EDPM = DEFAULT_ESTIMATION_SETTINGS.workingDaysPerMonth * DEFAULT_PERSON_FOCUS_FACTOR;
@@ -55,13 +63,33 @@ function input(projects: Project[], p: Partial<CapabilityVector>): AutopilotInpu
 const horizonOf = (cells: ReturnType<typeof cellsFor>, i: AutopilotInput) =>
   simulateCapabilitySchedule({ ...i, cells }).horizonMonths;
 
-describe("proposeCeilings", () => {
+// The production path, exactly as the UI drives it: useCeilingProposal steps
+// createSearch/stepSearch to completion, and CapabilityMatrix applies each
+// accepted move as an absolute maxFte write to its cell.
+function runSearch(cells: ReturnType<typeof cellsFor>, i: AutopilotInput): AutopilotResult {
+  const search = createSearch(cells, i);
+  while (!stepSearch(search)) {
+    /* run to completion */
+  }
+  return searchResult(search);
+}
+
+function applied(
+  cells: ReturnType<typeof cellsFor>,
+  moves: CeilingMove[],
+): ReturnType<typeof cellsFor> {
+  const next = structuredClone(cells);
+  for (const move of moves) next[move.projectId][move.capability].maxFte = move.to;
+  return next;
+}
+
+describe("the ceiling search", () => {
   it("raises the one ceiling holding a project back", () => {
     // BE is pinned at 1 with plenty of pool behind it — the textbook case.
     const cells = cellsFor({ p1: { BE: { days: 120, maxFte: 1 } } });
     const i = input([project("p1")], { BE: 4 });
 
-    const result = proposeCeilings(cells, i);
+    const result = runSearch(cells, i);
     expect(result.moves.length).toBeGreaterThan(0);
     expect(result.moves[0]).toMatchObject({ projectId: "p1", capability: "BE", from: 1, to: 1.5 });
     expect(result.horizonAfter).toBeLessThan(result.horizonBefore);
@@ -71,7 +99,7 @@ describe("proposeCeilings", () => {
     // One backend in the whole company: the ceiling is already everything
     // there is, so the only honest answer is "nobody to add".
     const cells = cellsFor({ p1: { BE: { days: 120, maxFte: 1 } } });
-    const result = proposeCeilings(cells, input([project("p1")], { BE: 1 }));
+    const result = runSearch(cells, input([project("p1")], { BE: 1 }));
 
     expect(result.moves).toEqual([]);
     expect(result.blocked).toHaveLength(1);
@@ -84,7 +112,7 @@ describe("proposeCeilings", () => {
     const cells = cellsFor({
       p1: { BE: { days: 120, maxFte: 1 }, QA: { days: 4, maxFte: 1 } },
     });
-    const result = proposeCeilings(cells, input([project("p1")], { BE: 4, QA: 4 }));
+    const result = runSearch(cells, input([project("p1")], { BE: 4, QA: 4 }));
 
     expect(result.moves.length).toBeGreaterThan(0);
     expect(result.moves.every((m) => m.capability !== "QA")).toBe(true);
@@ -96,7 +124,7 @@ describe("proposeCeilings", () => {
     const cells = cellsFor({
       p1: { BE: { days: 120, maxFte: 1 }, UX: { days: 60, maxFte: 1 } },
     });
-    const result = proposeCeilings(cells, input([project("p1")], { BE: 4, UX: 1 }));
+    const result = runSearch(cells, input([project("p1")], { BE: 4, UX: 1 }));
 
     expect(result.moves.every((m) => m.capability === "BE")).toBe(true);
     expect(result.blocked.some((b) => b.capability === "UX" && b.reason === "pool")).toBe(true);
@@ -110,7 +138,7 @@ describe("proposeCeilings", () => {
       p1: { BE: { days: 60, maxFte: 1 } },
       p2: { BE: { days: 60, maxFte: 1 } },
     });
-    const result = proposeCeilings(cells, input([project("p1"), project("p2")], { BE: 1.5 }));
+    const result = runSearch(cells, input([project("p1"), project("p2")], { BE: 1.5 }));
     const noted = [...result.moves.map((m) => m.capability), ...result.blocked.map((b) => b.capability)];
     expect(noted).toContain("BE");
     // Whatever it decided, it never left the plan worse than it found it.
@@ -120,14 +148,14 @@ describe("proposeCeilings", () => {
   it("never returns a proposal that makes a project impossible", () => {
     const cells = cellsFor({ p1: { BE: { days: 120, maxFte: 1 } } });
     const i = input([project("p1")], { BE: 4 });
-    const result = proposeCeilings(cells, i);
-    const after = simulateCapabilitySchedule({ ...i, cells: applyMoves(cells, result.moves) });
+    const result = runSearch(cells, i);
+    const after = simulateCapabilitySchedule({ ...i, cells: applied(cells, result.moves) });
     expect(after.scheduled.some((p) => p.isImpossible)).toBe(false);
   });
 
   it("finds nothing to do when there is nothing to do", () => {
     const cells = cellsFor({ p1: { BE: { days: 0, maxFte: 0 } } });
-    const result = proposeCeilings(cells, input([project("p1")], { BE: 4 }));
+    const result = runSearch(cells, input([project("p1")], { BE: 4 }));
     expect(result.moves).toEqual([]);
     expect(result.horizonBefore).toBe(result.horizonAfter);
   });
@@ -137,25 +165,26 @@ describe("proposeCeilings", () => {
       p1: { BE: { days: 200, maxFte: 1 } },
       p2: { FE: { days: 200, maxFte: 1 } },
     });
-    const result = proposeCeilings(cells, input([project("p1"), project("p2")], { BE: 9, FE: 9 }));
+    const result = runSearch(cells, input([project("p1"), project("p2")], { BE: 9, FE: 9 }));
     expect(result.moves.length).toBeLessThanOrEqual(12);
     expect(result.simulations).toBeLessThan(400);
   });
 });
 
-describe("applyMoves", () => {
+describe("applying accepted moves", () => {
   it("produces exactly the plan the proposal previewed", () => {
     const cells = cellsFor({ p1: { BE: { days: 120, maxFte: 1 } } });
     const i = input([project("p1")], { BE: 4 });
-    const result = proposeCeilings(cells, i);
+    const result = runSearch(cells, i);
 
-    expect(horizonOf(applyMoves(cells, result.moves), i)).toBeCloseTo(result.horizonAfter, 6);
+    expect(horizonOf(applied(cells, result.moves), i)).toBeCloseTo(result.horizonAfter, 6);
   });
 
-  it("leaves the original cells untouched", () => {
+  it("never mutates the cells the search was given", () => {
     const cells = cellsFor({ p1: { BE: { days: 120, maxFte: 1 } } });
     const i = input([project("p1")], { BE: 4 });
-    applyMoves(cells, proposeCeilings(cells, i).moves);
+    const result = runSearch(cells, i);
+    expect(result.moves.length).toBeGreaterThan(0);
     expect(cells.p1.BE.maxFte).toBe(1);
   });
 
@@ -165,11 +194,11 @@ describe("applyMoves", () => {
       p2: { FE: { days: 120, maxFte: 1 } },
     });
     const i = input([project("p1"), project("p2")], { BE: 4, FE: 4 });
-    const result = proposeCeilings(cells, i);
+    const result = runSearch(cells, i);
     const first = result.moves.filter((m) => m.projectId === "p1");
-    const applied = applyMoves(cells, first);
-    expect(applied.p2.FE.maxFte).toBe(1);
-    expect(applied.p1.BE.maxFte).toBeGreaterThan(1);
+    const next = applied(cells, first);
+    expect(next.p2.FE.maxFte).toBe(1);
+    expect(next.p1.BE.maxFte).toBeGreaterThan(1);
   });
 });
 

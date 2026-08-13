@@ -24,7 +24,6 @@
  * floor and finish early, which is what actually happens.
  */
 import { CAPABILITY_ORDER, DEFAULT_MIN_CREW_FTE } from "./estimation";
-import type { CapabilityVector } from "../types";
 
 const EPS = 1e-9;
 
@@ -105,18 +104,4 @@ export function deriveCrew(
   }
 
   return { months, fte, paceIndex, burstIndexes };
-}
-
-/** Total headcount on the phase — an output, never an input. */
-export function crewSize(crew: DerivedCrew): number {
-  return crew.fte.reduce((total, f) => total + f, 0);
-}
-
-/** Vector form, for the UI. The scheduler uses the array form directly. */
-export function crewVector(crew: DerivedCrew): CapabilityVector {
-  const out = {} as CapabilityVector;
-  CAPABILITY_ORDER.forEach((capability, k) => {
-    out[capability] = crew.fte[k];
-  });
-  return out;
 }

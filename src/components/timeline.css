@@ -2076,6 +2076,45 @@
   overflow-wrap: anywhere;
 }
 
+/* A repository write failed after its optimistic update — the screen may be
+   ahead of the database. Rendered by the provider, outside the themed .bv/.atl
+   shells, so it colours itself with light-dark() off the OS scheme instead of
+   the shell tokens, and sits above every overlay: a failed save outranks
+   whatever is open. */
+.sync-banner {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(92vw, 600px);
+  padding: 10px 12px 10px 14px;
+  border-radius: 10px;
+  font: 13px/1.45 ui-sans-serif, system-ui, sans-serif;
+  color: light-dark(#5b3313, #f3ddc9);
+  background: light-dark(#fdf1e4, #35271a);
+  border: 1px solid light-dark(#dcb489, #6b4b2a);
+  box-shadow: rgba(0, 0, 0, 0.18) 0 10px 24px -6px, rgba(0, 0, 0, 0.12) 0 4px 8px -4px;
+}
+
+.sync-banner-close {
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: inherit;
+  font-size: 13px;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+
+.sync-banner-close:hover {
+  background: light-dark(rgba(0, 0, 0, 0.07), rgba(255, 255, 255, 0.09));
+}
+
 /* Team / roster view */
 
 /* The header pools are the roster's summary — one strip of joined cells rather

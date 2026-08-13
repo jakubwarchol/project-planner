@@ -123,9 +123,6 @@ route("DELETE", "/api/leaves/:id", (p) => repo.deleteLeave(db, p.id));
 route("PUT", "/api/projects/:id/cells/:capability", (p, body: CapabilityCell) =>
   repo.setProjectCell(db, p.id, p.capability as Capability, body),
 );
-route("PUT", "/api/projects/:id/cells", (p, body: { row: Record<Capability, CapabilityCell> }) =>
-  repo.setProjectRow(db, p.id, body.row),
-);
 
 route("PATCH", "/api/estimation-settings", (_p, body: Omit<EstimationSettings, "estimateValues">) =>
   repo.updateEstimationSettings(db, body),

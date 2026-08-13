@@ -20,7 +20,7 @@ import {
 } from "../../lib/staffing";
 import type { Capability, Leave, Person, Team } from "../../types";
 import type { StaffingApi } from "../../hooks/useStaffing";
-import { fmt, plCount, solid } from "../timelineChrome";
+import { fmt, fmt2, plCount, solid } from "../timelineChrome";
 import { AxisBackdrop, AxisHeader, ObsadaToolbar } from "./ObsadaGrid";
 import { AXIS_H, useTimelineScroll } from "./timelineScroll";
 import { buildObsadaAxis, focusLabel, shortDay, stepTo } from "./axis";
@@ -36,10 +36,6 @@ const EPS = 1e-6;
 
 type Grouping = "team" | "capability";
 
-function fmt2(n: number): string {
-  const r = Math.round(n * 100) / 100;
-  return Math.abs(r - Math.round(r)) < 0.005 ? String(Math.round(r)) : r.toFixed(2);
-}
 
 const pct = (n: number) => `${Math.round(n * 100)}%`;
 

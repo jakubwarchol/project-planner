@@ -103,6 +103,13 @@ export function fmt(n: number): string {
   return Math.abs(r - Math.round(r)) < 0.05 ? String(Math.round(r)) : r.toFixed(1);
 }
 
+/** Two decimals where they carry information, none where they don't — FTE
+ *  figures read as "1.5" or "2", never "2.00". */
+export function fmt2(n: number): string {
+  const r = Math.round(n * 100) / 100;
+  return Math.abs(r - Math.round(r)) < 0.005 ? String(Math.round(r)) : r.toFixed(2);
+}
+
 /** "Mar 27" for a whole number of months after `startMonth` of `startYear`. */
 export function monthLabel(startYear: number, startMonth: number, offsetMonths: number): string {
   const abs = startMonth + Math.round(offsetMonths);

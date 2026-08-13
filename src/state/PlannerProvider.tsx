@@ -15,17 +15,25 @@ import type {
 import { PlannerContext, type PlannerContextValue } from "./plannerContext";
 import { plannerReducer } from "./plannerReducer";
 
-// Writes are optimistic: state moves first so the UI stays instant, and the
-// repository call follows. Once that call is a network round trip a failure
-// needs surfacing to the user — for now it lands in the console.
-function report(action: string) {
-  return (error: unknown) => console.error(`[planner] ${action} failed`, error);
-}
-
 export function PlannerProvider({ children }: { children: ReactNode }) {
   const repo = useMemo(() => getRepository(), []);
   const [snapshot, dispatch] = useReducer(plannerReducer, null);
   const [error, setError] = useState<string | null>(null);
+  const [failedWrites, setFailedWrites] = useState(0);
+
+  // Writes are optimistic: state moves first so the UI stays instant, and the
+  // repository call follows. A failure means the screen is now showing
+  // something the database never accepted, so it is raised as a banner rather
+  // than left in the console — the only honest remedy is a reload. Stable
+  // identity on purpose, so listing it in every mutation callback's deps
+  // never re-creates them.
+  const report = useCallback(
+    (action: string) => (err: unknown) => {
+      console.error(`[planner] ${action} failed`, err);
+      setFailedWrites((n) => n + 1);
+    },
+    [],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -48,7 +56,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "setProjects", projects });
       repo.setProjectOrder(projects.map((p) => p.id)).catch(report("reorder"));
     },
-    [repo],
+    [repo, report],
   );
 
   const resetProjectOrder = useCallback(() => {
@@ -57,14 +65,14 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       .then(() => repo.loadSnapshot())
       .then((data) => dispatch({ type: "snapshot", snapshot: data }))
       .catch(report("reset order"));
-  }, [repo]);
+  }, [repo, report]);
 
   const addProject = useCallback(
     (project: Project) => {
       dispatch({ type: "addProject", project, cells: emptyCapabilityCells() });
       repo.createProject(project).catch(report("add project"));
     },
-    [repo],
+    [repo, report],
   );
 
   const updateProject = useCallback(
@@ -72,7 +80,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "updateProject", id, fields });
       repo.updateProject(id, fields).catch(report("update project"));
     },
-    [repo],
+    [repo, report],
   );
 
   const removeProject = useCallback(
@@ -80,7 +88,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "removeProject", id });
       repo.deleteProject(id).catch(report("delete project"));
     },
-    [repo],
+    [repo, report],
   );
 
   const setBlockedBy = useCallback(
@@ -88,7 +96,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "setBlockedBy", id, blockedById });
       repo.setBlockedBy(id, blockedById).catch(report("set blocked by"));
     },
-    [repo],
+    [repo, report],
   );
 
   const setIncludeInPlan = useCallback(
@@ -96,7 +104,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "setIncludeInPlan", id, includeInPlan });
       repo.setIncludeInPlan(id, includeInPlan).catch(report("set include in plan"));
     },
-    [repo],
+    [repo, report],
   );
 
   const addVariant = useCallback(
@@ -104,7 +112,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "addVariant", variant });
       repo.createVariant(variant).catch(report("create variant"));
     },
-    [repo],
+    [repo, report],
   );
 
   const renameVariant = useCallback(
@@ -112,7 +120,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "renameVariant", id, label });
       repo.renameVariant(id, label).catch(report("rename variant"));
     },
-    [repo],
+    [repo, report],
   );
 
   const setVariantFte = useCallback(
@@ -120,7 +128,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "setVariantFte", id, capability, fte });
       repo.setVariantFte(id, capability, fte).catch(report("set variant fte"));
     },
-    [repo],
+    [repo, report],
   );
 
   const resetVariantFromRoster = useCallback(
@@ -128,7 +136,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "resetVariantFromRoster", id });
       repo.resetVariantFromRoster(id).catch(report("reset variant from roster"));
     },
-    [repo],
+    [repo, report],
   );
 
   const deleteVariant = useCallback(
@@ -136,7 +144,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "deleteVariant", id });
       repo.deleteVariant(id).catch(report("delete variant"));
     },
-    [repo],
+    [repo, report],
   );
 
   const addPerson = useCallback(
@@ -144,7 +152,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "addPerson", person });
       repo.createPerson(person).catch(report("add person"));
     },
-    [repo],
+    [repo, report],
   );
 
   const updatePerson = useCallback(
@@ -152,7 +160,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "updatePerson", id, fields });
       repo.updatePerson(id, fields).catch(report("update person"));
     },
-    [repo],
+    [repo, report],
   );
 
   const removePerson = useCallback(
@@ -160,7 +168,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "removePerson", id });
       repo.deletePerson(id).catch(report("remove person"));
     },
-    [repo],
+    [repo, report],
   );
 
   const setPersonAllocation = useCallback(
@@ -168,7 +176,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "setPersonAllocation", id, capability, fte });
       repo.setPersonAllocation(id, capability, fte).catch(report("set person allocation"));
     },
-    [repo],
+    [repo, report],
   );
 
   const addAssignment = useCallback(
@@ -176,7 +184,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "addAssignment", assignment });
       repo.createAssignment(assignment).catch(report("add assignment"));
     },
-    [repo],
+    [repo, report],
   );
 
   const updateAssignment = useCallback(
@@ -184,7 +192,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "updateAssignment", id, fields });
       repo.updateAssignment(id, fields).catch(report("update assignment"));
     },
-    [repo],
+    [repo, report],
   );
 
   const removeAssignment = useCallback(
@@ -192,7 +200,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "removeAssignment", id });
       repo.deleteAssignment(id).catch(report("remove assignment"));
     },
-    [repo],
+    [repo, report],
   );
 
   const addLeave = useCallback(
@@ -200,7 +208,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "addLeave", leave });
       repo.createLeave(leave).catch(report("add leave"));
     },
-    [repo],
+    [repo, report],
   );
 
   const updateLeave = useCallback(
@@ -208,7 +216,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "updateLeave", id, fields });
       repo.updateLeave(id, fields).catch(report("update leave"));
     },
-    [repo],
+    [repo, report],
   );
 
   const removeLeave = useCallback(
@@ -216,7 +224,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "removeLeave", id });
       repo.deleteLeave(id).catch(report("remove leave"));
     },
-    [repo],
+    [repo, report],
   );
 
   const setProjectCell = useCallback(
@@ -224,15 +232,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "setProjectCell", projectId, capability, cell });
       repo.setProjectCell(projectId, capability, cell).catch(report("set project cell"));
     },
-    [repo],
-  );
-
-  const setProjectRow = useCallback(
-    (projectId: string, row: Record<Capability, CapabilityCell>) => {
-      dispatch({ type: "setProjectRow", projectId, row });
-      repo.setProjectRow(projectId, row).catch(report("set project row"));
-    },
-    [repo],
+    [repo, report],
   );
 
   const updateEstimationSettings = useCallback(
@@ -240,7 +240,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "updateEstimationSettings", fields });
       repo.updateEstimationSettings(fields).catch(report("update estimation settings"));
     },
-    [repo],
+    [repo, report],
   );
 
   const setEstimateWeight = useCallback(
@@ -248,7 +248,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "setEstimateWeight", estimate, weight });
       repo.setEstimateWeight(estimate, weight).catch(report("set estimate weight"));
     },
-    [repo],
+    [repo, report],
   );
 
   const value = useMemo<PlannerContextValue | null>(() => {
@@ -278,7 +278,6 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       updateLeave,
       removeLeave,
       setProjectCell,
-      setProjectRow,
       updateEstimationSettings,
       setEstimateWeight,
       exportDatabase: repo.exportDatabase ? () => repo.exportDatabase!() : null,
@@ -309,7 +308,6 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
     updateLeave,
     removeLeave,
     setProjectCell,
-    setProjectRow,
     updateEstimationSettings,
     setEstimateWeight,
   ]);
@@ -327,5 +325,26 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
   // has to deal with a half-loaded store.
   if (!value) return <div className="db-splash">Wczytywanie…</div>;
 
-  return <PlannerContext.Provider value={value}>{children}</PlannerContext.Provider>;
+  return (
+    <PlannerContext.Provider value={value}>
+      {children}
+      {failedWrites > 0 && (
+        <div className="sync-banner" role="alert">
+          <span>
+            Nie udało się zapisać zmian na serwerze
+            {failedWrites > 1 ? ` (nieudane zapisy: ${failedWrites})` : ""} — widok może różnić
+            się od zapisanych danych. Odśwież stronę.
+          </span>
+          <button
+            type="button"
+            className="sync-banner-close"
+            onClick={() => setFailedWrites(0)}
+            aria-label="Zamknij"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+    </PlannerContext.Provider>
+  );
 }
