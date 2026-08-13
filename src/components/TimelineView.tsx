@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { X } from "lucide-react";
 import { useTeamVariants } from "../hooks/useTeamVariants";
 import { earliestStartOffsets } from "../hooks/useCapabilitySchedule";
 import {
@@ -35,7 +34,6 @@ import "./timeline.css";
 interface TimelineViewProps {
   projects: Project[];
   theme: "auto" | "light" | "dark";
-  onClose: () => void;
 }
 
 const WHOLE_PLAN = "Cała praca";
@@ -56,7 +54,7 @@ interface CompareBand {
   isWholePlan: boolean;
 }
 
-export function TimelineView({ projects, theme, onClose }: TimelineViewProps) {
+export function TimelineView({ projects, theme }: TimelineViewProps) {
   // The one screen where variants apply — every other view plans on the live
   // roster, so the comparison owns its selection instead of the app shell.
   const variantsApi = useTeamVariants();
@@ -81,13 +79,11 @@ export function TimelineView({ projects, theme, onClose }: TimelineViewProps) {
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
-      if (event.key !== "Escape") return;
-      if (editorOpen) setEditorOpen(false);
-      else onClose();
+      if (event.key === "Escape" && editorOpen) setEditorOpen(false);
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [editorOpen, onClose]);
+  }, [editorOpen]);
 
   const hueByVariant = useMemo(() => {
     const map: Record<string, number> = {};
@@ -383,17 +379,13 @@ export function TimelineView({ projects, theme, onClose }: TimelineViewProps) {
   const planDelta = deltaAgainstBaseline(fastestPlan, bands[0]);
 
   return (
-    <div
-      className="atl"
-      data-theme={theme === "auto" ? undefined : theme}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Porównanie pojemności"
-    >
+    <div className="atl" data-theme={theme === "auto" ? undefined : theme}>
       <header className="atl-header" style={{ height: D.hdr }}>
         <div className="atl-title">
-          <b>Harmonogram pojemności</b>
-          <span className="atl-chip">porównanie</span>
+          <b>Symulacje</b>
+          <span className="atl-chip">
+            {plCount(variants.length, "wariant", "warianty", "wariantów")}
+          </span>
         </div>
 
         <div className="atl-group is-divided">
@@ -456,10 +448,6 @@ export function TimelineView({ projects, theme, onClose }: TimelineViewProps) {
             onClick={() => setKeyOpen((v) => !v)}
           >
             Legenda
-          </button>
-          <div className="atl-rule" />
-          <button type="button" className="atl-close" onClick={onClose} aria-label="Zamknij harmonogram">
-            <X size={16} />
           </button>
         </div>
       </header>
@@ -547,7 +535,7 @@ export function TimelineView({ projects, theme, onClose }: TimelineViewProps) {
           <span style={{ color: "var(--accent)" }}>wariant bazowy jest najszybszy</span>
         )}
         <span style={{ flex: 1 }} />
-        <span>kliknij wiersz, aby zmienić punkt odniesienia · esc zamyka warianty · potem widok</span>
+        <span>kliknij wiersz, aby zmienić punkt odniesienia · esc zamyka warianty</span>
       </footer>
 
       {editorOpen && (

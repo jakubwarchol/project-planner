@@ -487,7 +487,7 @@ export function ProjectList({ projects, onReorder, showEstimates, onToggleEstima
                 className="bv-size"
                 title={
                   showEstimates
-                    ? `${project.estimate} — orientacyjnie ${referenceEffortDays(project, settings)} dni pracy (harmonogram liczy z macierzy kompetencji)`
+                    ? `${project.estimate} — orientacyjnie ${referenceEffortDays(project, settings)} dni pracy (harmonogram liczy z wycen)`
                     : undefined
                 }
               >

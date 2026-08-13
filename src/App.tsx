@@ -4,9 +4,10 @@ import { CapabilityMatrix } from "./components/CapabilityMatrix";
 import { CategoryTimeline } from "./components/CategoryTimeline";
 import { ProjectList } from "./components/ProjectList";
 import { ObsadaWorkspace } from "./components/obsada/ObsadaWorkspace";
+import { NavRail } from "./components/NavRail";
 import { TeamView } from "./components/TeamView";
 import { TimelineView } from "./components/TimelineView";
-import { buildHueMap, fmt, plCount } from "./components/timelineChrome";
+import { MOD, SCREENS, buildHueMap, fmt, plCount, type Screen } from "./components/timelineChrome";
 import { useCapabilitySchedule } from "./hooks/useCapabilitySchedule";
 import { useOrderedProjects } from "./hooks/useOrderedProjects";
 import { useRoster } from "./hooks/useRoster";
@@ -15,7 +16,6 @@ import type { CapabilityVector, Project } from "./types";
 import "./components/timeline.css";
 
 export type ThemeChoice = "auto" | "light" | "dark";
-type Screen = "backlog" | "team" | "matrix" | "compare" | "advanced" | "obsada";
 
 /** The footer's one derived number. Its own component so the schedule is only
  *  simulated while the footer line is actually on screen — a hook cannot be
@@ -41,47 +41,37 @@ function App() {
     };
   }, [screen]);
 
+  // ⌘1…⌘6 follow the rail's tab order — the same six places the rail shows.
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
+      const n = Number(event.key);
+      if (!Number.isInteger(n) || n < 1 || n > SCREENS.length) return;
+      event.preventDefault();
+      setScreen(SCREENS[n - 1].id);
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
   const hueById = useMemo(() => buildHueMap(projects), [projects]);
-  // Every other screen is a full-window overlay, so the backlog behind it is
-  // not visible. Keeping it mounted meant editing in the matrix re-simulated
+  // Screens are full-window panels below the rail, so the backlog behind them
+  // is not visible. Keeping it mounted meant editing in the matrix re-simulated
   // the whole plan for a footer nobody could see — the single biggest cost of
   // toggling a project in or out of the plan.
   const backlogVisible = screen === "backlog";
 
   const cycleTheme = () =>
     setTheme((t) => (t === "auto" ? "light" : t === "light" ? "dark" : "auto"));
-  const themeLabel = theme === "auto" ? "AUTO" : theme === "dark" ? "CIEMNY" : "JASNY";
 
   return (
     <div className="bv" data-theme={theme === "auto" ? undefined : theme}>
+      <NavRail screen={screen} onSelect={setScreen} theme={theme} onCycleTheme={cycleTheme} />
+
       <header className="bv-header">
         <div className="atl-title">
           <b>Projekty</b>
           <span className="bv-count">{projects.length} w backlogu</span>
-        </div>
-
-        <div className="atl-spacer" />
-
-        <div className="atl-group">
-          <button type="button" className="atl-btn" onClick={() => setScreen("team")}>
-            Zespół
-          </button>
-          <button type="button" className="atl-btn" onClick={() => setScreen("matrix")}>
-            Kompetencje
-          </button>
-          <button type="button" className="atl-btn" onClick={() => setScreen("compare")}>
-            Pokaż projekcje
-          </button>
-          <button type="button" className="bv-btn-accent" onClick={() => setScreen("advanced")}>
-            Pokaż harmonogram
-          </button>
-          <button type="button" className="atl-btn" onClick={() => setScreen("obsada")}>
-            Obsada
-          </button>
-          <div className="atl-rule" />
-          <button type="button" className="atl-btn is-mono" onClick={cycleTheme}>
-            {themeLabel}
-          </button>
         </div>
       </header>
 
@@ -108,20 +98,17 @@ function App() {
         </span>
         {backlogVisible && <PlanHorizon projects={projects} pools={pools} />}
         <span style={{ flex: 1 }} />
-        <span>tryb prosty · otwórz harmonogram, aby zobaczyć szczegóły obsady</span>
+        <span>
+          {MOD}1…{MOD}
+          {SCREENS.length} przeskakuje między widokami
+        </span>
       </footer>
 
-      {screen === "team" && (
-        <TeamView theme={theme} onClose={() => setScreen("backlog")} />
-      )}
+      {screen === "team" && <TeamView theme={theme} />}
 
-      {screen === "matrix" && (
-        <CapabilityMatrix projects={projects} theme={theme} onClose={() => setScreen("backlog")} />
-      )}
+      {screen === "matrix" && <CapabilityMatrix projects={projects} theme={theme} />}
 
-      {screen === "compare" && (
-        <TimelineView projects={projects} theme={theme} onClose={() => setScreen("backlog")} />
-      )}
+      {screen === "compare" && <TimelineView projects={projects} theme={theme} />}
 
       {screen === "advanced" && (
         <AdvancedTimeline
@@ -129,13 +116,10 @@ function App() {
           pools={pools}
           onOpenMatrix={() => setScreen("matrix")}
           theme={theme}
-          onClose={() => setScreen("backlog")}
         />
       )}
 
-      {screen === "obsada" && (
-        <ObsadaWorkspace projects={projects} theme={theme} onClose={() => setScreen("backlog")} />
-      )}
+      {screen === "obsada" && <ObsadaWorkspace projects={projects} theme={theme} />}
     </div>
   );
 }

@@ -1,6 +1,26 @@
 // Shared vocabulary for the two timeline views: the same density and zoom
 // steps, the same colour helpers, the same month formatting.
 
+export type Screen = "backlog" | "team" | "matrix" | "advanced" | "obsada" | "compare";
+
+/** Ordered from data to results — dane wejściowe | wyniki | hipotezy. The
+ *  hairlines in the nav rail sit on the group boundaries, and ⌘1…⌘6 follow
+ *  this order, so it is the one place the sequence is defined. */
+export const SCREENS: { id: Screen; label: string; hint: string; group: number }[] = [
+  { id: "backlog", label: "Projekty", hint: "backlog i kolejność", group: 0 },
+  { id: "team", label: "Zespół", hint: "ludzie i produktywność", group: 0 },
+  { id: "matrix", label: "Wyceny", hint: "nakład w dniach i maksymalne obłożenie", group: 0 },
+  { id: "advanced", label: "Plan", hint: "wyliczony harmonogram", group: 1 },
+  { id: "obsada", label: "Obsada", hint: "kto konkretnie i kiedy", group: 1 },
+  { id: "compare", label: "Symulacje", hint: "co, gdyby zespół był inny", group: 2 },
+];
+
+/** "⌘" only where the shortcut really is the command key. */
+export const MOD =
+  typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform || "")
+    ? "⌘"
+    : "^";
+
 export const MON = ["Sty", "Lut", "Mar", "Kwi", "Maj", "Cze", "Lip", "Sie", "Wrz", "Paź", "Lis", "Gru"];
 
 export interface Density {

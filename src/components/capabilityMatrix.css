@@ -98,7 +98,8 @@
 
 .cm2 {
   position: fixed;
-  inset: 0;
+  /* Below the nav rail — the one piece of chrome every screen shares. */
+  inset: 26px 0 0 0;
   z-index: 100;
   display: flex;
   flex-direction: column;
@@ -301,28 +302,6 @@
   border-color: var(--accent-line);
   background: var(--accent-wash);
   color: var(--accent);
-}
-
-.cm2-rule {
-  width: 1px;
-  height: 22px;
-  background: var(--line);
-}
-
-.cm2-close {
-  border: 0;
-  background: transparent;
-  color: var(--ink-2);
-  width: 26px;
-  height: 26px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-
-.cm2-close:hover {
-  color: var(--ink);
 }
 
 /* ── the grid ───────────────────────────────────────────────────────────── */

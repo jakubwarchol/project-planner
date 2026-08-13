@@ -14,8 +14,7 @@
  *   Projekty    — is every project's plan actually covered by real people?
  *   Obsadzanie  — close one specific hole, with the best candidate for it.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useCapabilitySchedule } from "../../hooks/useCapabilitySchedule";
 import { useRoster } from "../../hooks/useRoster";
 import { useStaffing } from "../../hooks/useStaffing";
@@ -39,15 +38,14 @@ import "./obsada.css";
 export type ObsadaTab = "people" | "projects" | "assign";
 
 const TABS: { id: ObsadaTab; label: string; chip: string }[] = [
-  { id: "people", label: "Ludzie", chip: "zaangażowanie osób" },
-  { id: "projects", label: "Projekty", chip: "kto i kiedy w projekcie" },
-  { id: "assign", label: "Obsadzanie", chip: "obsadzanie zapotrzebowania" },
+  { id: "people", label: "Obciążenie ludzi", chip: "zaangażowanie osób" },
+  { id: "projects", label: "Braki w projektach", chip: "kto i kiedy w projekcie" },
+  { id: "assign", label: "Przydziel", chip: "obsadzanie zapotrzebowania" },
 ];
 
 interface ObsadaWorkspaceProps {
   projects: Project[];
   theme: "auto" | "light" | "dark";
-  onClose: () => void;
 }
 
 /** Everything the three views read, computed once at the top so they cannot
@@ -75,7 +73,7 @@ export interface ObsadaContext {
   openItem: (projectId: string, capability: Capability) => void;
 }
 
-export function ObsadaWorkspace({ projects, theme, onClose }: ObsadaWorkspaceProps) {
+export function ObsadaWorkspace({ projects, theme }: ObsadaWorkspaceProps) {
   const { people, teams, pools } = useRoster();
   const { settings } = usePlanner();
   const schedule = useCapabilitySchedule(projects, pools);
@@ -110,14 +108,6 @@ export function ObsadaWorkspace({ projects, theme, onClose }: ObsadaWorkspacePro
     setTab("assign");
   }, []);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
   const ctx: ObsadaContext = {
     window: window_,
     today,
@@ -146,13 +136,7 @@ export function ObsadaWorkspace({ projects, theme, onClose }: ObsadaWorkspacePro
   const chip = TABS.find((t) => t.id === tab)!.chip;
 
   return (
-    <div
-      className="atl obs"
-      data-theme={theme === "auto" ? undefined : theme}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Obsada"
-    >
+    <div className="atl obs" data-theme={theme === "auto" ? undefined : theme}>
       <div className="obs-strip">
         <div className="atl-title">
           <b>Obsada</b>
@@ -174,10 +158,6 @@ export function ObsadaWorkspace({ projects, theme, onClose }: ObsadaWorkspacePro
 
         <div className="atl-spacer" />
         <span className="obs-strip-sum">{summary}</span>
-        <div className="atl-rule" />
-        <button type="button" className="atl-close" onClick={onClose} aria-label="Zamknij obsadę">
-          <X size={16} />
-        </button>
       </div>
 
       {tab === "people" && (

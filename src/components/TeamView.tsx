@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Plus, X } from "lucide-react";
 import { useRoster } from "../hooks/useRoster";
 import {
@@ -11,12 +11,11 @@ import {
 } from "../lib/estimation";
 import type { Capability, Person, TeamCode } from "../types";
 import { NumberField } from "./NumberField";
-import { CAPABILITY_HUES, fmt, plCount, solid } from "./timelineChrome";
+import { CAPABILITY_HUES, MOD, fmt, plCount, solid } from "./timelineChrome";
 import "./timeline.css";
 
 interface TeamViewProps {
   theme: "auto" | "light" | "dark";
-  onClose: () => void;
 }
 
 const TEAM_ORDER: TeamCode[] = ["ZWO", "ZP", "Inni"];
@@ -72,7 +71,7 @@ function SplitBar({ person, over }: { person: Person; over: boolean }) {
   );
 }
 
-export function TeamView({ theme, onClose }: TeamViewProps) {
+export function TeamView({ theme }: TeamViewProps) {
   const {
     teams,
     people,
@@ -86,14 +85,6 @@ export function TeamView({ theme, onClose }: TeamViewProps) {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [addingTeam, setAddingTeam] = useState<TeamCode | null>(null);
   const [addDraft, setAddDraft] = useState<Omit<Person, "id">>(() => emptyDraft("ZWO"));
-
-  useEffect(() => {
-    function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
 
   function startAdd(teamId: TeamCode) {
     setConfirmDeleteId(null);
@@ -125,13 +116,7 @@ export function TeamView({ theme, onClose }: TeamViewProps) {
   const maxPool = Math.max(1, ...CAPABILITY_ORDER.map((capability) => pools[capability]));
 
   return (
-    <div
-      className="atl"
-      data-theme={theme === "auto" ? undefined : theme}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Zespół"
-    >
+    <div className="atl" data-theme={theme === "auto" ? undefined : theme}>
       <header className="atl-header" style={{ height: 56 }}>
         <div className="atl-title">
           <b>Zespół</b>
@@ -160,12 +145,6 @@ export function TeamView({ theme, onClose }: TeamViewProps) {
               </span>
             </span>
           ))}
-        </div>
-        <div className="atl-rule" />
-        <div className="atl-group">
-          <button type="button" className="atl-close" onClick={onClose} aria-label="Zamknij zespół">
-            <X size={16} />
-          </button>
         </div>
       </header>
 
@@ -380,7 +359,9 @@ export function TeamView({ theme, onClose }: TeamViewProps) {
           </span>
         )}
         <span style={{ flex: 1 }} />
-        <span>esc zamyka okno</span>
+        <span>
+          {MOD}1…{MOD}6 przeskakuje między widokami
+        </span>
       </footer>
     </div>
   );

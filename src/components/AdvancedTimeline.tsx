@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronsLeft, ChevronsRight, Clock, Flag, TriangleAlert, X } from "lucide-react";
+import { ChevronsLeft, ChevronsRight, Clock, Flag, TriangleAlert } from "lucide-react";
 import { formatDateKey, monthsFrom } from "../lib/calendar";
 import { computeStartDrift } from "../lib/planning";
 import { useCapabilityMatrix } from "../hooks/useCapabilityMatrix";
@@ -38,7 +38,6 @@ interface AdvancedTimelineProps {
   pools: CapabilityVector;
   onOpenMatrix: () => void;
   theme: "auto" | "light" | "dark";
-  onClose: () => void;
 }
 
 const EPS = 1e-6;
@@ -53,13 +52,7 @@ interface BandModel {
   rows: RowModel[];
 }
 
-export function AdvancedTimeline({
-  projects,
-  pools,
-  onOpenMatrix,
-  theme,
-  onClose,
-}: AdvancedTimelineProps) {
+export function AdvancedTimeline({ projects, pools, onOpenMatrix, theme }: AdvancedTimelineProps) {
   const { cells, setCell } = useCapabilityMatrix();
   const schedule = useCapabilitySchedule(projects, pools);
   const { people, settings } = usePlanner();
@@ -74,13 +67,11 @@ export function AdvancedTimeline({
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
-      if (event.key !== "Escape") return;
-      if (popover) setPopover(null);
-      else onClose();
+      if (event.key === "Escape" && popover) setPopover(null);
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [popover, onClose]);
+  }, [popover]);
 
   const hueById = useMemo(() => buildHueMap(projects), [projects]);
   const focusByCap = useMemo(() => focusByCapability(people), [people]);
@@ -411,7 +402,7 @@ export function AdvancedTimeline({
               </div>
               <div className="atl-pop-foot">
                 <button type="button" className="atl-pop-clear" onClick={onOpenMatrix}>
-                  otwórz macierz kompetencji
+                  otwórz wyceny
                 </button>
               </div>
             </div>
@@ -555,16 +546,10 @@ export function AdvancedTimeline({
       : null;
 
   return (
-    <div
-      className="atl"
-      data-theme={theme === "auto" ? undefined : theme}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Harmonogram pojemności"
-    >
+    <div className="atl" data-theme={theme === "auto" ? undefined : theme}>
       <header className="atl-header" style={{ height: D.hdr }}>
         <div className="atl-title">
-          <b>Harmonogram pojemności</b>
+          <b>Plan</b>
           <span className="atl-chip">obecny zespół</span>
         </div>
 
@@ -607,10 +592,6 @@ export function AdvancedTimeline({
             onClick={() => setKeyOpen((v) => !v)}
           >
             Legenda
-          </button>
-          <div className="atl-rule" />
-          <button type="button" className="atl-close" onClick={onClose} aria-label="Zamknij harmonogram">
-            <X size={16} />
           </button>
         </div>
       </header>
@@ -698,7 +679,7 @@ export function AdvancedTimeline({
         )}
         {schedule.truncated && <span style={{ color: "var(--warn)" }}>symulacja przerwana — zgłoś błąd</span>}
         <span style={{ flex: 1 }} />
-        <span>esc zamyka okno · potem widok</span>
+        <span>esc zamyka okno projektu</span>
       </footer>
 
       {tipTarget && (

@@ -20,13 +20,12 @@ import {
 import { usePlanner } from "../state/plannerContext";
 import type { Capability, CapabilityCell, Estimate, EstimationSettings, Project } from "../types";
 import { NumberField } from "./NumberField";
-import { fmt, fmt2, plCount } from "./timelineChrome";
+import { MOD, fmt, fmt2, plCount } from "./timelineChrome";
 import "./capabilityMatrix.css";
 
 interface CapabilityMatrixProps {
   projects: Project[];
   theme: "auto" | "light" | "dark";
-  onClose: () => void;
 }
 
 type Tab = "days" | "settings";
@@ -108,7 +107,7 @@ const HELP_ITEMS: { token: string; tone?: "accent" | "warn"; title: string; body
   },
 ];
 
-export function CapabilityMatrix({ projects, theme, onClose }: CapabilityMatrixProps) {
+export function CapabilityMatrix({ projects, theme }: CapabilityMatrixProps) {
   const { cells, setCell } = useCapabilityMatrix();
   const { setIncludeInPlan } = useProjectCrud();
   const { settings, people, leaves, setProjects, updateEstimationSettings, setEstimateWeight } =
@@ -197,11 +196,10 @@ export function CapabilityMatrix({ projects, theme, onClose }: CapabilityMatrixP
       // Innermost layer first: help sits above the proposals drawer.
       if (showHelp) setShowHelp(false);
       else if (showProposals) setShowProposals(false);
-      else onClose();
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [onClose, showProposals, showHelp]);
+  }, [showProposals, showHelp]);
 
   const byCategory = useMemo(() => {
     return CATEGORY_ORDER.map((category) => ({
@@ -388,16 +386,10 @@ export function CapabilityMatrix({ projects, theme, onClose }: CapabilityMatrixP
   const showHorizonDelta = Number.isFinite(horizonDelta) && Math.abs(horizonDelta) >= 0.05;
 
   return (
-    <div
-      className="cm2"
-      data-theme={theme === "auto" ? undefined : theme}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Macierz kompetencji"
-    >
+    <div className="cm2" data-theme={theme === "auto" ? undefined : theme}>
       <header className="cm2-header">
         <div className="cm2-title">
-          <b>Macierz kompetencji</b>
+          <b>Wyceny</b>
           <span className="cm2-chip">
             {plCount(projects.length, "projekt", "projekty", "projektów")}
           </span>
@@ -456,10 +448,6 @@ export function CapabilityMatrix({ projects, theme, onClose }: CapabilityMatrixP
             aria-label="Jak czytać ten ekran"
           >
             <HelpCircle size={14} />
-          </button>
-          <div className="cm2-rule" />
-          <button type="button" className="cm2-close" onClick={onClose} aria-label="Zamknij macierz">
-            <X size={16} />
           </button>
         </div>
       </header>
@@ -917,7 +905,9 @@ export function CapabilityMatrix({ projects, theme, onClose }: CapabilityMatrixP
           <>
             <span>zmiany wpływają na wszystkie projekty i harmonogram od razu</span>
             <span style={{ flex: 1 }} />
-            <span>esc zamyka okno</span>
+            <span>
+              {MOD}1…{MOD}6 przeskakuje między widokami
+            </span>
           </>
         ) : (
           <>
@@ -956,7 +946,7 @@ export function CapabilityMatrix({ projects, theme, onClose }: CapabilityMatrixP
               </span>
             </div>
             <span style={{ flex: 1 }} />
-            <span>tab i ↑↓ po komórkach · shift + klik wyłącza kompetencję · esc zamyka</span>
+            <span>tab i ↑↓ po komórkach · shift + klik wyłącza kompetencję</span>
           </>
         )}
       </footer>
