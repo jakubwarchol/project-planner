@@ -2966,3 +2966,54 @@
   opacity: 0.45;
   cursor: default;
 }
+
+/* report sections inside the optimizer drawer */
+
+.atl-opt-caption {
+  margin: 0;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--ink-3);
+}
+
+.atl-opt-hire {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 0;
+  border-top: 1px solid var(--line-soft);
+  font-family: var(--atl-mono);
+  font-size: 10.5px;
+  color: var(--ink-2);
+}
+
+.atl-opt-hire b {
+  flex: none;
+  min-width: 28px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.atl-opt-hire span {
+  flex: 1;
+  min-width: 0;
+}
+
+.atl-opt-hire.is-idle {
+  color: var(--ink-4);
+}
+
+.atl-opt-hire.is-idle b {
+  color: var(--ink-4);
+}
+
+.atl-opt-cell-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.atl-opt-cell-fig {
+  flex: none !important;
+  color: var(--ink-3);
+}

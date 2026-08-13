@@ -1,6 +1,12 @@
 import { X } from "lucide-react";
 import type { PoolProposalApi } from "../hooks/usePoolProposal";
-import type { BlockedPoolCandidate } from "../lib/poolOptimizer";
+import type {
+  BlockedPoolCandidate,
+  FloorDiagnostic,
+  HiringEntry,
+  PlanScore,
+  PoolOptimizerResult,
+} from "../lib/poolOptimizer";
 import type { CapabilityVector, Project } from "../types";
 import { fmt, fmt2, plCount, weeksOf } from "./timelineChrome";
 
@@ -226,6 +232,10 @@ export function PoolProposalDrawer({
 
             <BlockedPoolRows blocked={result.blocked} />
 
+            <HiringReport hiring={result.hiring} scoreAfter={result.scoreAfter} />
+            <CeilingsReport result={result} nameOf={nameOf} />
+            <FloorReport before={result.floorBefore} after={result.floorAfter} />
+
             <p className="atl-opt-footnote">
               {plCount(result.simulations, "symulacja", "symulacje", "symulacji")} całego portfela.
             </p>
@@ -256,6 +266,113 @@ export function PoolProposalDrawer({
         </>
       )}
     </aside>
+  );
+}
+
+/** Hiring is a separate report, never folded into the zero-sum proposal — a
+ *  hire is a different kind of decision. Priced against the vector *after* the
+ *  proposed moves, because that is where hiring starts mattering: once
+ *  redistribution has saturated, what remains is what only more people fix. */
+function HiringReport({ hiring, scoreAfter }: { hiring: HiringEntry[]; scoreAfter: PlanScore }) {
+  if (hiring.length === 0) return null;
+  return (
+    <div className="atl-opt-section">
+      <span className="atl-eyebrow">co kupiłby +1 etat</span>
+      <p className="atl-opt-caption">
+        osobna decyzja — nie wlicza się do przesunięć; liczone po ich zastosowaniu
+      </p>
+      {hiring.map((entry) => {
+        const heals = entry.score.impossible < scoreAfter.impossible;
+        const parts: string[] = [];
+        if (heals) parts.push("ratuje projekt");
+        if (entry.deltaMissed < 0) parts.push(`terminy ${entry.deltaMissed}`);
+        if (!heals && Math.abs(entry.deltaSumEnds) >= 0.05) {
+          parts.push(`Σ ${signedMonths(entry.deltaSumEnds)} mies.`);
+        }
+        const idle = parts.length === 0;
+        return (
+          <div className={`atl-opt-hire ${idle ? "is-idle" : ""}`} key={entry.capability}>
+            <b>{entry.capability}</b>
+            <span>{idle ? "bez efektu" : parts.join(" · ")}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Ceilings are reported, never manipulated — a search free to raise `maxFte`
+ *  would raise every one of them. The pace-setting cells still ceiling-bound
+ *  after the moves are exactly the ones no team change can touch; the tool
+ *  for those lives in Wyceny. */
+function CeilingsReport({
+  result,
+  nameOf,
+}: {
+  result: PoolOptimizerResult;
+  nameOf: (id: string) => string;
+}) {
+  const bound = result.ceilings.filter((c) => c.ceilingBound);
+  const poolBound = result.ceilings.length - bound.length;
+  if (result.ceilings.length === 0) return null;
+  return (
+    <div className="atl-opt-section">
+      <span className="atl-eyebrow">sufity ograniczające plan</span>
+      <p className="atl-opt-caption">
+        sufit to własność pracy, nie zespołu — podnieś go w Wycenach → Propozycje sufitów
+      </p>
+      {bound.map((c) => (
+        <div className="atl-opt-hire" key={`${c.projectId}:${c.capability}`}>
+          <b>{c.capability}</b>
+          <span className="atl-opt-cell-name" title={nameOf(c.projectId)}>
+            {nameOf(c.projectId)}
+          </span>
+          <span className="atl-opt-cell-fig">
+            max {fmt2(c.maxFte)} (pula {fmt2(c.pool)})
+          </span>
+        </div>
+      ))}
+      {bound.length === 0 && (
+        <div className="atl-opt-hire is-idle">
+          <b>—</b>
+          <span>żaden sufit nie ogranicza — tempo wszędzie wyznaczają pule</span>
+        </div>
+      )}
+      {poolBound > 0 && (
+        <p className="atl-opt-caption">
+          {plCount(poolBound, "komórka nadaje tempo", "komórki nadają tempo", "komórek nadaje tempo")}{" "}
+          z ograniczenia puli, nie sufitu
+        </p>
+      )}
+    </div>
+  );
+}
+
+const floorFig = (n: number) => (Number.isFinite(n) ? `${fmt(n)} mies.` : "—");
+
+/** Arithmetic bounds, deliberately labeled as unreachable: they ignore
+ *  phasing, ceilings, minimum crews and leaves. The fungible floor is
+ *  invariant under zero-sum moves — it is what no redistribution can beat. */
+function FloorReport({ before, after }: { before: FloorDiagnostic; after: FloorDiagnostic }) {
+  return (
+    <div className="atl-opt-section">
+      <span className="atl-eyebrow">dolna granica portfela</span>
+      <div className="atl-opt-hire">
+        <b>{after.binding ?? "—"}</b>
+        <span>
+          najbardziej obciążona pula: {floorFig(before.perCapabilityMonths)}
+          {before.binding ? ` (${before.binding})` : ""} → {floorFig(after.perCapabilityMonths)}
+        </span>
+      </div>
+      <div className="atl-opt-hire">
+        <b>Σ</b>
+        <span>przy idealnie podzielnym zespole: {floorFig(after.fungibleMonths)}</span>
+      </div>
+      <p className="atl-opt-caption">
+        niezmienna przy przesunięciach i nieosiągalna w praktyce (pomija fazowanie, sufity i
+        urlopy) — pokazuje, ile jest do ugrania
+      </p>
+    </div>
   );
 }
 
