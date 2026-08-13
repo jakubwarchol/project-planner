@@ -619,18 +619,16 @@
   opacity: 1;
 }
 
-/* The max band keeps its slot even when hidden (visibility, not display), so
-   dni / max / załoga sit on one baseline grid across all seven columns. */
+/* Every cell with effort carries an editable max band. The pace cell is the
+   only one whose ceiling constrains the plan today, so it alone gets the
+   accent treatment — the rest stay quiet but stay writable, because lowering
+   a slack ceiling is a real edit even when raising it would change nothing. */
 .cm2-ceil {
   display: flex;
   align-items: center;
   gap: 4px;
   height: 24px;
   border-top: 1px solid var(--line-soft);
-}
-
-.cm2-ceil.is-hidden {
-  visibility: hidden;
 }
 
 .cm2-ceil.is-pace {
@@ -665,8 +663,12 @@
 .cm2-ceil .cm2-input {
   font-size: 12px;
   font-weight: 600;
-  color: var(--accent);
+  color: var(--ink-2);
   padding: 0 8px 0 0;
+}
+
+.cm2-ceil.is-pace .cm2-input {
+  color: var(--accent);
 }
 
 .cm2-ceil.is-flagged .cm2-input {

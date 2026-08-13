@@ -49,12 +49,6 @@ interface CellPlan {
   phases: number[];
 }
 
-/** Ceilings with slack are provably no-ops — whichever capability is on its
- *  maximum sets the phase's length and everyone else is de-rated to land with
- *  it. So only the pace cell (and a broken one) shows its max line at all;
- *  the design carries this as its default reading mode. */
-const PACE_ONLY = true;
-
 const HELP_ITEMS: { token: string; tone?: "accent" | "warn"; title: string; body: string }[] = [
   {
     token: "186",
@@ -350,6 +344,9 @@ export function CapabilityMatrix({ projects, theme }: CapabilityMatrixProps) {
   // Vertical movement, grid convention. Tab already walks a row correctly and
   // left/right stay with the caret, where a text input needs them. Moving
   // focus is what commits the field being left: see NumberField's deferCommit.
+  // The walk keeps going past rows with no landing spot — a max column skips
+  // rows whose cell has no effort, and any column skips a cell parked as
+  // "nie dotyczy" — otherwise Enter silently stops at the first such row.
   function handleGridKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
     const step =
       event.key === "ArrowDown" || (event.key === "Enter" && !event.shiftKey)
@@ -360,12 +357,17 @@ export function CapabilityMatrix({ projects, theme }: CapabilityMatrixProps) {
     if (step === 0) return;
     const from = (event.target as HTMLElement).closest<HTMLElement>("[data-cm-row]");
     if (!from) return;
-    const next = gridRef.current?.querySelector<HTMLInputElement>(
-      `[data-cm-row="${Number(from.dataset.cmRow) + step}"][data-cm-col="${from.dataset.cmCol}"] input`,
-    );
-    if (!next) return;
-    event.preventDefault();
-    next.focus();
+    const rowCount = Object.keys(rowIndexById).length;
+    for (let row = Number(from.dataset.cmRow) + step; row >= 0 && row < rowCount; row += step) {
+      const next = gridRef.current?.querySelector<HTMLInputElement>(
+        `[data-cm-row="${row}"][data-cm-col="${from.dataset.cmCol}"] input`,
+      );
+      if (next) {
+        event.preventDefault();
+        next.focus();
+        return;
+      }
+    }
   }
 
   // Every knob-field commit sends all of them — `updateEstimationSettings`
@@ -748,9 +750,6 @@ export function CapabilityMatrix({ projects, theme }: CapabilityMatrixProps) {
                           const flagged = !off && days > 0 && cell.maxFte <= 0;
                           const cp = cellPlan.get(`${project.id}:${capability}`);
                           const isPace = cp?.setsPace ?? false;
-                          // Slack ceilings change nothing, so only the pace
-                          // cell — and a broken one — shows its max line.
-                          const showCeil = days > 0 && (!PACE_ONLY || isPace || flagged);
                           return (
                             <div
                               key={capability}
@@ -814,9 +813,7 @@ export function CapabilityMatrix({ projects, theme }: CapabilityMatrixProps) {
                                   {days > 0 && (
                                     <>
                                       <div
-                                        className={`cm2-ceil ${showCeil ? "" : "is-hidden"} ${
-                                          isPace ? "is-pace" : ""
-                                        } ${flagged ? "is-flagged" : ""}`}
+                                        className={`cm2-ceil ${isPace ? "is-pace" : ""} ${flagged ? "is-flagged" : ""}`}
                                         data-cm-row={rowIndexById[project.id]}
                                         data-cm-col={`${capability}:ceil`}
                                         title={
