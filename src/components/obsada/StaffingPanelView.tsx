@@ -155,7 +155,7 @@ export function StaffingPanelView({ ctx, people, staffing, selectedId, onSelect 
     return (
       <>
         <div className="obs-panel-empty">
-          <p>Plan nie zgłasza jeszcze żadnego zapotrzebowania — uzupełnij dni nakładu w Kompetencjach.</p>
+          <p>Plan nie zgłasza jeszcze żadnego zapotrzebowania — uzupełnij dni nakładu w Wycenach.</p>
         </div>
         <footer className="obs-foot">
           <span>0 pozycji zapotrzebowania</span>
