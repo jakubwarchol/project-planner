@@ -243,8 +243,11 @@ it means the plan has capacity nobody has put a name against yet.
 - **A person's band is scaled to their availability**, not to a whole person: someone at 0.5 FTE
   carrying 0.25 is half spoken for. An over-committed band is scaled to its own peak so the
   overflow shows instead of clipping, and the 100% line then sits inside the band.
-- **Leave crosses assignments rather than shortening them**, so a holiday in the middle of a
-  posting stays visible as a risk instead of being silently absorbed into a shorter bar.
+- **Leave crosses assignments rather than shortening them** — the bar stays whole, so a holiday in
+  the middle of a posting stays visible as a risk. But it is not only ink: on leave days the person
+  counts as absent, so coverage drops, a gap opens under the crossed bar, and their free capacity
+  shrinks by the days away. The plan itself feels it too — `lib/leaves.ts` folds leaves into the
+  monthly pool the scheduler draws from, so a team's absences genuinely push project ends out.
 - `MAX_PARALLEL_PROJECTS` (4) is **flagged, never enforced**. A real week sometimes has five, and a
   tool that refuses to record that has stopped describing the team.
 

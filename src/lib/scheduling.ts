@@ -188,6 +188,14 @@ export interface SimulateInput {
    *  Missing or <= 0 means "available now", which is the default for all of
    *  them. Callers convert calendar months to this offset (see lib/calendar). */
   earliestStart?: Record<string, number>;
+  /** FTE per capability away on leave, indexed by whole month offset from
+   *  t=0 — the calendar folded into the sim's own unit by `lib/leaves.ts`, so
+   *  the scheduler still never sees a date. During month m capability k draws
+   *  from `max(0, pools[k] - leaveFteByMonth[k][m])`; missing months (and a
+   *  missing map) mean the full pool. The reduction is real people, so a
+   *  variant pool larger than the roster keeps its hypothetical extras — they
+   *  have nobody to be away. */
+  leaveFteByMonth?: Partial<Record<Capability, number[]>>;
 }
 
 function sum(values: number[]): number {
@@ -540,6 +548,30 @@ function simulateOnce(input: SimulateInput, releaseAt: Map<string, number>): Cap
   // rate is always read with the `k` already in hand.
   const EDPM = CAPABILITY_ORDER.map((c) => input.effectiveDaysPerMonth[c] ?? 0);
 
+  // Leave dips: within [m, m+1) capability k's pool is poolByIndex[k] minus
+  // its month-m reduction. Constant inside a month by construction, so every
+  // moment a dip starts or ends becomes a clock event below and no slice ever
+  // straddles a change in capacity.
+  const leaveDips = CAPABILITY_ORDER.map((c) => input.leaveFteByMonth?.[c] ?? []);
+  const hasLeaveDips = leaveDips.some((arr) => arr.some((v) => (v ?? 0) > EPS));
+  const dipBoundaries: number[] = [];
+  if (hasLeaveDips) {
+    const months = new Set<number>();
+    for (const arr of leaveDips) {
+      arr.forEach((v, month) => {
+        if ((v ?? 0) > EPS) {
+          months.add(month);
+          months.add(month + 1);
+        }
+      });
+    }
+    dipBoundaries.push(...[...months].sort((a, b) => a - b));
+  }
+  function poolNowAt(k: number, time: number): number {
+    if (!hasLeaveDips) return poolByIndex[k];
+    return Math.max(0, poolByIndex[k] - (leaveDips[k][Math.floor(time + EPS)] ?? 0));
+  }
+
   // ---- 1. build demand -----------------------------------------------------
   const assignedDays: number[][] = [];
   const maxFte: number[][] = [];
@@ -826,8 +858,10 @@ function simulateOnce(input: SimulateInput, releaseAt: Map<string, number>): Cap
   // and TL twice each, UX, BE, FE, QA, SEC) — or advances to a `notBefore`
   // boundary, of which a project has at most two (its faza 1 deferral and its
   // external earliest start, which can bind again in faza 2). Each fires once,
-  // since `t` only ever moves forward.
-  const maxIterations = 12 * n + 16;
+  // since `t` only ever moves forward. Leave-dip boundaries are events of the
+  // same kind — each is crossed exactly once — so they widen the budget by
+  // their own count.
+  const maxIterations = 12 * n + 16 + dipBoundaries.length;
   let iteration = 0;
   let truncated = false;
 
@@ -861,9 +895,25 @@ function simulateOnce(input: SimulateInput, releaseAt: Map<string, number>): Cap
 
     const desired: number[][] = Array.from({ length: m }, () => new Array(CAPABILITY_ORDER.length).fill(0));
 
-    const poolLeft = poolByIndex.slice();
+    const poolNow = CAPABILITY_ORDER.map((_, k) => poolNowAt(k, t));
+    const poolLeft = poolNow.slice();
     for (const j of remaining) {
       for (let k = 0; k < CAPABILITY_ORDER.length; k++) poolLeft[k] -= held[j][k];
+    }
+    // A month can open with less pool than the crews already hold — the pool
+    // *is* the people, and some of them are away. De-rate every holder of the
+    // dipped capability by one common factor; the ordinary top-up brings them
+    // back to strength the moment the dip ends. Under-target time this causes
+    // is reported as a "pool" wait like any other shortage.
+    if (hasLeaveDips) {
+      for (let k = 0; k < CAPABILITY_ORDER.length; k++) {
+        if (poolLeft[k] >= -EPS) continue;
+        let heldSum = 0;
+        for (const j of remaining) heldSum += held[j][k];
+        const factor = heldSum > EPS ? Math.max(0, poolNow[k]) / heldSum : 0;
+        for (const j of remaining) held[j][k] *= factor;
+        poolLeft[k] = 0;
+      }
     }
 
     for (const j of notDone) {
@@ -1092,6 +1142,20 @@ function simulateOnce(input: SimulateInput, releaseAt: Map<string, number>): Cap
     if (nextRelease < dt - EPS) {
       dt = nextRelease;
       binding = []; // nothing finishes at a release; don't force-zero a stream
+    }
+    // A leave-dip boundary is an event for the same reason a release is: the
+    // pool changes there, so the slice must end there. It can also be the only
+    // event — a capability's whole pool away means nothing burns this month —
+    // which is why it must be found before the "stuck for good" test below.
+    if (hasLeaveDips) {
+      for (const boundary of dipBoundaries) {
+        if (boundary <= t + EPS) continue;
+        if (boundary - t < dt - EPS) {
+          dt = boundary - t;
+          binding = [];
+        }
+        break; // sorted ascending — the first future boundary is the nearest
+      }
     }
 
     if (!Number.isFinite(dt)) break; // nobody funded anywhere — stuck for good

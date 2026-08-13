@@ -35,6 +35,9 @@ export interface CeilingProposalApi {
   accepted: Set<number>;
   /** Horizon if exactly the accepted moves were applied. */
   previewHorizon: number | null;
+  /** The matrix changed since the search ran — each move's `from`/deltas
+   *  describe a grid that no longer exists, so applying must wait for a rerun. */
+  stale: boolean;
   run: () => void;
   cancel: () => void;
   toggle: (index: number) => void;
@@ -56,6 +59,11 @@ export function useCeilingProposal(cells: Cells, input: AutopilotInput): Ceiling
   const runId = useRef(0);
   useEffect(() => () => { runId.current++; }, []);
 
+  // The cells object the search ran against. The grid stays editable behind
+  // the drawer, and the reducer replaces this object on every cell edit — so
+  // identity is exactly "has anything changed since the numbers were priced".
+  const cellsAtSearch = useRef<Cells | null>(null);
+
   const reset = useCallback(() => {
     runId.current++;
     setStatus("idle");
@@ -73,6 +81,7 @@ export function useCeilingProposal(cells: Cells, input: AutopilotInput): Ceiling
     setAccepted(new Set());
     setPreviewHorizon(null);
 
+    cellsAtSearch.current = cells;
     const state = createSearch(cells, input);
 
     const tick = () => {
@@ -125,17 +134,34 @@ export function useCeilingProposal(cells: Cells, input: AutopilotInput): Ceiling
     [cells, input, result],
   );
 
+  // The search can raise the same cell twice (1.0→1.5, then 1.5→2.0), and the
+  // later move's `to` assumes the earlier one happened. Checking a move pulls
+  // its prerequisites in; unchecking one drops everything built on it.
   const toggle = useCallback(
     (index: number) => {
       setAccepted((current) => {
+        const moves = result?.moves ?? [];
+        const target = moves[index];
+        if (!target) return current;
+        const sameCell = (m: CeilingMove) =>
+          m.projectId === target.projectId && m.capability === target.capability;
         const next = new Set(current);
-        if (next.has(index)) next.delete(index);
-        else next.add(index);
+        if (next.has(index)) {
+          next.delete(index);
+          for (let i = index + 1; i < moves.length; i++) {
+            if (sameCell(moves[i])) next.delete(i);
+          }
+        } else {
+          next.add(index);
+          for (let i = 0; i < index; i++) {
+            if (sameCell(moves[i])) next.add(i);
+          }
+        }
         reprice(next);
         return next;
       });
     },
-    [reprice],
+    [reprice, result],
   );
 
   const setAll = useCallback(
@@ -158,6 +184,7 @@ export function useCeilingProposal(cells: Cells, input: AutopilotInput): Ceiling
     found,
     accepted,
     previewHorizon,
+    stale: status === "ready" && cellsAtSearch.current !== null && cells !== cellsAtSearch.current,
     run,
     cancel,
     toggle,

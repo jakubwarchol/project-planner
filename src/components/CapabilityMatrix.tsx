@@ -7,6 +7,7 @@ import { useCeilingProposal } from "../hooks/useCeilingProposal";
 import { useProjectCrud } from "../hooks/useProjectCrud";
 import { useRoster } from "../hooks/useRoster";
 import { capacityFloor, type AutopilotInput, type CeilingMove } from "../lib/autopilot";
+import { leaveFteByMonth } from "../lib/leaves";
 import {
   CAPABILITY_LABELS,
   CAPABILITY_ORDER,
@@ -70,7 +71,7 @@ function heatAlpha(days: number, maxDays: number): number {
 export function CapabilityMatrix({ projects, theme, onClose }: CapabilityMatrixProps) {
   const { cells, setCell } = useCapabilityMatrix();
   const { setIncludeInPlan } = useProjectCrud();
-  const { settings, people, updateEstimationSettings, setEstimateWeight } = usePlanner();
+  const { settings, people, leaves, updateEstimationSettings, setEstimateWeight } = usePlanner();
   const { pools } = useRoster();
   const [tab, setTab] = useState<Tab>("days");
   const [showProposals, setShowProposals] = useState(false);
@@ -130,8 +131,9 @@ export function CapabilityMatrix({ projects, theme, onClose }: CapabilityMatrixP
       minStaffingFraction: settings.minStaffingFraction,
       minCrewFte: settings.minCrewFte,
       earliestStart: earliestStartOffsets(plannedProjects),
+      leaveFteByMonth: leaveFteByMonth(people, leaves),
     }),
-    [plannedProjects, pools, people, settings],
+    [plannedProjects, pools, people, leaves, settings],
   );
 
   const proposal = useCeilingProposal(cells, autopilotInput);

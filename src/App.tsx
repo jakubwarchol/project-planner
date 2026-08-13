@@ -6,11 +6,11 @@ import { ProjectList } from "./components/ProjectList";
 import { ObsadaWorkspace } from "./components/obsada/ObsadaWorkspace";
 import { TeamView } from "./components/TeamView";
 import { TimelineView } from "./components/TimelineView";
-import { buildHueMap, fmt, plCount, variantCaption } from "./components/timelineChrome";
+import { buildHueMap, fmt, plCount } from "./components/timelineChrome";
 import { useCapabilitySchedule } from "./hooks/useCapabilitySchedule";
 import { useOrderedProjects } from "./hooks/useOrderedProjects";
-import { useTeamVariants } from "./hooks/useTeamVariants";
-import { CATEGORY_ORDER, type TeamVariant } from "./lib/estimation";
+import { useRoster } from "./hooks/useRoster";
+import { CATEGORY_ORDER } from "./lib/estimation";
 import type { CapabilityVector, Project } from "./types";
 import "./components/timeline.css";
 
@@ -27,17 +27,12 @@ function PlanHorizon({ projects, pools }: { projects: Project[]; pools: Capabili
 
 function App() {
   const { projects, reorder } = useOrderedProjects();
-  const variantsApi = useTeamVariants();
-  const { variants } = variantsApi;
+  // Every screen here plans on the team we actually have; hypothetical
+  // variants live only inside the projections view, which owns them itself.
+  const { pools } = useRoster();
   const [showEstimates, setShowEstimates] = useState(true);
   const [screen, setScreen] = useState<Screen>("backlog");
   const [theme, setTheme] = useState<ThemeChoice>("dark");
-  const [variantId, setVariantId] = useState(() => variants[0].id);
-
-  // The shown variant can be deleted out from under us — fall back to the first.
-  useEffect(() => {
-    if (!variants.some((v) => v.id === variantId)) setVariantId(variants[0].id);
-  }, [variants, variantId]);
 
   useEffect(() => {
     document.body.style.overflow = screen === "backlog" ? "" : "hidden";
@@ -47,7 +42,6 @@ function App() {
   }, [screen]);
 
   const hueById = useMemo(() => buildHueMap(projects), [projects]);
-  const variant: TeamVariant = variants.find((v) => v.id === variantId) ?? variants[0];
   // Every other screen is a full-window overlay, so the backlog behind it is
   // not visible. Keeping it mounted meant editing in the matrix re-simulated
   // the whole plan for a footer nobody could see — the single biggest cost of
@@ -101,24 +95,18 @@ function App() {
             onToggleEstimates={() => setShowEstimates((v) => !v)}
             hueById={hueById}
           />
-          <CategoryTimeline
-            projects={projects}
-            variants={variants}
-            variantId={variantId}
-            onVariantChange={setVariantId}
-            hueById={hueById}
-          />
+          <CategoryTimeline projects={projects} pools={pools} hueById={hueById} />
         </div>
       </div>
       )}
 
       <footer className="bv-footer">
-        <span>{variantCaption(variant.label)}</span>
+        <span>obecny zespół</span>
         <span>
           {plCount(projects.length, "projekt", "projekty", "projektów")} ·{" "}
           {plCount(CATEGORY_ORDER.length, "kategoria", "kategorie", "kategorii")}
         </span>
-        {backlogVisible && <PlanHorizon projects={projects} pools={variant.fte} />}
+        {backlogVisible && <PlanHorizon projects={projects} pools={pools} />}
         <span style={{ flex: 1 }} />
         <span>tryb prosty · otwórz harmonogram, aby zobaczyć szczegóły obsady</span>
       </footer>
@@ -132,22 +120,13 @@ function App() {
       )}
 
       {screen === "compare" && (
-        <TimelineView
-          projects={projects}
-          variantId={variantId}
-          variantsApi={variantsApi}
-          onVariantChange={setVariantId}
-          theme={theme}
-          onClose={() => setScreen("backlog")}
-        />
+        <TimelineView projects={projects} theme={theme} onClose={() => setScreen("backlog")} />
       )}
 
       {screen === "advanced" && (
         <AdvancedTimeline
           projects={projects}
-          variantId={variantId}
-          variantsApi={variantsApi}
-          onVariantChange={setVariantId}
+          pools={pools}
           onOpenMatrix={() => setScreen("matrix")}
           theme={theme}
           onClose={() => setScreen("backlog")}

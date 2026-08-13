@@ -48,31 +48,68 @@ export function isoOfIndex(originIso: string, index: number): string {
   return addDays(originIso, index);
 }
 
-// Clamps to the target month's last day instead of letting `Date` overflow
-// into the following month (native `Date` arithmetic would turn "Jan 31 + 1
-// month" into early March, not Feb 28).
-function addMonths(d: Date, months: number): Date {
-  const first = new Date(d.getFullYear(), d.getMonth() + months, 1);
-  const daysInTarget = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
-  return new Date(first.getFullYear(), first.getMonth(), Math.min(d.getDate(), daysInTarget));
+/** True for Mon–Fri that is not a Polish public holiday — the one definition
+ *  of a working day, shared by the leave math and the schedule→grid bridge so
+ *  the two can never disagree about what a day is worth. */
+export function isWorkingDate(d: Date): boolean {
+  const dow = d.getDay();
+  if (dow === 0 || dow === 6) return false;
+  return !isPolishHoliday(isoOfDate(d));
+}
+
+/** Guard against a walk that never finds its working days — a wrong year in
+ *  the data should fail visibly at the bound, not hang the tab. */
+const MAX_WALK_DAYS = 36_600; // ~100 years
+
+export interface WorkingDayCalendar {
+  /** Working days inside the day-index span `[startIndex, endIndex)`. */
+  countBetween(startIndex: number, endIndex: number): number;
+  /** First day index at or after `fromIndex` by which `workingDays` full
+   *  working days have elapsed — where work consuming that many lands on the
+   *  calendar. Weekends and holidays push it further out. */
+  indexAfter(workingDays: number, fromIndex?: number): number;
 }
 
 /**
- * Converts a fractional month-offset from `scheduling.ts` (e.g. `4.5`) into a
- * day index from `origin`, using real `Date` month arithmetic so actual month
- * lengths are respected rather than an average day-per-month constant. The
- * fractional remainder is interpolated across the number of days in the
- * specific month it falls into.
+ * Working-day arithmetic anchored at `originIso`.
+ *
+ * The cumulative count is cached and extended lazily: obsada converts one
+ * span per stream segment plus one per sweep slice, and each conversion is an
+ * array lookup instead of a fresh walk over the calendar.
  */
-export function monthOffsetToDayIndex(origin: Date, monthOffset: number): number {
-  const wholeMonths = Math.floor(monthOffset);
-  const frac = monthOffset - wholeMonths;
-  const base = addMonths(origin, wholeMonths);
-  const baseIndex = daysBetween(origin, base);
-  if (frac === 0) return baseIndex;
-  const next = addMonths(origin, wholeMonths + 1);
-  const daysInSpan = daysBetween(base, next);
-  return baseIndex + Math.round(frac * daysInSpan);
+export function workingDayCalendar(originIso: string): WorkingDayCalendar {
+  // prefix[d] = working days in [0, d); cursor is the date at index
+  // prefix.length - 1, i.e. the next day to be classified.
+  const prefix: number[] = [0];
+  const cursor = dateOfIso(originIso);
+
+  function extendTo(dayIndex: number): void {
+    const limit = Math.min(dayIndex, MAX_WALK_DAYS);
+    while (prefix.length <= limit) {
+      prefix.push(prefix[prefix.length - 1] + (isWorkingDate(cursor) ? 1 : 0));
+      cursor.setDate(cursor.getDate() + 1);
+    }
+  }
+
+  return {
+    countBetween(startIndex, endIndex) {
+      const a = Math.max(0, Math.floor(startIndex));
+      const b = Math.max(a, Math.min(Math.floor(endIndex), MAX_WALK_DAYS));
+      extendTo(b);
+      return prefix[b] - prefix[a];
+    },
+    indexAfter(workingDays, fromIndex = 0) {
+      const from = Math.max(0, Math.min(Math.floor(fromIndex), MAX_WALK_DAYS));
+      if (workingDays <= 0) return from;
+      extendTo(from);
+      const target = prefix[from] + workingDays;
+      for (let d = from + 1; d <= MAX_WALK_DAYS; d++) {
+        extendTo(d);
+        if (prefix[d] >= target) return d;
+      }
+      return MAX_WALK_DAYS;
+    },
+  };
 }
 
 const FIXED_HOLIDAYS: [month: number, day: number][] = [

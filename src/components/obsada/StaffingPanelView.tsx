@@ -16,6 +16,7 @@ import { isoOfIndex } from "../../lib/days";
 import { CAPABILITY_ORDER } from "../../lib/estimation";
 import {
   MAX_PARALLEL_PROJECTS,
+  candidateScore,
   personLoadIn,
   type DemandItem,
   type ItemCoverage,
@@ -141,12 +142,13 @@ export function StaffingPanelView({ ctx, people, staffing, selectedId, onSelect 
           load,
           already: assignedHere.has(person.id),
           match,
-          score:
-            match * 100 +
-            load.free * 40 -
-            load.leaveDays * 0.3 -
-            load.projects * 3 -
-            (load.projects >= MAX_PARALLEL_PROJECTS ? 40 : 0),
+          score: candidateScore({
+            match,
+            free: load.free,
+            focusFactor: person.focusFactor,
+            leaveDays: load.leaveDays,
+            projects: load.projects,
+          }),
         };
       })
       .filter((c) => !c.already && (allPeople || c.match > 0))
@@ -562,7 +564,9 @@ export function StaffingPanelView({ ctx, people, staffing, selectedId, onSelect 
           {plCount(staffing.assignments.length, "przypisanie", "przypisania", "przypisań")}
         </span>
         <span>
-          {totals.missing > EPS ? `nieobsadzone ${fmt2(totals.missing / 30)} osobomiesięcy` : "wszystko obsadzone"}
+          {totals.missing > EPS
+            ? `nieobsadzone ${fmt2(totals.missing / ctx.workingDaysPerMonth)} osobomiesięcy`
+            : "wszystko obsadzone"}
         </span>
         <span className="atl-spacer" />
         <span>obsadzanie nie przesuwa dat portfela</span>

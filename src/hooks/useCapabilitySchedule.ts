@@ -1,5 +1,6 @@
 import { monthKeyOf, monthsFrom, parseMonthKey } from "../lib/calendar";
 import { effectiveDaysByCapability, isIncludedInPlan } from "../lib/estimation";
+import { leaveFteByMonth } from "../lib/leaves";
 import { simulateCapabilitySchedule, type CapabilitySchedule } from "../lib/scheduling";
 import { usePlanner } from "../state/plannerContext";
 import type {
@@ -7,6 +8,7 @@ import type {
   CapabilityCell,
   CapabilityVector,
   EstimationSettings,
+  Leave,
   Person,
   Project,
 } from "../types";
@@ -38,8 +40,12 @@ interface Key {
    *  inside from `people`, so both stay identity-stable. */
   pools: CapabilityVector;
   people: Person[];
+  /** The reducer replaces this array on every leave edit, so its identity is
+   *  exactly as stable — and as invalidating — as `projects` or `cells`. */
+  leaves: Leave[];
   settings: EstimationSettings;
   minStaffingFraction: number;
+  minCrewFte: number;
 }
 
 // Simulating is expensive, and four components ask for the same answer: App
@@ -64,8 +70,10 @@ function sameKey(a: Key, b: Key): boolean {
     a.cells === b.cells &&
     a.pools === b.pools &&
     a.people === b.people &&
+    a.leaves === b.leaves &&
     a.settings === b.settings &&
-    a.minStaffingFraction === b.minStaffingFraction
+    a.minStaffingFraction === b.minStaffingFraction &&
+    a.minCrewFte === b.minCrewFte
   );
 }
 
@@ -84,7 +92,9 @@ function sharedSchedule(key: Key): CapabilitySchedule {
     pools: key.pools,
     effectiveDaysPerMonth: effectiveDaysByCapability(key.people, key.settings),
     minStaffingFraction: key.minStaffingFraction,
+    minCrewFte: key.minCrewFte,
     earliestStart: earliestStartOffsets(planned),
+    leaveFteByMonth: leaveFteByMonth(key.people, key.leaves),
   });
 
   cache.unshift({ key, value });
@@ -96,13 +106,15 @@ export function useCapabilitySchedule(
   projects: Project[],
   pools: CapabilityVector,
 ): CapabilitySchedule {
-  const { cells, people, settings } = usePlanner();
+  const { cells, people, leaves, settings } = usePlanner();
   return sharedSchedule({
     projects,
     cells,
     pools,
     people,
+    leaves,
     settings,
     minStaffingFraction: settings.minStaffingFraction,
+    minCrewFte: settings.minCrewFte,
   });
 }

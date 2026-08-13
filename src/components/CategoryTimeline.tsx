@@ -1,29 +1,21 @@
 import { useMemo } from "react";
-import type { Project } from "../types";
-import { CATEGORY_ORDER, isIncludedInPlan, type TeamVariant } from "../lib/estimation";
+import type { CapabilityVector, Project } from "../types";
+import { CATEGORY_ORDER, isIncludedInPlan } from "../lib/estimation";
 import { useCapabilitySchedule } from "../hooks/useCapabilitySchedule";
 import { fmt, plCount, solid } from "./timelineChrome";
 
 interface CategoryTimelineProps {
   projects: Project[];
-  variants: TeamVariant[];
-  variantId: string;
-  onVariantChange: (id: string) => void;
+  /** Roster pools, shared with the footer so both hit one cache entry. */
+  pools: CapabilityVector;
   hueById: Record<string, number>;
 }
 
 const LABEL_W = 168;
 const SEGMENT_LABEL_MIN_PCT = 9;
 
-export function CategoryTimeline({
-  projects,
-  variants,
-  variantId,
-  onVariantChange,
-  hueById,
-}: CategoryTimelineProps) {
-  const variant: TeamVariant = variants.find((v) => v.id === variantId) ?? variants[0];
-  const schedule = useCapabilitySchedule(projects, variant.fte);
+export function CategoryTimeline({ projects, pools, hueById }: CategoryTimelineProps) {
+  const schedule = useCapabilitySchedule(projects, pools);
 
   const { queues, ticks } = useMemo(() => {
     const byId = new Map(schedule.scheduled.map((sp) => [sp.project.id, sp]));
@@ -78,22 +70,7 @@ export function CategoryTimeline({
           <b>Harmonogram według kategorii</b>
           <span className="bv-card-sub">zakres każdej kategorii, wyliczony z pełnego harmonogramu</span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span className="atl-eyebrow">wariant</span>
-          <div className="atl-seg">
-            {variants.map((v) => (
-              <button
-                key={v.id}
-                type="button"
-                className={`atl-seg-text ${v.id === variantId ? "is-active" : ""}`}
-                style={{ height: 24 }}
-                onClick={() => onVariantChange(v.id)}
-              >
-                {v.label}
-              </button>
-            ))}
-          </div>
-        </div>
+        <span className="atl-eyebrow">obecny zespół</span>
       </div>
 
       <div className="bv-axis">

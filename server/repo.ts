@@ -317,6 +317,19 @@ export function setVariantFte(db: Db, id: string, capability: Capability, fte: n
   // Editing a capability by hand takes the variant off roster tracking —
   // otherwise the next reload would silently overwrite this edit.
   db.transaction(() => {
+    const [row] = all(db, "SELECT is_roster_derived FROM variants WHERE id = ?", [id]);
+    // A tracked variant's stored rows are stale — every read has been deriving
+    // its pools from the roster since the row was written. Materialise today's
+    // roster before detaching, so the six capabilities the edit didn't touch
+    // keep the values the user was looking at instead of reverting.
+    if (row && Number(row.is_roster_derived) === 1) {
+      const derived = derivePoolsFromPeople(readPeople(db));
+      const stmt = db.prepare(
+        `INSERT INTO variant_capability_fte (variant_id, capability, fte) VALUES (?, ?, ?)
+           ON CONFLICT (variant_id, capability) DO UPDATE SET fte = excluded.fte`,
+      );
+      for (const cap of CAPABILITY_ORDER) stmt.run(id, cap, derived[cap]);
+    }
     run(
       db,
       `INSERT INTO variant_capability_fte (variant_id, capability, fte) VALUES (?, ?, ?)

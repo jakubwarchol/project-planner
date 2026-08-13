@@ -4,9 +4,10 @@
  * The plan — who is needed, when, and how many — comes entirely from
  * `simulateCapabilitySchedule`. Nothing here writes back into it: assigning a
  * named person to a demand item cannot move a date, because dates come from
- * pools and the crew model. What obsada adds is the layer the scheduler
- * deliberately doesn't model — *which* of the four PMs, and whether they are
- * on leave that week.
+ * pools and the crew model (leaves reach it separately, as monthly pool dips
+ * via `lib/leaves.ts`). What obsada adds is the layer the scheduler
+ * deliberately doesn't model — *which* of the four PMs, and what their leave
+ * that week does to this particular posting.
  *
  * The three views are the same data asked three different questions:
  *   Ludzie      — is anyone over-committed, and who has room?
@@ -18,6 +19,7 @@ import { X } from "lucide-react";
 import { useCapabilitySchedule } from "../../hooks/useCapabilitySchedule";
 import { useRoster } from "../../hooks/useRoster";
 import { useStaffing } from "../../hooks/useStaffing";
+import { usePlanner } from "../../state/plannerContext";
 import {
   buildDemandItems,
   computeStaffingWindow,
@@ -26,7 +28,7 @@ import {
   type ItemCoverage,
   type StaffingWindow,
 } from "../../lib/staffing";
-import type { Capability, Person, Project, StaffingAssignment } from "../../types";
+import type { Capability, Leave, Person, Project, StaffingAssignment } from "../../types";
 import { buildHueMap } from "../timelineChrome";
 import { PeopleLoadView } from "./PeopleLoadView";
 import { ProjectStaffingView } from "./ProjectStaffingView";
@@ -53,9 +55,13 @@ interface ObsadaWorkspaceProps {
 export interface ObsadaContext {
   window: StaffingWindow;
   today: Date;
+  /** The scheduler's month, in working days — the divisor behind every
+   *  "osobomiesięcy" figure, so all three tabs quote the same month. */
+  workingDaysPerMonth: number;
   items: DemandItem[];
   coverage: Map<string, ItemCoverage>;
   assignments: StaffingAssignment[];
+  leaves: Leave[];
   projectById: Map<string, Project>;
   personById: Map<string, Person>;
   hueById: Record<string, number>;
@@ -71,9 +77,11 @@ export interface ObsadaContext {
 
 export function ObsadaWorkspace({ projects, theme, onClose }: ObsadaWorkspaceProps) {
   const { people, teams, pools } = useRoster();
+  const { settings } = usePlanner();
   const schedule = useCapabilitySchedule(projects, pools);
   const staffing = useStaffing();
   const { assignments, leaves } = staffing;
+  const workingDaysPerMonth = settings.workingDaysPerMonth;
 
   const [tab, setTab] = useState<ObsadaTab>("people");
   const [unit, setUnit] = useState<ObsadaUnit>("months");
@@ -82,13 +90,16 @@ export function ObsadaWorkspace({ projects, theme, onClose }: ObsadaWorkspacePro
 
   const today = useMemo(() => new Date(), []);
   const window_ = useMemo(
-    () => computeStaffingWindow(assignments, leaves, schedule, today),
-    [assignments, leaves, schedule, today],
+    () => computeStaffingWindow(assignments, leaves, schedule, today, workingDaysPerMonth),
+    [assignments, leaves, schedule, today, workingDaysPerMonth],
   );
-  const items = useMemo(() => buildDemandItems(schedule, window_, today), [schedule, window_, today]);
+  const items = useMemo(
+    () => buildDemandItems(schedule, window_, workingDaysPerMonth),
+    [schedule, window_, workingDaysPerMonth],
+  );
   const coverage = useMemo(
-    () => new Map(items.map((item) => [item.id, coverageOf(item, assignments, window_)])),
-    [items, assignments, window_],
+    () => new Map(items.map((item) => [item.id, coverageOf(item, assignments, leaves, window_)])),
+    [items, assignments, leaves, window_],
   );
   const projectById = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects]);
   const personById = useMemo(() => new Map(people.map((p) => [p.id, p])), [people]);
@@ -110,9 +121,11 @@ export function ObsadaWorkspace({ projects, theme, onClose }: ObsadaWorkspacePro
   const ctx: ObsadaContext = {
     window: window_,
     today,
+    workingDaysPerMonth,
     items,
     coverage,
     assignments,
+    leaves,
     projectById,
     personById,
     hueById,

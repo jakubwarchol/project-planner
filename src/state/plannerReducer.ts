@@ -1,8 +1,9 @@
 import type { PlannerSnapshot } from "../db";
-import { derivePoolsFromPeople, type TeamVariant } from "../lib/estimation";
+import { CAPABILITY_ORDER, derivePoolsFromPeople, type TeamVariant } from "../lib/estimation";
 import type {
   Capability,
   CapabilityCell,
+  CapabilityVector,
   Estimate,
   EstimationSettings,
   Leave,
@@ -39,12 +40,26 @@ export type PlannerAction =
   | { type: "updateEstimationSettings"; fields: Omit<EstimationSettings, "estimateValues"> }
   | { type: "setEstimateWeight"; estimate: Estimate; weight: number };
 
+function sameVector(a: CapabilityVector, b: CapabilityVector): boolean {
+  return CAPABILITY_ORDER.every((capability) => a[capability] === b[capability]);
+}
+
 // Wariant 1 tracks the live roster rather than storing its own numbers, so
 // editing a person moves it without a repository round trip.
+//
+// Identity is load-bearing: the shared schedule cache is keyed on the `fte`
+// object, so handing a tracked variant a fresh-but-equal vector on every
+// action would re-simulate the whole plan per keystroke. Only a genuinely
+// changed roster gets a new object.
 function withDerivedVariants(snapshot: PlannerSnapshot): PlannerSnapshot {
   const derived = derivePoolsFromPeople(snapshot.people);
-  const variants = snapshot.variants.map((v) => (v.isRosterDerived ? { ...v, fte: derived } : v));
-  return { ...snapshot, variants };
+  let changed = false;
+  const variants = snapshot.variants.map((v) => {
+    if (!v.isRosterDerived || sameVector(v.fte, derived)) return v;
+    changed = true;
+    return { ...v, fte: derived };
+  });
+  return changed ? { ...snapshot, variants } : snapshot;
 }
 
 function applyAction(state: PlannerSnapshot, action: PlannerAction): PlannerSnapshot {
@@ -80,7 +95,14 @@ function applyAction(state: PlannerSnapshot, action: PlannerAction): PlannerSnap
         .map((p) => (p.blockedBy === action.id ? { ...p, blockedBy: undefined } : p));
       const cells = { ...state.cells };
       delete cells[action.id];
-      return { ...state, projects, cells };
+      // Mirrors the database's ON DELETE CASCADE — the server drops these
+      // rows, so keeping them optimistically would show ghosts until reload.
+      return {
+        ...state,
+        projects,
+        cells,
+        assignments: state.assignments.filter((a) => a.projectId !== action.id),
+      };
     }
 
     case "setBlockedBy":
@@ -138,8 +160,14 @@ function applyAction(state: PlannerSnapshot, action: PlannerAction): PlannerSnap
         people: state.people.map((p) => (p.id === action.id ? { id: action.id, ...action.fields } : p)),
       };
 
+    // Mirrors the database's ON DELETE CASCADE, same as `removeProject`.
     case "removePerson":
-      return { ...state, people: state.people.filter((p) => p.id !== action.id) };
+      return {
+        ...state,
+        people: state.people.filter((p) => p.id !== action.id),
+        assignments: state.assignments.filter((a) => a.personId !== action.id),
+        leaves: state.leaves.filter((l) => l.personId !== action.id),
+      };
 
     case "setPersonAllocation":
       return {

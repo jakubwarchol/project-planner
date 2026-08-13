@@ -23,6 +23,8 @@ export interface PlannerSnapshot {
   /** Real, named staffing — who is actually on what, and when. Obsada's own
    *  data, never read by the capability-pool scheduler. */
   assignments: StaffingAssignment[];
+  /** Unlike assignments, leaves do reach the scheduler: `lib/leaves.ts` folds
+   *  them into per-month pool reductions, so absences extend the plan. */
   leaves: Leave[];
 }
 

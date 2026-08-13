@@ -4,7 +4,6 @@ import { formatDateKey, monthsFrom } from "../lib/calendar";
 import { computeStartDrift } from "../lib/planning";
 import { useCapabilityMatrix } from "../hooks/useCapabilityMatrix";
 import { useCapabilitySchedule } from "../hooks/useCapabilitySchedule";
-import type { TeamVariantsApi } from "../hooks/useTeamVariants";
 import { useZoomGesture } from "../hooks/useZoomGesture";
 import {
   CAPABILITY_LABELS,
@@ -13,14 +12,12 @@ import {
   ESTIMATE_ORDER,
   effortDrift,
   focusByCapability,
-  type TeamVariant,
 } from "../lib/estimation";
 import { assignOwnLanes, type ScheduledProject } from "../lib/scheduling";
 import { usePlanner } from "../state/plannerContext";
-import type { Project } from "../types";
+import type { CapabilityVector, Project } from "../types";
 import { NumberField } from "./NumberField";
 import { ProjectBreakdownTip, type TipAnchor } from "./ProjectBreakdownTip";
-import { VariantEditor } from "./VariantEditor";
 import {
   DENSITIES,
   HUES,
@@ -32,15 +29,13 @@ import {
   plCount,
   soft,
   solid,
-  variantCaption,
 } from "./timelineChrome";
 import "./timeline.css";
 
 interface AdvancedTimelineProps {
   projects: Project[];
-  variantId: string;
-  variantsApi: TeamVariantsApi;
-  onVariantChange: (id: string) => void;
+  /** Live roster pools — hypothetical variants live only in the projections view. */
+  pools: CapabilityVector;
   onOpenMatrix: () => void;
   theme: "auto" | "light" | "dark";
   onClose: () => void;
@@ -60,17 +55,13 @@ interface BandModel {
 
 export function AdvancedTimeline({
   projects,
-  variantId,
-  variantsApi,
-  onVariantChange,
+  pools,
   onOpenMatrix,
   theme,
   onClose,
 }: AdvancedTimelineProps) {
-  const { variants } = variantsApi;
-  const variant: TeamVariant = variants.find((v) => v.id === variantId) ?? variants[0];
   const { cells, setCell } = useCapabilityMatrix();
-  const schedule = useCapabilitySchedule(projects, variant.fte);
+  const schedule = useCapabilitySchedule(projects, pools);
   const { people, settings } = usePlanner();
 
   const { ppm, setPpm, scrollRef } = useZoomGesture(ZOOMS[1].ppm);
@@ -80,18 +71,16 @@ export function AdvancedTimeline({
   const [hover, setHover] = useState<string | null>(null);
   const [popover, setPopover] = useState<string | null>(null);
   const [tip, setTip] = useState<{ projectId: string; anchor: TipAnchor } | null>(null);
-  const [editorOpen, setEditorOpen] = useState(false);
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
       if (popover) setPopover(null);
-      else if (editorOpen) setEditorOpen(false);
       else onClose();
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [popover, editorOpen, onClose]);
+  }, [popover, onClose]);
 
   const hueById = useMemo(() => buildHueMap(projects), [projects]);
   const focusByCap = useMemo(() => focusByCapability(people), [people]);
@@ -576,30 +565,7 @@ export function AdvancedTimeline({
       <header className="atl-header" style={{ height: D.hdr }}>
         <div className="atl-title">
           <b>Harmonogram pojemności</b>
-        </div>
-
-        <div className="atl-group is-divided">
-          <span className="atl-eyebrow" style={{ paddingLeft: 10 }}>
-            wariant
-          </span>
-          <div className="atl-seg">
-            {variants.map((v) => (
-              <button
-                key={v.id}
-                type="button"
-                className={`atl-seg-text ${v.id === variantId ? "is-active" : ""}`}
-                onClick={() => {
-                  onVariantChange(v.id);
-                  setPopover(null);
-                }}
-              >
-                {v.label}
-              </button>
-            ))}
-          </div>
-          <button type="button" className="atl-btn" onClick={() => setEditorOpen(true)}>
-            Edytuj…
-          </button>
+          <span className="atl-chip">obecny zespół</span>
         </div>
 
         <div className="atl-spacer" />
@@ -719,7 +685,7 @@ export function AdvancedTimeline({
       </div>
 
       <footer className="atl-footer" style={{ height: D.foot }}>
-        <span>{variantCaption(variant.label)}</span>
+        <span>obecny zespół</span>
         <span>
           {plCount(projectCount, "projekt", "projekty", "projektów")} ·{" "}
           {plCount(CATEGORY_ORDER.length, "kategoria", "kategorie", "kategorii")}
@@ -732,7 +698,7 @@ export function AdvancedTimeline({
         )}
         {schedule.truncated && <span style={{ color: "var(--warn)" }}>symulacja przerwana — zgłoś błąd</span>}
         <span style={{ flex: 1 }} />
-        <span>esc zamyka okno · potem warianty · potem widok</span>
+        <span>esc zamyka okno · potem widok</span>
       </footer>
 
       {tipTarget && (
@@ -743,15 +709,6 @@ export function AdvancedTimeline({
           focus={focusByCap}
           anchor={tip!.anchor}
           positionLabel={positionLabel(tipTarget.project)}
-        />
-      )}
-
-      {editorOpen && (
-        <VariantEditor
-          api={variantsApi}
-          activeId={variant.id}
-          onActivate={onVariantChange}
-          onClose={() => setEditorOpen(false)}
         />
       )}
     </div>

@@ -49,7 +49,10 @@ export function CeilingProposals({
 
   const before = result?.horizonBefore ?? 0;
   const preview = previewHorizon ?? before;
-  const delta = preview - before;
+  // With an impossible project in the plan both horizons are Infinity and the
+  // difference is NaN — a dash says more than either would.
+  const finiteDelta = Number.isFinite(before) && Number.isFinite(preview);
+  const delta = finiteDelta ? preview - before : 0;
 
   return (
     <aside className="cp" aria-label="Propozycje sufitów">
@@ -102,7 +105,7 @@ export function CeilingProposals({
             <div className="cp-figures">
               <span>
                 <em>teraz</em>
-                <b>{fmt(before)}</b>
+                <b>{Number.isFinite(before) ? fmt(before) : "—"}</b>
               </span>
               <span className="cp-arrow" aria-hidden="true">→</span>
               <span>
@@ -114,7 +117,7 @@ export function CeilingProposals({
               <span className="cp-delta">
                 <em>różnica</em>
                 <b className={delta < -EPS ? "is-ok" : delta > EPS ? "is-warn" : undefined}>
-                  {Math.abs(delta) < 0.05 ? "0" : signed(delta)} mies.
+                  {finiteDelta ? `${Math.abs(delta) < 0.05 ? "0" : signed(delta)} mies.` : "—"}
                 </b>
               </span>
             </div>
@@ -202,6 +205,12 @@ export function CeilingProposals({
             </p>
           </div>
 
+          {api.stale && (
+            <p className="cp-note is-warn">
+              Macierz zmieniła się od wyliczenia — uruchom ponownie.
+            </p>
+          )}
+
           <footer className="cp-foot">
             <button type="button" className="atl-btn" onClick={onClose}>
               Anuluj
@@ -210,7 +219,7 @@ export function CeilingProposals({
             <button
               type="button"
               className="cp-primary"
-              disabled={accepted.size === 0}
+              disabled={accepted.size === 0 || api.stale}
               onClick={() => onApply(api.acceptedMoves())}
             >
               Zastosuj {accepted.size > 0 ? `(${accepted.size})` : ""}
@@ -233,7 +242,13 @@ function BlockedList({
 }) {
   const pool = blocked.filter((b) => b.reason === "pool");
   const worse = blocked.filter((b) => b.reason === "worse");
-  if (!pool.length && !worse.length) return null;
+  const impossible = blocked.filter((b) => b.reason === "impossible");
+  const noEffect = blocked.filter((b) => b.reason === "no-effect");
+  if (!pool.length && !worse.length && !impossible.length && !noEffect.length) return null;
+
+  // One candidate per (project, capability) — the same project can appear for
+  // several capabilities, but the fact worth reading is per project.
+  const impossibleNames = [...new Set(impossible.map((b) => nameOf(b.projectId)))];
 
   const byCapability = new Map<string, BlockedCandidate[]>();
   for (const b of pool) {
@@ -267,6 +282,37 @@ function BlockedList({
             {plCount(worse.length, "kandydatka wydłużyłaby", "kandydatki wydłużyłyby", "kandydatek wydłużyłoby")}{" "}
             plan — większa załoga musi mieć więcej ludzi wolnych naraz, żeby faza w ogóle ruszyła,
             więc projekt dłużej czeka w kolejce, niż zyskuje na budowie.
+          </p>
+        </div>
+      )}
+
+      {impossible.length > 0 && (
+        <div className="cp-block">
+          <p>
+            {plCount(
+              impossibleNames.length,
+              "projekt nie domyka się",
+              "projekty nie domykają się",
+              "projektów nie domyka się",
+            )}{" "}
+            przy obecnych pulach — żaden sufit tego nie zmieni, dopiero większa pula.
+          </p>
+          <p className="cp-block-list" title={impossibleNames.join("\n")}>
+            {impossibleNames.join(" · ")}
+          </p>
+        </div>
+      )}
+
+      {noEffect.length > 0 && (
+        <div className="cp-block">
+          <p>
+            {plCount(
+              noEffect.length,
+              "kandydatka nie zmieniła",
+              "kandydatki nie zmieniły",
+              "kandydatek nie zmieniło",
+            )}{" "}
+            niczego — po podniesieniu sufitu tempo i tak wyznacza inna kompetencja.
           </p>
         </div>
       )}

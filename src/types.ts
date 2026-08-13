@@ -105,9 +105,12 @@ export interface StaffingAssignment {
   fte: number;
 }
 
-/** A person's leave (vacation, etc.) — crosses every assignment on that day
- *  rather than shortening them, so staffing gaps caused by leave stay visible
- *  instead of silently absorbed. `endDate` is exclusive, same as above. */
+/** A person's leave (vacation, etc.). Visually it crosses every assignment on
+ *  that day rather than shortening them, so the risk stays on the chart — but
+ *  it also counts: the person is absent in every capacity number (coverage,
+ *  free FTE, over-commitment), and `lib/leaves.ts` folds leaves into the
+ *  monthly pools the scheduler draws from, so absences genuinely extend
+ *  project ends. `endDate` is exclusive, same as above. */
 export interface Leave {
   id: string;
   personId: string;

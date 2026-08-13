@@ -89,10 +89,17 @@ export function VariantEditor({ api, activeId, onActivate, onClose }: VariantEdi
               <p className="ve-field-label" style={{ margin: 0 }}>
                 FTE na kompetencję
               </p>
-              <button type="button" className="ve-copy" onClick={() => copyFromRoster(selected.id)}>
-                Skopiuj z obecnego zespołu
-              </button>
+              {!selected.isRosterDerived && (
+                <button type="button" className="ve-copy" onClick={() => copyFromRoster(selected.id)}>
+                  Skopiuj z obecnego zespołu
+                </button>
+              )}
             </div>
+            {selected.isRosterDerived && (
+              <p className="ve-field-label" style={{ margin: 0 }}>
+                Wartości pochodzą z obecnego zespołu — edytuj zespół albo utwórz nowy wariant.
+              </p>
+            )}
             <div className="ve-rows">
               {CAPABILITY_ORDER.map((capability) => (
                 <div className="ve-row" key={capability}>
@@ -101,6 +108,7 @@ export function VariantEditor({ api, activeId, onActivate, onClose }: VariantEdi
                     key={`${selected.id}-${capability}`}
                     initial={selected.fte[capability] ?? 0}
                     label={`FTE dla ${capability}`}
+                    disabled={selected.isRosterDerived}
                     onCommit={(value) => setVariantFte(selected.id, capability, value)}
                   />
                 </div>

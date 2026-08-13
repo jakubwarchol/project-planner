@@ -1482,3 +1482,81 @@ describe("the crew moves as one", () => {
     expect(sp.endMonths).toBeCloseTo(be.endMonths, 6);
   });
 });
+
+describe("leaveFteByMonth (pool dips)", () => {
+  it("stalls the month a capability's whole pool is away and pushes the end out", () => {
+    const p = project("p1", "M");
+    const base = simulate({
+      projects: [p],
+      cells: cellsFor({ p1: { BE: { days: 24, maxFte: 1 } } }),
+      pools: pools({ BE: 1 }),
+    });
+    const dipped = simulate({
+      projects: [p],
+      cells: cellsFor({ p1: { BE: { days: 24, maxFte: 1 } } }),
+      pools: pools({ BE: 1 }),
+      leaveFteByMonth: { BE: [1] },
+    });
+
+    const sp = dipped.scheduled[0];
+    // Nothing can burn while the only backend is away, so the whole bar
+    // shifts by exactly the month of leave — and no further.
+    expect(sp.startMonths).toBeCloseTo(1, 6);
+    expect(sp.endMonths).toBeCloseTo(base.scheduled[0].endMonths + 1, 6);
+    expect(dipped.horizonMonths).toBeCloseTo(base.horizonMonths + 1, 6);
+  });
+
+  it("runs a partial dip month under strength instead of stalling it", () => {
+    const p = project("p1", "M");
+    const result = simulate({
+      projects: [p],
+      cells: cellsFor({ p1: { BE: { days: 24, maxFte: 1 } } }),
+      pools: pools({ BE: 1 }),
+      leaveFteByMonth: { BE: [0.5] },
+    });
+
+    const sp = result.scheduled[0];
+    // Half the crew for the first month costs exactly half a month at the end.
+    expect(sp.startMonths).toBeCloseTo(0, 6);
+    expect(sp.endMonths).toBeCloseTo(24 / EDPM + 0.5, 6);
+    // The under-strength stretch is visible as reduced FTE, not hidden.
+    const be = sp.streams.find((s) => s.capability === "BE")!;
+    expect(be.segments[0].fte).toBeCloseTo(0.5, 6);
+  });
+
+  it("ignores a dip that falls after the plan is already done", () => {
+    const p = project("p1", "M");
+    const base = simulate({
+      projects: [p],
+      cells: cellsFor({ p1: { BE: { days: 24, maxFte: 1 } } }),
+      pools: pools({ BE: 1 }),
+    });
+    const dipped = simulate({
+      projects: [p],
+      cells: cellsFor({ p1: { BE: { days: 24, maxFte: 1 } } }),
+      pools: pools({ BE: 1 }),
+      // 24 days at EDPM finishes just under month 2; a month-3 dip is moot.
+      leaveFteByMonth: { BE: [0, 0, 0, 1] },
+    });
+    expect(dipped.scheduled[0].endMonths).toBeCloseTo(base.scheduled[0].endMonths, 6);
+    expect(dipped.horizonMonths).toBeCloseTo(base.horizonMonths, 6);
+  });
+
+  it("de-rates work already under way when its people go on leave mid-run", () => {
+    // Two months of work; the second month half the pool is away. The crew
+    // opened at full strength, so the dip must squeeze a running hold, not
+    // just block an admission.
+    const p = project("p1", "M");
+    const result = simulate({
+      projects: [p],
+      cells: cellsFor({ p1: { BE: { days: 24, maxFte: 1 } } }),
+      pools: pools({ BE: 1 }),
+      leaveFteByMonth: { BE: [0, 0.5] },
+    });
+    const sp = result.scheduled[0];
+    const be = sp.streams.find((s) => s.capability === "BE")!;
+    const during = be.segments.find((s) => s.startMonths >= 1 - 1e-9 && s.startMonths < 2)!;
+    expect(during.fte).toBeCloseTo(0.5, 6);
+    expect(sp.endMonths).toBeCloseTo(24 / EDPM + 0.5, 6);
+  });
+});

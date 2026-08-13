@@ -50,9 +50,9 @@ export function ProjectStaffingView({ ctx, projects }: ProjectStaffingViewProps)
   const X = useMemo(() => (d: number) => Math.round(d * axis.pxPerDay), [axis.pxPerDay]);
 
   const rowById = useMemo(() => {
-    const built = buildProjectStaffingRows(ctx.items, ctx.assignments, ctx.window);
+    const built = buildProjectStaffingRows(ctx.items, ctx.assignments, ctx.leaves, ctx.window);
     return new Map(built.map((r) => [r.projectId, r]));
-  }, [ctx.items, ctx.assignments, ctx.window]);
+  }, [ctx.items, ctx.assignments, ctx.leaves, ctx.window]);
 
   const personName = useMemo(
     () => (personId: string) => ctx.personById.get(personId)?.name ?? personId,
@@ -253,7 +253,9 @@ export function ProjectStaffingView({ ctx, projects }: ProjectStaffingViewProps)
           {plCount(ctx.assignments.length, "przypisanie", "przypisania", "przypisań")}
         </span>
         <span>
-          {missingFteDays > EPS ? `nieobsadzone ${fmt2(missingFteDays / 30)} osobomiesięcy` : "wszystko obsadzone"}
+          {missingFteDays > EPS
+            ? `nieobsadzone ${fmt2(missingFteDays / ctx.workingDaysPerMonth)} osobomiesięcy`
+            : "wszystko obsadzone"}
         </span>
         <span className="atl-spacer" />
         <span>pasek = przypisana osoba · kreskowane = bez obsady · ! = początek luki</span>

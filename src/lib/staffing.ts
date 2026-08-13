@@ -6,6 +6,12 @@
  * This module only *reads* `scheduling.ts` output; nothing here ever feeds
  * back into it. Assigning a person cannot move a date — the plan is built from
  * pools and the crew model, and obsada is the answer to "and who, exactly".
+ * (Leaves do reach the plan, but along their own path: `lib/leaves.ts` folds
+ * them into the pool the simulation draws from, not through anything here.)
+ *
+ * A leave still renders as a band crossing the person's assignments, but it is
+ * no longer only ink: on a leave day the person counts as absent, so coverage
+ * drops, gaps open, and free capacity shrinks by exactly the days away.
  *
  * Geometry stays out: rows carry shares and day indices, and each view turns
  * those into pixels. That keeps the arithmetic testable and lets the three
@@ -13,8 +19,35 @@
  */
 import type { CapabilitySchedule, StreamSchedule } from "./scheduling";
 import type { Capability, Leave, Person, StaffingAssignment } from "../types";
-import { dateOfIso, dayIndex, isoOfDate, monthOffsetToDayIndex } from "./days";
+import {
+  dateOfIso,
+  dayIndex,
+  isoOfDate,
+  workingDayCalendar,
+  type WorkingDayCalendar,
+} from "./days";
 import { personAvailability } from "./estimation";
+
+// One working-day prefix per window origin, shared by every helper in a render
+// pass — the sweeps below convert many small spans, and each would otherwise
+// re-walk the calendar from scratch.
+let calMemo: { originIso: string; cal: WorkingDayCalendar } | null = null;
+function calendarFor(originIso: string): WorkingDayCalendar {
+  if (calMemo?.originIso !== originIso) calMemo = { originIso, cal: workingDayCalendar(originIso) };
+  return calMemo.cal;
+}
+
+/** A scheduler month is `workingDaysPerMonth` working days, so its place on
+ *  the calendar is found by walking that many Mon–Fri-minus-holiday days from
+ *  today — December stretches further than March, exactly as lived. */
+function monthsToDayIndex(
+  cal: WorkingDayCalendar,
+  todayIndex: number,
+  months: number,
+  workingDaysPerMonth: number,
+): number {
+  return cal.indexAfter(Math.round(months * workingDaysPerMonth), todayIndex);
+}
 
 const EPS = 1e-6;
 const DEFAULT_MIN_WINDOW_DAYS = 180;
@@ -62,6 +95,7 @@ export function computeStaffingWindow(
   leaves: Leave[],
   schedule: CapabilitySchedule,
   today: Date,
+  workingDaysPerMonth: number,
 ): StaffingWindow {
   const todayIso = isoOfDate(today);
   const earliestIso = [todayIso, ...assignments.map((a) => a.startDate), ...leaves.map((l) => l.startDate)].sort()[0];
@@ -70,7 +104,12 @@ export function computeStaffingWindow(
   const originIso = isoOfDate(originDate);
   const todayIndex = dayIndex(originIso, todayIso);
 
-  const scheduleEndIndex = todayIndex + monthOffsetToDayIndex(today, schedule.horizonMonths);
+  const scheduleEndIndex = monthsToDayIndex(
+    calendarFor(originIso),
+    todayIndex,
+    schedule.horizonMonths,
+    workingDaysPerMonth,
+  );
   const latestRecordIso = [
     todayIso,
     ...assignments.map((a) => a.endDate),
@@ -125,6 +164,42 @@ function overlapDays(aStart: number, aEnd: number, bStart: number, bEnd: number)
   return Math.max(0, Math.min(aEnd, bEnd) - Math.max(aStart, bStart));
 }
 
+// ───────────────────────────────────────────────── leave awareness ──
+
+function leaveRunsByPerson(leaves: Leave[], window: StaffingWindow): Map<string, Run[]> {
+  const byPerson = new Map<string, Run[]>();
+  for (const l of leaves) {
+    const run = {
+      start: dayIndex(window.originIso, l.startDate),
+      end: dayIndex(window.originIso, l.endDate),
+    };
+    if (run.end <= run.start) continue;
+    const list = byPerson.get(l.personId);
+    if (list) list.push(run);
+    else byPerson.set(l.personId, [run]);
+  }
+  return byPerson;
+}
+
+/** The pieces of `run` left once `holes` are cut out — an assignment carried
+ *  by someone on leave contributes nothing on the days they are away, and
+ *  this is the subtraction that says so. Overlapping holes are fine; the walk
+ *  only ever moves the cursor forward. */
+function subtractRuns<T extends Run>(run: T, holes: Run[]): T[] {
+  const cuts = holes
+    .filter((h) => h.end > run.start && h.start < run.end)
+    .sort((a, b) => a.start - b.start);
+  const out: T[] = [];
+  let cursor = run.start;
+  for (const hole of cuts) {
+    if (hole.start > cursor) out.push({ ...run, start: cursor, end: hole.start });
+    cursor = Math.max(cursor, hole.end);
+    if (cursor >= run.end) break;
+  }
+  if (cursor < run.end) out.push({ ...run, start: cursor, end: run.end });
+  return out;
+}
+
 // ─────────────────────────────────────────────────── demand (plan) ──
 
 /**
@@ -148,6 +223,9 @@ export interface DemandItem {
   required: FteRun[];
   /** Worst-instant crew — the headline "wymagane". */
   peakFte: number;
+  /** FTE × **working** days — the unit "osobomiesięcy" figures divide by
+   *  `workingDaysPerMonth`, matching the scheduler's own month. Weekends and
+   *  holidays inside the span add calendar width but no effort. */
   requiredFteDays: number;
   /** Any of its streams is the one pinned at its ceiling, setting the phase's
    *  length. The cell worth raising if this project has to go faster. */
@@ -159,12 +237,17 @@ export interface DemandItem {
   phases: number[];
 }
 
-function streamRuns(streams: StreamSchedule[], window: StaffingWindow, today: Date): FteRun[] {
+function streamRuns(
+  streams: StreamSchedule[],
+  window: StaffingWindow,
+  workingDaysPerMonth: number,
+): FteRun[] {
+  const cal = calendarFor(window.originIso);
   const runs: FteRun[] = [];
   for (const stream of streams) {
     for (const seg of stream.segments) {
-      const start = window.todayIndex + monthOffsetToDayIndex(today, seg.startMonths);
-      const end = window.todayIndex + monthOffsetToDayIndex(today, seg.endMonths);
+      const start = monthsToDayIndex(cal, window.todayIndex, seg.startMonths, workingDaysPerMonth);
+      const end = monthsToDayIndex(cal, window.todayIndex, seg.endMonths, workingDaysPerMonth);
       if (end > start && seg.fte > EPS) runs.push({ start, end, fte: seg.fte });
     }
   }
@@ -177,9 +260,10 @@ function streamRuns(streams: StreamSchedule[], window: StaffingWindow, today: Da
 export function buildDemandItems(
   schedule: CapabilitySchedule,
   window: StaffingWindow,
-  today: Date,
+  workingDaysPerMonth: number,
 ): DemandItem[] {
   const items: DemandItem[] = [];
+  const cal = calendarFor(window.originIso);
 
   for (const sp of schedule.scheduled) {
     const byCapability = new Map<Capability, StreamSchedule[]>();
@@ -190,7 +274,7 @@ export function buildDemandItems(
     }
 
     for (const [capability, streams] of byCapability) {
-      const required = streamRuns(streams, window, today);
+      const required = streamRuns(streams, window, workingDaysPerMonth);
       if (!required.length) continue;
 
       const points = breakpoints(required);
@@ -201,7 +285,7 @@ export function buildDemandItems(
         const b = points[i + 1];
         const fte = sumAt(required, (a + b) / 2);
         peakFte = Math.max(peakFte, fte);
-        requiredFteDays += fte * (b - a);
+        requiredFteDays += fte * cal.countBetween(a, b);
       }
       if (requiredFteDays <= EPS) continue;
 
@@ -241,6 +325,7 @@ export interface ItemCoverage {
   /** Thinnest staffed moment — what "obsadzone" honestly reads, since a run
    *  that covers half the window does not cover the window. */
   minAssigned: number;
+  /** FTE × working days, same unit as `DemandItem.requiredFteDays`. */
   missingFteDays: number;
   requiredFteDays: number;
   /** Share of the window with no shortfall at all, 0..100. */
@@ -264,10 +349,14 @@ const EMPTY_COVERAGE: ItemCoverage = {
 
 /** One demand item measured against the real assignments carrying it. Runs are
  *  clipped to the item's own window: a person assigned past the plan's end is
- *  neither covering nor over-covering it. */
+ *  neither covering nor over-covering it. An assignment covers nothing on days
+ *  its person is on leave — the bar still renders whole (`runs` stay uncut),
+ *  but the coverage math sees the absence, so the gap shows on exactly those
+ *  days instead of being silently absorbed. */
 export function coverageOf(
   item: DemandItem,
   assignments: StaffingAssignment[],
+  leaves: Leave[],
   window: StaffingWindow,
 ): ItemCoverage {
   const mine = assignments.filter((a) => a.projectId === item.projectId && a.capability === item.capability);
@@ -281,10 +370,13 @@ export function coverageOf(
   const span = item.end - item.start;
   if (span <= 0) return { ...EMPTY_COVERAGE, runs };
 
-  const inside = clampRuns(runs, item.start, item.end);
+  const awayByPerson = leaveRunsByPerson(leaves, window);
+  const effective = runs.flatMap((r) => subtractRuns(r, awayByPerson.get(r.assignment.personId) ?? []));
+  const inside = clampRuns(effective, item.start, item.end);
   const points = breakpoints(item.required, inside, [{ start: item.start, end: item.end }])
     .filter((p) => p >= item.start && p <= item.end);
 
+  const cal = calendarFor(window.originIso);
   const slices: CoverageSlice[] = [];
   let peakGap = 0;
   let minAssigned = Infinity;
@@ -302,7 +394,7 @@ export function coverageOf(
     slices.push({ start, end, required, assigned, gap });
     peakGap = Math.max(peakGap, gap);
     minAssigned = Math.min(minAssigned, assigned);
-    missingFteDays += gap * (end - start);
+    missingFteDays += gap * cal.countBetween(start, end);
     if (gap <= EPS) coveredDays += end - start;
   }
 
@@ -327,6 +419,10 @@ export function coverageOf(
 export interface PersonLoad {
   /** Worst-instant committed FTE inside the window. */
   peak: number;
+  /** Mean genuinely spare FTE across the window, with leave days counting as
+   *  zero availability. A mean rather than a worst instant on purpose: a week
+   *  of urlop inside a three-month window should discount a candidate by a
+   *  week, not disqualify them outright the way a min would. */
   free: number;
   capacity: number;
   leaveDays: number;
@@ -355,28 +451,48 @@ export function personLoadIn(
     }))
     .filter((r) => overlapDays(r.start, r.end, start, end) > 0);
 
-  const points = breakpoints(runs, [{ start, end }]).filter((p) => p >= start && p <= end);
+  const away = clampRuns(leaveRunsByPerson(leaves, window).get(person.id) ?? [], start, end);
+
+  const points = breakpoints(runs, away, [{ start, end }]).filter((p) => p >= start && p <= end);
   let peak = 0;
+  let spareDays = 0;
   for (let i = 0; i < points.length - 1; i++) {
-    peak = Math.max(peak, sumAt(runs, (points[i] + points[i + 1]) / 2));
+    const mid = (points[i] + points[i + 1]) / 2;
+    const committed = sumAt(runs, mid);
+    peak = Math.max(peak, committed);
+    const available = activeAt(away, mid).length > 0 ? 0 : capacity;
+    spareDays += Math.max(0, available - committed) * (points[i + 1] - points[i]);
   }
 
-  const leaveDays = leaves
-    .filter((l) => l.personId === person.id)
-    .reduce(
-      (sum, l) =>
-        sum +
-        overlapDays(dayIndex(window.originIso, l.startDate), dayIndex(window.originIso, l.endDate), start, end),
-      0,
-    );
+  const leaveDays = away.reduce((sum, r) => sum + (r.end - r.start), 0);
 
   return {
     peak,
-    free: Math.max(0, capacity - peak),
+    free: end > start ? spareDays / (end - start) : Math.max(0, capacity - peak),
     capacity,
     leaveDays,
     projects: new Set(runs.map((r) => r.projectId)).size,
   };
+}
+
+/** Ranking weight for the candidate list — ordering only, every figure the
+ *  card displays stays plain time. Free capacity is weighted by the person's
+ *  own productivity: of two equally free candidates, the one whose hours
+ *  deliver more work ranks first. */
+export function candidateScore(c: {
+  match: number;
+  free: number;
+  focusFactor: number;
+  leaveDays: number;
+  projects: number;
+}): number {
+  return (
+    c.match * 100 +
+    c.free * c.focusFactor * 40 -
+    c.leaveDays * 0.3 -
+    c.projects * 3 -
+    (c.projects >= MAX_PARALLEL_PROJECTS ? 40 : 0)
+  );
 }
 
 // ─────────────────────────────────────────── people rows (widok 1) ──
@@ -411,15 +527,19 @@ export interface PersonLoadRow {
   maxProjects: number;
 }
 
-function computeOverRuns(runs: FteRun[], availability: number): OverRun[] {
+function computeOverRuns(runs: FteRun[], availability: number, away: Run[]): OverRun[] {
   if (!runs.length) return [];
-  const points = breakpoints(runs);
+  const points = breakpoints(runs, away);
   const result: OverRun[] = [];
   let current: OverRun | null = null;
   for (let i = 0; i < points.length - 1; i++) {
     const start = points[i];
     const end = points[i + 1];
-    const over = sumAt(runs, (start + end) / 2) - availability;
+    const mid = (start + end) / 2;
+    // On a leave day there is nobody to commit: any assigned FTE at all is an
+    // over-commitment, not just the part past availability.
+    const cap = activeAt(away, mid).length > 0 ? 0 : availability;
+    const over = sumAt(runs, mid) - cap;
     if (over > EPS) {
       if (current && current.end === start) {
         current.end = end;
@@ -506,6 +626,20 @@ export function buildPersonLoadRows(
 
     const util = window.windowDays > 0 ? fteDays / window.windowDays : 0;
 
+    const leaveBands: LeaveBand[] = (leavesByPerson.get(person.id) ?? []).map((leave) => ({
+      leave,
+      start: dayIndex(window.originIso, leave.startDate),
+      end: dayIndex(window.originIso, leave.endDate),
+    }));
+    // Free capacity is what the window's leave days leave of the person: the
+    // mean availability across the window, minus what is already committed.
+    const awayDays = clampRuns(leaveBands, 0, window.windowDays).reduce(
+      (sum, r) => sum + (r.end - r.start),
+      0,
+    );
+    const meanAvailability =
+      window.windowDays > 0 ? capacity * (1 - awayDays / window.windowDays) : capacity;
+
     return {
       person,
       capacity,
@@ -513,13 +647,9 @@ export function buildPersonLoadRows(
       runs: runs.map((r) => ({ assignment: r.assignment, start: r.start, end: r.end })),
       peak,
       util,
-      freeFte: Math.max(0, capacity - util),
-      overRuns: computeOverRuns(runs, capacity),
-      leaveBands: (leavesByPerson.get(person.id) ?? []).map((leave) => ({
-        leave,
-        start: dayIndex(window.originIso, leave.startDate),
-        end: dayIndex(window.originIso, leave.endDate),
-      })),
+      freeFte: Math.max(0, meanAvailability - util),
+      overRuns: computeOverRuns(runs, capacity, leaveBands),
+      leaveBands,
       maxProjects: maxConcurrentProjects(runs),
     };
   });
@@ -578,6 +708,7 @@ function packLanes<T extends Run>(items: T[]): number[] {
 function gapRunsAcross(
   items: DemandItem[],
   assignedByCapability: Map<Capability, FteRun[]>,
+  cal: WorkingDayCalendar,
 ): { runs: GapRun[]; missingFteDays: number } {
   const curves = items.map((item) => ({
     required: item.required,
@@ -596,7 +727,7 @@ function gapRunsAcross(
     let gap = 0;
     for (const c of curves) gap += Math.max(0, sumAt(c.required, mid) - sumAt(c.assigned, mid));
     if (gap > EPS) {
-      missingFteDays += gap * (end - start);
+      missingFteDays += gap * cal.countBetween(start, end);
       if (current && current.end === start) {
         current.end = end;
         current.gap = Math.max(current.gap, gap);
@@ -612,10 +743,13 @@ function gapRunsAcross(
 }
 
 /** One row per project: a lane per assigned person over the whole window, plus
- *  one hatched lane for whatever the plan still asks for and nobody covers. */
+ *  one hatched lane for whatever the plan still asks for and nobody covers.
+ *  The gap math counts a person as absent on their leave days — the bar stays
+ *  whole, the coverage under it does not. */
 export function buildProjectStaffingRows(
   items: DemandItem[],
   assignments: StaffingAssignment[],
+  leaves: Leave[],
   window: StaffingWindow,
 ): ProjectStaffingRow[] {
   const itemsByProject = new Map<string, DemandItem[]>();
@@ -629,6 +763,7 @@ export function buildProjectStaffingRows(
   }
 
   const rows: ProjectStaffingRow[] = [];
+  const awayByPerson = leaveRunsByPerson(leaves, window);
 
   for (const [projectId, projectItems] of itemsByProject) {
     const mine = assignments
@@ -643,14 +778,22 @@ export function buildProjectStaffingRows(
 
     const assignedByCapability = new Map<Capability, FteRun[]>();
     for (const m of mine) {
+      const pieces = subtractRuns(
+        { start: m.start, end: m.end, fte: m.fte },
+        awayByPerson.get(m.assignment.personId) ?? [],
+      );
+      if (!pieces.length) continue;
       const list = assignedByCapability.get(m.assignment.capability);
-      const run = { start: m.start, end: m.end, fte: m.fte };
-      if (list) list.push(run);
-      else assignedByCapability.set(m.assignment.capability, [run]);
+      if (list) list.push(...pieces);
+      else assignedByCapability.set(m.assignment.capability, pieces);
     }
 
     const lanes = packLanes(mine);
-    const { runs: gapRuns, missingFteDays } = gapRunsAcross(projectItems, assignedByCapability);
+    const { runs: gapRuns, missingFteDays } = gapRunsAcross(
+      projectItems,
+      assignedByCapability,
+      calendarFor(window.originIso),
+    );
 
     const starts = [...projectItems.map((i) => i.start), ...mine.map((m) => m.start)];
     const ends = [...projectItems.map((i) => i.end), ...mine.map((m) => m.end)];

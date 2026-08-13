@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
-import type { TeamVariantsApi } from "../hooks/useTeamVariants";
+import { useTeamVariants } from "../hooks/useTeamVariants";
+import { earliestStartOffsets } from "../hooks/useCapabilitySchedule";
 import {
   CAPABILITY_LABELS,
   CAPABILITY_ORDER,
@@ -10,6 +11,7 @@ import {
   totalCapabilityEffortDays,
   type TeamVariant,
 } from "../lib/estimation";
+import { leaveFteByMonth } from "../lib/leaves";
 import { simulateCapabilitySchedule } from "../lib/scheduling";
 import { usePlanner } from "../state/plannerContext";
 import type { Project } from "../types";
@@ -32,9 +34,6 @@ import "./timeline.css";
 
 interface TimelineViewProps {
   projects: Project[];
-  variantId: string;
-  variantsApi: TeamVariantsApi;
-  onVariantChange: (id: string) => void;
   theme: "auto" | "light" | "dark";
   onClose: () => void;
 }
@@ -57,20 +56,22 @@ interface CompareBand {
   isWholePlan: boolean;
 }
 
-export function TimelineView({
-  projects,
-  variantId,
-  variantsApi,
-  onVariantChange,
-  theme,
-  onClose,
-}: TimelineViewProps) {
+export function TimelineView({ projects, theme, onClose }: TimelineViewProps) {
+  // The one screen where variants apply — every other view plans on the live
+  // roster, so the comparison owns its selection instead of the app shell.
+  const variantsApi = useTeamVariants();
   const { variants } = variantsApi;
-  const { cells, people, settings } = usePlanner();
+  const [variantId, setVariantId] = useState(() => variants[0].id);
+  const { cells, people, leaves, settings } = usePlanner();
   // Every FTE figure in this view is headcount; productivity is in the rate,
   // and each capability's rate is its own people's.
   const edpm = useMemo(() => effectiveDaysByCapability(people, settings), [people, settings]);
   const baseline: TeamVariant = variants.find((v) => v.id === variantId) ?? variants[0];
+
+  // The baseline can be deleted from the editor below — fall back to the first.
+  useEffect(() => {
+    if (!variants.some((v) => v.id === variantId)) setVariantId(variants[0].id);
+  }, [variants, variantId]);
 
   const { ppm, setPpm, scrollRef } = useZoomGesture(ZOOMS[1].ppm);
   const [densityId, setDensityId] = useState("m");
@@ -107,6 +108,10 @@ export function TimelineView({
   // to account for phase gating and pool contention across capabilities.
   const wholePlanMonthsByVariant = useMemo(() => {
     const map: Record<string, number> = {};
+    // Same inputs as the harmonogram's simulation — dropping `earliestStart`
+    // here made the same variant finish earlier on this screen than on that one.
+    const earliestStart = earliestStartOffsets(plannedProjects);
+    const leaveDips = leaveFteByMonth(people, leaves);
     for (const v of variants) {
       const schedule = simulateCapabilitySchedule({
         projects: plannedProjects,
@@ -114,12 +119,15 @@ export function TimelineView({
         pools: v.fte,
         effectiveDaysPerMonth: edpm,
         minStaffingFraction: settings.minStaffingFraction,
+        minCrewFte: settings.minCrewFte,
+        earliestStart,
+        leaveFteByMonth: leaveDips,
       });
       const anyImpossible = schedule.scheduled.some((s) => s.isImpossible);
       map[v.id] = anyImpossible ? Infinity : schedule.horizonMonths;
     }
     return map;
-  }, [variants, plannedProjects, cells, edpm, settings.minStaffingFraction]);
+  }, [variants, plannedProjects, cells, edpm, people, leaves, settings.minStaffingFraction, settings.minCrewFte]);
 
   const bands: CompareBand[] = useMemo(() => {
     const capabilityBands = CAPABILITY_ORDER.map((capability) => {
@@ -227,7 +235,7 @@ export function TimelineView({
         style={{ height: D.row, background: hovered ? "var(--row-hover)" : "transparent" }}
         onMouseEnter={() => setHover(row.variant.id)}
         onMouseLeave={() => setHover((h) => (h === row.variant.id ? null : h))}
-        onClick={() => onVariantChange(row.variant.id)}
+        onClick={() => setVariantId(row.variant.id)}
       >
         <div
           className="atl-row-name"
@@ -398,7 +406,7 @@ export function TimelineView({
                 key={v.id}
                 type="button"
                 className={`atl-seg-text ${v.id === variantId ? "is-active" : ""}`}
-                onClick={() => onVariantChange(v.id)}
+                onClick={() => setVariantId(v.id)}
               >
                 {v.label}
               </button>
@@ -546,7 +554,7 @@ export function TimelineView({
         <VariantEditor
           api={variantsApi}
           activeId={baseline.id}
-          onActivate={onVariantChange}
+          onActivate={setVariantId}
           onClose={() => setEditorOpen(false)}
         />
       )}
