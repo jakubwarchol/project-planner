@@ -6,11 +6,12 @@ import type { Capability } from "../types";
 
 export const MAX_FTE_PER_CAPABILITY = 99;
 
-// One decimal place — fine-grained enough for a fraction of a person, coarse
-// enough that the matrix stays readable.
+// Quarters — the smallest staffing decision worth making. Finer steps are
+// false precision on the input side; derived figures (crew FTE, rates) stay
+// continuous, this only quantizes what a human decides.
 export function clampFte(value: number): number {
   if (!Number.isFinite(value)) return 0;
-  const rounded = Math.round(value * 10) / 10;
+  const rounded = Math.round(value * 4) / 4;
   return Math.min(Math.max(rounded, 0), MAX_FTE_PER_CAPABILITY);
 }
 

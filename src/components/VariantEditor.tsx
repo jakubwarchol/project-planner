@@ -108,6 +108,7 @@ export function VariantEditor({ api, activeId, onActivate, onClose }: VariantEdi
                     key={`${selected.id}-${capability}`}
                     initial={selected.fte[capability] ?? 0}
                     label={`FTE dla ${capability}`}
+                    decimals={2}
                     disabled={selected.isRosterDerived}
                     onCommit={(value) => setVariantFte(selected.id, capability, value)}
                   />
