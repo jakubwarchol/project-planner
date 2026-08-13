@@ -141,6 +141,27 @@ auto-zastosowanie**, i zawsze widać, kto traci. Oraz: **nie optymalizujemy
 urlopów** — technicznie ta sama maszyneria, ale zamienia narzędzie planistyczne
 w narzędzie nacisku na ludzi; urlopy pozostają danymi wejściowymi.
 
+### 8. Kwantyzacja etatów do ćwiartek
+
+Wszystkie **decyzje** etatowe w kroku 0,25: alokacje osób w Zespole,
+przypisania w Obsadzie, sufity `maxFte`, ruchy optymalizatora składu. Zyski:
+
+- przestrzeń przeszukiwania optymalizatora robi się skończona i mała, a
+  propozycje wykonalne — „przesuń 0,25 do QA" to decyzja, „przesuń 0,2137"
+  to szum; ćwiartka to minimalny „gruby, stabilny ruch",
+- znika fałszywa precyzja z danych wejściowych.
+
+**Nie kwantyzować wielkości wyliczanych.** FTE strumieni z modelu załogi są
+ciągłe z konstrukcji (kompetencja nadająca tempo biegnie na suficie, reszta
+dorzeźbiona, żeby skończyć razem — 0,63 FTE to średnie tempo fazy, nie obsada
+ułamka człowieka), a przypadki skrajne już mają mechanizm zrywu (`minCrewFte`).
+Ćwiartki dotyczą etatów nagłówkowych — pule efektywne po przemnożeniu przez
+produktywność pozostają ciągłe, i słusznie.
+
+Implementacja: krok 0,25 w polach liczbowych + granulacja ruchów
+optymalizatora; ewentualnie ustawienie „krok etatu", gdyby teoretyczny
+eksperyment potrzebował drobniej.
+
 ## Ulepszenia mniejsze
 
 - **Warianty projektowe w Symulacjach** — dziś warianty różnicują tylko zespół;
