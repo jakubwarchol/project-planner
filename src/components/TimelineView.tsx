@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTeamVariants } from "../hooks/useTeamVariants";
+import { usePoolProposal } from "../hooks/usePoolProposal";
 import { earliestStartOffsets } from "../hooks/useCapabilitySchedule";
+import { monthKeyOf, monthsFrom, parseMonthKey } from "../lib/calendar";
 import {
   CAPABILITY_LABELS,
   CAPABILITY_ORDER,
@@ -10,11 +12,14 @@ import {
   totalCapabilityEffortDays,
   type TeamVariant,
 } from "../lib/estimation";
+import { newId } from "../lib/id";
 import { leaveFteByMonth } from "../lib/leaves";
+import type { PoolSearchInput } from "../lib/poolOptimizer";
 import { simulateCapabilitySchedule } from "../lib/scheduling";
 import { usePlanner } from "../state/plannerContext";
-import type { Project } from "../types";
+import type { CapabilityVector, Project } from "../types";
 import { useZoomGesture } from "../hooks/useZoomGesture";
+import { PoolProposalDrawer } from "./PoolProposalDrawer";
 import { VariantEditor } from "./VariantEditor";
 import {
   DENSITIES,
@@ -23,6 +28,7 @@ import {
   buildAxis,
   fmt,
   monthLabel,
+  optimizedLabel,
   plCount,
   variantCaption,
   soft,
@@ -60,7 +66,7 @@ export function TimelineView({ projects, theme }: TimelineViewProps) {
   const variantsApi = useTeamVariants();
   const { variants } = variantsApi;
   const [variantId, setVariantId] = useState(() => variants[0].id);
-  const { cells, people, leaves, settings } = usePlanner();
+  const { cells, people, leaves, settings, addVariant } = usePlanner();
   // Every FTE figure in this view is headcount; productivity is in the rate,
   // and each capability's rate is its own people's.
   const edpm = useMemo(() => effectiveDaysByCapability(people, settings), [people, settings]);
@@ -76,14 +82,18 @@ export function TimelineView({ projects, theme }: TimelineViewProps) {
   const [keyOpen, setKeyOpen] = useState(true);
   const [hover, setHover] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
+  const [optimizerOpen, setOptimizerOpen] = useState(false);
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape" && editorOpen) setEditorOpen(false);
+      if (event.key !== "Escape") return;
+      // Innermost layer first: the editor is a modal above the drawer.
+      if (editorOpen) setEditorOpen(false);
+      else if (optimizerOpen) setOptimizerOpen(false);
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [editorOpen]);
+  }, [editorOpen, optimizerOpen]);
 
   const hueByVariant = useMemo(() => {
     const map: Record<string, number> = {};
@@ -99,15 +109,16 @@ export function TimelineView({ projects, theme }: TimelineViewProps) {
     [plannedProjects, cells],
   );
 
+  // Same inputs as the harmonogram's simulation — dropping `earliestStart`
+  // here made the same variant finish earlier on this screen than on that one.
+  const earliestStart = useMemo(() => earliestStartOffsets(plannedProjects), [plannedProjects]);
+  const leaveDips = useMemo(() => leaveFteByMonth(people, leaves), [people, leaves]);
+
   // A whole-plan month count run through the real phase-gated simulation for
   // each variant — cheap (three sims of ~47 projects) and the only honest way
   // to account for phase gating and pool contention across capabilities.
   const wholePlanMonthsByVariant = useMemo(() => {
     const map: Record<string, number> = {};
-    // Same inputs as the harmonogram's simulation — dropping `earliestStart`
-    // here made the same variant finish earlier on this screen than on that one.
-    const earliestStart = earliestStartOffsets(plannedProjects);
-    const leaveDips = leaveFteByMonth(people, leaves);
     for (const v of variants) {
       const schedule = simulateCapabilitySchedule({
         projects: plannedProjects,
@@ -123,7 +134,61 @@ export function TimelineView({ projects, theme }: TimelineViewProps) {
       map[v.id] = anyImpossible ? Infinity : schedule.horizonMonths;
     }
     return map;
-  }, [variants, plannedProjects, cells, edpm, people, leaves, settings.minStaffingFraction, settings.minCrewFte]);
+  }, [variants, plannedProjects, cells, edpm, earliestStart, leaveDips, settings.minStaffingFraction, settings.minCrewFte]);
+
+  // The optimizer's input — everything but the pools it searches over. The
+  // deadline map follows the Plan screen's comparison to the letter, past
+  // deadlines included un-clamped: still missable, still worth saving.
+  const nowMonth = useMemo(() => parseMonthKey(monthKeyOf(new Date()))!, []);
+  const deadlineMonths = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const p of plannedProjects) {
+      const m = monthsFrom(nowMonth, p.deadlineDate);
+      if (m != null) map[p.id] = m;
+    }
+    return map;
+  }, [plannedProjects, nowMonth]);
+
+  const optimizerInput = useMemo<PoolSearchInput>(
+    () => ({
+      projects: plannedProjects,
+      cells,
+      effectiveDaysPerMonth: edpm,
+      minStaffingFraction: settings.minStaffingFraction,
+      minCrewFte: settings.minCrewFte,
+      earliestStart,
+      leaveFteByMonth: leaveDips,
+      deadlineMonths,
+    }),
+    [plannedProjects, cells, edpm, earliestStart, leaveDips, settings.minStaffingFraction, settings.minCrewFte, deadlineMonths],
+  );
+
+  // Calls the simulation through the lib directly — the shared schedule hook's
+  // tiny identity-keyed cache would thrash under hundreds of trial vectors.
+  const proposal = usePoolProposal(baseline.fte, optimizerInput);
+  const projectById = useMemo(
+    () => new Map(plannedProjects.map((p) => [p.id, p] as const)),
+    [plannedProjects],
+  );
+  const baselineTotalFte = useMemo(
+    () => CAPABILITY_ORDER.reduce((sum, c) => sum + (baseline.fte[c] ?? 0), 0),
+    [baseline.fte],
+  );
+
+  const applyProposal = useCallback(
+    (vector: CapabilityVector) => {
+      const id = newId("variant");
+      const label = optimizedLabel(variants.map((v) => v.label), baseline.label);
+      // Straight through addVariant, not createVariant — clampFte would
+      // re-round the composed vector and store a different plan than the one
+      // the drawer previewed.
+      addVariant({ id, label, fte: vector, isRosterDerived: false });
+      setVariantId(id);
+      proposal.reset();
+      setOptimizerOpen(false);
+    },
+    [variants, baseline.label, addVariant, proposal],
+  );
 
   const bands: CompareBand[] = useMemo(() => {
     const capabilityBands = CAPABILITY_ORDER.map((capability) => {
@@ -407,6 +472,21 @@ export function TimelineView({ projects, theme }: TimelineViewProps) {
           <button type="button" className="atl-btn" onClick={() => setEditorOpen(true)}>
             Edytuj…
           </button>
+          <button
+            type="button"
+            className={`atl-btn ${optimizerOpen ? "is-on" : ""}`}
+            onClick={() => setOptimizerOpen(true)}
+            disabled={baselineTotalFte <= 0 || plannedProjects.length === 0}
+            title={
+              baselineTotalFte <= 0
+                ? "Wariant bez ludzi — nie ma czego przesuwać"
+                : plannedProjects.length === 0
+                  ? "Brak projektów w planie"
+                  : undefined
+            }
+          >
+            Optymalizuj…
+          </button>
         </div>
 
         <div className="atl-spacer" />
@@ -535,8 +615,19 @@ export function TimelineView({ projects, theme }: TimelineViewProps) {
           <span style={{ color: "var(--accent)" }}>wariant bazowy jest najszybszy</span>
         )}
         <span style={{ flex: 1 }} />
-        <span>kliknij wiersz, aby zmienić punkt odniesienia · esc zamyka warianty</span>
+        <span>kliknij wiersz, aby zmienić punkt odniesienia · esc zamyka panele</span>
       </footer>
+
+      {optimizerOpen && (
+        <PoolProposalDrawer
+          api={proposal}
+          baselineLabel={baseline.label}
+          projectById={projectById}
+          insets={{ top: D.hdr, bottom: D.foot }}
+          onApply={applyProposal}
+          onClose={() => setOptimizerOpen(false)}
+        />
+      )}
 
       {editorOpen && (
         <VariantEditor

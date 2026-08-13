@@ -80,7 +80,10 @@ export interface PoolMove {
   fte: number;
   /** Score after this move with every earlier move applied. */
   scoreAfter: PlanScore;
-  /** vs the state before this move; negative is better. */
+  /** vs the state before this move; negative is better. A healing move
+   *  (deltaImpossible < 0) legitimately *raises* deltaSumEnds — the healed
+   *  project's end rejoins the sum — so the UI must read this tier first. */
+  deltaImpossible: number;
   deltaMissed: number;
   deltaSumEnds: number;
   poolFromAfter: number;
@@ -454,6 +457,7 @@ export function stepSearch(state: SearchState): boolean {
     to,
     fte: increments * round.step,
     scoreAfter: winner.score,
+    deltaImpossible: winner.score.impossible - state.score.impossible,
     deltaMissed: winner.score.missedDeadlines - state.score.missedDeadlines,
     deltaSumEnds: winner.score.sumEndMonths - state.score.sumEndMonths,
     poolFromAfter: winner.pools[from],
@@ -501,10 +505,16 @@ function ceilingBindings(schedule: CapabilitySchedule, pools: CapabilityVector):
   return out;
 }
 
-export function searchResult(state: SearchState): PoolOptimizerResult {
-  const { deadlineMonths } = state.input;
-  const projectDeltas: ProjectEndDelta[] = state.schedule.scheduled.map((sp) => {
-    const before = state.endsBefore[sp.project.id] ?? 0;
+/** Per-project deltas of `schedule` against baseline ends — also what the UI
+ *  uses to re-price an accepted subset, so it lives here rather than in the
+ *  hook. */
+export function projectDeltasOf(
+  schedule: CapabilitySchedule,
+  endsBefore: Record<string, number>,
+  deadlineMonths: Record<string, number>,
+): ProjectEndDelta[] {
+  return schedule.scheduled.map((sp) => {
+    const before = endsBefore[sp.project.id] ?? 0;
     const after = sp.isImpossible || !Number.isFinite(sp.endMonths) ? Infinity : sp.endMonths;
     const deadline = deadlineMonths[sp.project.id];
     const missedOf = (end: number) =>
@@ -519,6 +529,10 @@ export function searchResult(state: SearchState): PoolOptimizerResult {
       missedAfter: missedOf(after),
     };
   });
+}
+
+export function searchResult(state: SearchState): PoolOptimizerResult {
+  const { deadlineMonths } = state.input;
   return {
     moves: state.moves,
     blocked: state.blocked,
@@ -526,7 +540,7 @@ export function searchResult(state: SearchState): PoolOptimizerResult {
     scoreAfter: state.score,
     poolsBefore: state.poolsBefore,
     poolsAfter: { ...state.pools },
-    projectDeltas,
+    projectDeltas: projectDeltasOf(state.schedule, state.endsBefore, deadlineMonths),
     hiring: state.hiring,
     ceilings: ceilingBindings(state.schedule, state.pools),
     floorBefore: floorDiagnostic(state.input, state.poolsBefore),

@@ -270,6 +270,7 @@ describe("composing the proposed vector", () => {
       to,
       fte,
       scoreAfter: score,
+      deltaImpossible: 0,
       deltaMissed: 0,
       deltaSumEnds: 0,
       poolFromAfter: 0,

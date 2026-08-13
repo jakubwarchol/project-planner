@@ -130,6 +130,24 @@ export function fmt2(n: number): string {
   return Math.abs(r - Math.round(r)) < 0.005 ? String(Math.round(r)) : r.toFixed(2);
 }
 
+/** Model months are averages, but "11 tygodni" lands better than "2,5 mies."
+ *  for deltas a human weighs — weeks are what sprints are made of. */
+export function weeksOf(months: number): number {
+  return (months * 52) / 12;
+}
+
+/** "Optymalizacja: Wariant 2", suffixed "(2)", "(3)"… when taken — the same
+ *  tidy-label spirit as the variant editor's "Wariant N". */
+export function optimizedLabel(existing: string[], baselineLabel: string): string {
+  const base = `Optymalizacja: ${baselineLabel}`;
+  if (!existing.includes(base)) return base;
+  for (let n = 2; n <= existing.length + 2; n += 1) {
+    const label = `${base} (${n})`;
+    if (!existing.includes(label)) return label;
+  }
+  return base;
+}
+
 /** "Mar 27" for a whole number of months after `startMonth` of `startYear`. */
 export function monthLabel(startYear: number, startMonth: number, offsetMonths: number): string {
   const abs = startMonth + Math.round(offsetMonths);
