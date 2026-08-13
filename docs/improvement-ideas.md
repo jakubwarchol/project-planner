@@ -86,6 +86,61 @@ przeciąganie projektów metodą prób i błędów w jedną sugestię do zaakcep
 Filozofia „deadline to fakt, nie wejście" zostaje nienaruszona: deadline'y
 byłyby celem optymalizacji kolejności, nie ograniczeniem schedulera.
 
+Zastrzeżenie z dyskusji: kolejność bywa nienegocjowalna. Zależności techniczne
+i ograniczenia kalendarzowe już są twarde (`blockedBy`, `earliestStartDate`);
+dla decyzji odgórnych potrzebne jest **przypinanie** — projekt (albo cała góra
+backlogu) zablokowany na pozycji, optymalizator permutuje tylko resztę. Przy w
+pełni sztywnej kolejności ta sama maszyneria działa jako **wycennik narzuconego
+porządku**: diff „kolejność narzucona vs najlepsza znaleziona" pokazuje, ile
+kosztuje utrzymanie priorytetów — spóźnienie przestaje być porażką zespołu,
+a staje się wycenioną, świadomą decyzją.
+
+### 7. Optymalizator składu zespołu
+
+Docelowa forma analizy wrażliwości pul i sufitów (to jedno pytanie, nie dwa):
+**przy ustalonym portfelu i ustalonej kolejności — jak rozłożyć zespół, żeby
+całość poszła jak najszybciej.** Rozstrzygnięcia z dyskusji (sierpień 2026):
+
+- **Cel: suma dat końca wszystkich projektów** (wszystko średnio wcześniej),
+  z deadline'ami jako warunkiem nadrzędnym. Sam makespan ignoruje wszystko
+  poza jednym maruderem.
+- **Założenie wymienialności ludzi** — model jest teoretyczny; zespół to suma
+  FTE do rozłożenia po kompetencjach, bez pytania kto co potrafi.
+- **Główna gałka: redystrybucja FTE między pulami**, zero-sum na obecnym
+  pogłowiu. Dopuszczalne 2–3 punkty zmiany w czasie (popyt przesuwa się z faz
+  inicjacji na wytwarzanie), z **karą za każdą zmianę** — ludzie to nie suwaki;
+  mało ruchów, grubych i stabilnych.
+- **Zatrudnianie osobno** — to ciężka decyzja, więc „co by dało +1 FTE i
+  gdzie" jest oddzielnym raportem obok propozycji, nie wmieszanym w nią.
+- **Sufity (`maxFte`) są raportowane, nie manipulowane.** Sufit to własność
+  pracy (jak drobno się dzieli), nie przypisanie ludzi — wolna zmienna
+  podkręciłaby wszystkie sufity do nieba (Goodhart) i plan przestałby opisywać
+  rzeczywiste projekty. Zamiast tego raport: „ten sufit ogranicza portfel;
+  inne pokrojenie pracy w projekcie X dałoby N tygodni".
+
+Mechanika: zachłanna pętla po diagnostyce, którą scheduler już produkuje —
+okresy czekania mają winne kompetencje i powód (`pool` vs `crew`), strumień
+nadający tempo jest oznaczony (`setsPace`). Symulacja → mapa gardeł w czasie →
+ruchy kandydujące tylko na gardło → ocena każdego symulacją (~14 ms) → najlepszy
+→ powtórz. Kluczowe rozróżnienie: gardło **puli** leczy się przesunięciem FTE,
+gardło **sufitu** — nie (dokładanie ludzi nie daje nic; do raportu).
+
+Po wysyceniu redystrybucji (marginalne zyski wyrównane między pulami) planem
+rządzą wyłącznie sufity — więc wynik ma dwie części: ruchy w składzie (do
+wykonania) i listę sufitów wartych zakwestionowania (do przemyślenia).
+
+Diagnostyk spinający: suma dni nakładu / łączne efektywne FTE miesięcznie =
+**absolutne minimum czasu portfela**. Różnicę plan − minimum można rozłożyć na
+przyczyny (sufity, fazowanie, urlopy) — od razu widać, ile jest do ugrania.
+
+Zależność: sensowna wycena zatrudnień wymaga zmiennego zespołu z ramp-upem
+(punkt 2) — inaczej „+1 BE od października" będzie zawsze zawyżone.
+
+Zasady wspólne wszystkich optymalizatorów: **propozycja z cennikiem, nigdy
+auto-zastosowanie**, i zawsze widać, kto traci. Oraz: **nie optymalizujemy
+urlopów** — technicznie ta sama maszyneria, ale zamienia narzędzie planistyczne
+w narzędzie nacisku na ludzi; urlopy pozostają danymi wejściowymi.
+
 ## Ulepszenia mniejsze
 
 - **Warianty projektowe w Symulacjach** — dziś warianty różnicują tylko zespół;
@@ -103,6 +158,21 @@ byłyby celem optymalizacji kolejności, nie ograniczeniem schedulera.
 - **Widok niewykorzystanej pojemności** — „ile FTE każdej kompetencji leży
   odłogiem w listopadzie". Odpowiada na pytanie odwrotne do zwykłego: nie
   „zdążymy?", tylko „czy stać nas na jeszcze jeden projekt?".
+- **Auto-przydział w Obsadzie** — inna matematyka niż przeszukiwanie symulacji:
+  klasyczne dopasowanie (przepływy / zachłanne z naprawą) proponujące komplet
+  przypisań z okien zapotrzebowania — minimalizuje luki i nadprzydziały,
+  preferuje ciągłość (mniej projektów na osobę naraz). Propozycja do
+  akceptacji; człowiek poprawia to, czego algorytm nie wie.
+- **Optymalizator zakresu („co wyciąć")** — gdy deadline'y się nie spinają,
+  enumeracja małych podzbiorów projektów do zaparkowania (przy 12 projektach
+  wszystkie pojedyncze i pary to ~78 symulacji ≈ sekunda): „wyłączenie X ratuje
+  deadline'y Y i Z". Lustrzanie: „czy nowy projekt zmieści się bez psucia
+  czegokolwiek, a jak nie — co dokładnie zepsuje".
+- **Ratownik deadline'ów** — parasol nad wszystkimi dźwigniami: dla padającego
+  deadline'u posortowana lista najtańszych ruchów (zamiana w kolejności /
+  zmiana składu / zaparkowanie projektu / nowy realny termin), każda z ceną
+  z diffu dwóch symulacji. Ma sens dopiero, gdy istnieją pojedyncze
+  optymalizatory, z których czerpie.
 
 ## Sugerowana kolejność wdrażania
 
@@ -112,4 +182,7 @@ byłyby celem optymalizacji kolejności, nie ograniczeniem schedulera.
    kalibrować.
 3. **Pozostały nakład** — gdy model zacznie być używany na bieżąco, a nie do
    jednorazowego planowania.
-4. Dalej według potrzeb: praca stała, niepewność, optymalizator, reszta.
+4. **Optymalizator składu zespołu** — najlepiej dopasowany do realnego użycia
+   (kolejność przyjmuje jako daną); tryb zatrudnieniowy dopiero po punkcie 1.
+5. Dalej według potrzeb: praca stała, niepewność, optymalizator kolejności,
+   reszta.
