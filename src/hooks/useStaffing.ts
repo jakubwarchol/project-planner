@@ -6,9 +6,12 @@ import type { Leave, StaffingAssignment } from "../types";
 export interface StaffingApi {
   assignments: StaffingAssignment[];
   leaves: Leave[];
-  addAssignment: (draft: Omit<StaffingAssignment, "id">) => void;
+  /** Returns the created record so the caller can offer "Cofnij" on it. */
+  addAssignment: (draft: Omit<StaffingAssignment, "id">) => StaffingAssignment;
   updateAssignment: (id: string, fields: Omit<StaffingAssignment, "id">) => void;
   removeAssignment: (id: string) => void;
+  /** Re-adds a removed assignment verbatim, id included — the undo of remove. */
+  restoreAssignment: (assignment: StaffingAssignment) => void;
   addLeave: (draft: Omit<Leave, "id">) => void;
   updateLeave: (id: string, fields: Omit<Leave, "id">) => void;
   removeLeave: (id: string) => void;
@@ -27,7 +30,11 @@ export function useStaffing(): StaffingApi {
   } = usePlanner();
 
   const createAssignment = useCallback(
-    (draft: Omit<StaffingAssignment, "id">) => addAssignment({ id: newId("assignment"), ...draft }),
+    (draft: Omit<StaffingAssignment, "id">) => {
+      const assignment = { id: newId("assignment"), ...draft };
+      addAssignment(assignment);
+      return assignment;
+    },
     [addAssignment],
   );
 
@@ -42,6 +49,7 @@ export function useStaffing(): StaffingApi {
     addAssignment: createAssignment,
     updateAssignment,
     removeAssignment,
+    restoreAssignment: addAssignment,
     addLeave: createLeave,
     updateLeave,
     removeLeave,

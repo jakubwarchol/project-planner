@@ -9,6 +9,7 @@ import {
   computeStaffingWindow,
   coverageOf,
   personLoadIn,
+  proposeStaffing,
   type StaffingWindow,
 } from "./staffing";
 import type { CapabilitySchedule, ScheduledProject, StreamSchedule } from "./scheduling";
@@ -472,6 +473,66 @@ describe("working-day month mapping", () => {
     const [item] = buildDemandItems(oneMonth(), MON_WINDOW, 10);
     expect(item.end).toBe(12); // ten working days end right after Fri Mar 13
     expect(item.requiredFteDays).toBeCloseTo(10);
+  });
+});
+
+describe("proposeStaffing", () => {
+  const schedule = fakeSchedule([fakeScheduledProject(fakeProject("p1"), [stream("BE", 0, 2, 1)])]);
+  const [item] = buildDemandItems(schedule, WINDOW, WDPM);
+
+  it("fills a hole with the free matching person, at the gap's size", () => {
+    const person = fakePerson("dev-1", "BE");
+    const proposals = proposeStaffing([item], [person], [], [], WINDOW);
+    expect(proposals).toEqual([{ itemId: item.id, personId: "dev-1", fte: 1 }]);
+  });
+
+  it("splits the hole across people when nobody free covers it alone", () => {
+    const half = fakePerson("dev-1", "BE");
+    const busy = fakeAssignment({ id: "b", personId: "dev-1", projectId: "other", startDate: iso(0), endDate: iso(2), fte: 0.5 });
+    const full = fakePerson("dev-2", "BE");
+    const proposals = proposeStaffing([item], [half, full], [busy], [], WINDOW);
+    // dev-2 is freer so goes first at the full gap; nothing is left for dev-1.
+    expect(proposals).toEqual([{ itemId: item.id, personId: "dev-2", fte: 1 }]);
+  });
+
+  it("tops up with a second person instead of overbooking the first", () => {
+    const a = fakePerson("dev-1", "BE");
+    const b = fakePerson("dev-2", "BE");
+    const parallel = [
+      fakeAssignment({ id: "b1", personId: "dev-1", projectId: "other", startDate: iso(0), endDate: iso(2), fte: 0.6 }),
+      fakeAssignment({ id: "b2", personId: "dev-2", projectId: "other", startDate: iso(0), endDate: iso(2), fte: 0.6 }),
+    ];
+    const proposals = proposeStaffing([item], [a, b], parallel, [], WINDOW);
+    expect(proposals).toHaveLength(2);
+    expect(proposals.map((p) => p.fte)).toEqual([0.4, 0.4]);
+    // 0.2 of the requirement stays open rather than pushing anyone past 1.0.
+  });
+
+  it("proposes nothing when the capability has nobody with head-room", () => {
+    const person = fakePerson("dev-1", "BE");
+    const busy = fakeAssignment({ id: "b", personId: "dev-1", projectId: "other", startDate: iso(0), endDate: iso(2), fte: 1 });
+    expect(proposeStaffing([item], [person], [busy], [], WINDOW)).toEqual([]);
+  });
+
+  it("never re-proposes someone already assigned to the item", () => {
+    const person = fakePerson("dev-1", "BE");
+    const already = fakeAssignment({ id: "a", personId: "dev-1", projectId: "p1", capability: "BE", startDate: iso(0), endDate: iso(1), fte: 0.5 });
+    const other = fakePerson("dev-2", "BE");
+    const proposals = proposeStaffing([item], [person, other], [already], [], WINDOW);
+    expect(proposals.every((p) => p.personId === "dev-2")).toBe(true);
+  });
+
+  it("prefers the person whose primary capability matches", () => {
+    const secondary: Person = {
+      id: "mixed",
+      name: "mixed",
+      teamId: "ZWO",
+      allocations: [{ capability: "TL", fte: 0.6 }, { capability: "BE", fte: 0.4 }],
+      focusFactor: DEFAULT_PERSON_FOCUS_FACTOR,
+    };
+    const primary = fakePerson("pure", "BE");
+    const [first] = proposeStaffing([item], [secondary, primary], [], [], WINDOW);
+    expect(first.personId).toBe("pure");
   });
 });
 

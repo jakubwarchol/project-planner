@@ -23,10 +23,11 @@ import {
   dateOfIso,
   dayIndex,
   isoOfDate,
+  isoOfIndex,
   workingDayCalendar,
   type WorkingDayCalendar,
 } from "./days";
-import { personAvailability } from "./estimation";
+import { allocationFor, personAvailability } from "./estimation";
 
 // One working-day prefix per window origin, shared by every helper in a render
 // pass — the sweeps below convert many small spans, and each would otherwise
@@ -427,6 +428,9 @@ export interface PersonLoad {
   capacity: number;
   leaveDays: number;
   projects: number;
+  /** What the load is made of, largest first — the candidate tooltip's answer
+   *  to "busy with what, exactly". */
+  projectFte: { projectId: string; fte: number }[];
 }
 
 /** What a person already carries across an arbitrary window — the figure the
@@ -466,13 +470,26 @@ export function personLoadIn(
 
   const leaveDays = away.reduce((sum, r) => sum + (r.end - r.start), 0);
 
+  const perProject = new Map<string, number>();
+  for (const r of runs) perProject.set(r.projectId, (perProject.get(r.projectId) ?? 0) + r.fte);
+
   return {
     peak,
     free: end > start ? spareDays / (end - start) : Math.max(0, capacity - peak),
     capacity,
     leaveDays,
-    projects: new Set(runs.map((r) => r.projectId)).size,
+    projects: perProject.size,
+    projectFte: [...perProject.entries()]
+      .map(([projectId, fte]) => ({ projectId, fte }))
+      .sort((a, b) => b.fte - a.fte),
   };
+}
+
+/** Their largest allocation — what someone is, as opposed to what they can
+ *  also do. A 0.6 TL / 0.4 BE is a tech lead who writes backend, and a
+ *  candidate list that ranked those two equally would be useless. */
+export function primaryCapability(person: Person): Capability | undefined {
+  return person.allocations.slice().sort((a, b) => b.fte - a.fte)[0]?.capability;
 }
 
 /** Ranking weight for the candidate list — ordering only, every figure the
@@ -493,6 +510,85 @@ export function candidateScore(c: {
     c.projects * 3 -
     (c.projects >= MAX_PARALLEL_PROJECTS ? 40 : 0)
   );
+}
+
+// ───────────────────────────────────────────────── rózdżka (wand) ──
+
+/** One suggested assignment, not yet made — the panel renders these as cards
+ *  the user accepts or rejects one by one, so nothing here writes anything. */
+export interface StaffingProposal {
+  itemId: string;
+  personId: string;
+  fte: number;
+}
+
+const MIN_PROPOSAL_FTE = 0.1;
+const roundFte = (n: number) => Math.round(n * 10) / 10;
+
+/**
+ * Greedy staffing for the given open items, worst hole first: repeatedly hand
+ * the item to the best-scoring person who has the capability, is not already
+ * on it, and still has head-room at the item's busiest moment — never past
+ * their availability, so a wand proposal cannot overbook anyone.
+ *
+ * Each proposal is appended to a tentative assignment list before the next is
+ * chosen, so two holes cannot both claim the same free half of a person. Gaps
+ * are re-read through `coverageOf`, which is leave-aware: a proposal that a
+ * leave keeps from closing the hole doesn't fool the loop into stopping.
+ */
+export function proposeStaffing(
+  items: DemandItem[],
+  people: Person[],
+  assignments: StaffingAssignment[],
+  leaves: Leave[],
+  window: StaffingWindow,
+): StaffingProposal[] {
+  const all = assignments.slice();
+  const out: StaffingProposal[] = [];
+  const gapOf = (item: DemandItem) => coverageOf(item, all, leaves, window).peakGap;
+
+  const ordered = items.slice().sort((a, b) => gapOf(b) - gapOf(a));
+  for (const item of ordered) {
+    let gap = gapOf(item);
+    // The guard bounds pathologies (a gap leave keeps open, a parade of 0.1
+    // slivers) — eight people on one capability of one project is already
+    // past the point where a human should be composing this by hand.
+    let guard = 0;
+    while (gap > 0.05 && guard++ < 8) {
+      let best: { person: Person; allocation: number; free: number; score: number } | null = null;
+      for (const person of people) {
+        const allocation = allocationFor(person, item.capability);
+        if (allocation <= EPS) continue;
+        const taken = all.some(
+          (a) =>
+            a.personId === person.id &&
+            a.projectId === item.projectId &&
+            a.capability === item.capability,
+        );
+        if (taken) continue;
+        const load = personLoadIn(person, all, leaves, window, item.start, item.end);
+        const free = load.capacity - load.peak;
+        if (free < 0.05) continue;
+        const primary = primaryCapability(person) === item.capability;
+        const score = (primary ? 100 : 60) + free * 40 - load.leaveDays * 0.3;
+        if (!best || score > best.score) best = { person, allocation, free, score };
+      }
+      if (!best) break;
+      const fte = Math.max(MIN_PROPOSAL_FTE, roundFte(Math.min(best.free, gap, best.allocation)));
+      out.push({ itemId: item.id, personId: best.person.id, fte });
+      all.push({
+        id: `proposal:${item.id}:${best.person.id}`,
+        personId: best.person.id,
+        projectId: item.projectId,
+        capability: item.capability,
+        startDate: isoOfIndex(window.originIso, item.start),
+        endDate: isoOfIndex(window.originIso, item.end),
+        fte,
+      });
+      gap = gapOf(item);
+    }
+  }
+  return out;
 }
 
 // ─────────────────────────────────────────── people rows (widok 1) ──

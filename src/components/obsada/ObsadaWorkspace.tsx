@@ -37,6 +37,13 @@ import "./obsada.css";
 
 export type ObsadaTab = "people" | "projects" | "assign";
 
+/** What Obsadzanie is focused on: one demand item, or a whole project's
+ *  staffing at once (widok zbiorczy). Lives up here so a jump from either
+ *  timeline can set it, and so it survives tab switches. */
+export type ObsadaSelection =
+  | { kind: "item"; id: string }
+  | { kind: "project"; id: string };
+
 const TABS: { id: ObsadaTab; label: string; chip: string }[] = [
   { id: "people", label: "Obciążenie ludzi", chip: "zaangażowanie osób" },
   { id: "projects", label: "Braki w projektach", chip: "kto i kiedy w projekcie" },
@@ -83,7 +90,7 @@ export function ObsadaWorkspace({ projects, theme }: ObsadaWorkspaceProps) {
 
   const [tab, setTab] = useState<ObsadaTab>("people");
   const [unit, setUnit] = useState<ObsadaUnit>("months");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selection, setSelection] = useState<ObsadaSelection | null>(null);
   const anchorDayRef = useRef<number | null>(null);
 
   const today = useMemo(() => new Date(), []);
@@ -104,7 +111,7 @@ export function ObsadaWorkspace({ projects, theme }: ObsadaWorkspaceProps) {
   const hueById = useMemo(() => buildHueMap(projects), [projects]);
 
   const openItem = useCallback((projectId: string, capability: Capability) => {
-    setSelectedId(`${projectId}:${capability}`);
+    setSelection({ kind: "item", id: `${projectId}:${capability}` });
     setTab("assign");
   }, []);
 
@@ -171,8 +178,8 @@ export function ObsadaWorkspace({ projects, theme }: ObsadaWorkspaceProps) {
           ctx={ctx}
           people={people}
           staffing={staffing}
-          selectedId={selectedId}
-          onSelect={setSelectedId}
+          selection={selection}
+          onSelect={setSelection}
         />
       )}
     </div>
