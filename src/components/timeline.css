@@ -3017,3 +3017,8 @@
   flex: none !important;
   color: var(--ink-3);
 }
+
+.atl-opt-mode {
+  display: flex;
+  gap: 6px;
+}

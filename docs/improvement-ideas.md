@@ -104,12 +104,18 @@ całość poszła jak najszybciej.** Rozstrzygnięcia z dyskusji (sierpień 2026
 - **Cel: suma dat końca wszystkich projektów** (wszystko średnio wcześniej),
   z deadline'ami jako warunkiem nadrzędnym. Sam makespan ignoruje wszystko
   poza jednym maruderem.
-- **Założenie wymienialności ludzi** — model jest teoretyczny; zespół to suma
-  FTE do rozłożenia po kompetencjach, bez pytania kto co potrafi.
+- **Wymienialność tylko wewnątrz kompetencji** (doprecyzowane po wdrożeniu v1):
+  dowolny z 4 BE robi cokolwiek z puli BE — ale PM nie staje się UX-em. Ruch
+  między pulami jest wykonalny wyłącznie przez ludzi, którzy realnie łączą
+  obie kompetencje w alokacjach, i najwyżej do wysokości ich etatu po stronie
+  oddającej (`transferLimits` w silniku, wyprowadzane z rostera). Tryb bez
+  ograniczeń istnieje jako opcja „docelowy skład" — odpowiada na pytanie
+  rekrutacyjne „jaki zespół chciałby ten portfel", nie jest planem przesunięć.
 - **Główna gałka: redystrybucja FTE między pulami**, zero-sum na obecnym
-  pogłowiu. Dopuszczalne 2–3 punkty zmiany w czasie (popyt przesuwa się z faz
-  inicjacji na wytwarzanie), z **karą za każdą zmianę** — ludzie to nie suwaki;
-  mało ruchów, grubych i stabilnych.
+  pogłowiu, w granicach transferów jak wyżej. Dopuszczalne 2–3 punkty zmiany
+  w czasie (popyt przesuwa się z faz inicjacji na wytwarzanie), z **karą za
+  każdą zmianę** — ludzie to nie suwaki; mało ruchów, grubych i stabilnych.
+  Przy szczupłych transferach główną dźwignią zostaje raport zatrudnieniowy.
 - **Zatrudnianie osobno** — to ciężka decyzja, więc „co by dało +1 FTE i
   gdzie" jest oddzielnym raportem obok propozycji, nie wmieszanym w nią.
 - **Sufity (`maxFte`) są raportowane, nie manipulowane.** Sufit to własność

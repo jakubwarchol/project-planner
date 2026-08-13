@@ -17,6 +17,12 @@ interface PoolProposalDrawerProps {
   /** Header/footer heights vary with the density control, unlike cm2's fixed
    *  chrome — so the drawer takes its vertical bounds from the screen. */
   insets: { top: number; bottom: number };
+  /** "real": moves only where someone on the roster links both capabilities.
+   *  "free": any pair — the recruitment-shape question, not an executable plan. */
+  mode: "real" | "free";
+  onModeChange: (mode: "real" | "free") => void;
+  /** Human-readable executable directions, e.g. "BE → SEC do 0.5". */
+  transfers: string[];
   onApply: (vector: CapabilityVector) => void;
   onClose: () => void;
 }
@@ -35,6 +41,9 @@ export function PoolProposalDrawer({
   baselineLabel,
   projectById,
   insets,
+  mode,
+  onModeChange,
+  transfers,
   onApply,
   onClose,
 }: PoolProposalDrawerProps) {
@@ -82,10 +91,46 @@ export function PoolProposalDrawer({
             terminów i kończą wszystkie projekty średnio wcześniej. Kolejność projektów, urlopy i
             sufity obłożenia zostają jak są.
           </p>
+          <div className="atl-opt-mode">
+            <button
+              type="button"
+              className={`atl-btn ${mode === "real" ? "is-on" : ""}`}
+              onClick={() => onModeChange("real")}
+            >
+              wykonalne zespołem
+            </button>
+            <button
+              type="button"
+              className={`atl-btn ${mode === "free" ? "is-on" : ""}`}
+              onClick={() => onModeChange("free")}
+            >
+              docelowy skład
+            </button>
+          </div>
+          {mode === "real" ? (
+            <>
+              <p className="is-muted">
+                Ruchy tylko tam, gdzie ktoś w zespole realnie łączy obie kompetencje — i najwyżej o
+                tyle, ile daje dziś stronie oddającej.
+              </p>
+              {transfers.length > 0 ? (
+                <p className="is-muted">możliwe kierunki: {transfers.join(" · ")}</p>
+              ) : (
+                <p className="is-muted">
+                  Nikt w zespole nie łączy dwóch kompetencji, więc nie ma czego przesuwać — zostaje
+                  raport „co kupiłby +1 etat".
+                </p>
+              )}
+            </>
+          ) : (
+            <p className="is-muted">
+              Bez ograniczeń kadrowych: odpowiedź na pytanie, jak powinien wyglądać zespół pod ten
+              portfel. To wskazówka rekrutacyjna, nie plan przesunięć — obecni ludzie nie zmieniają
+              kompetencji.
+            </p>
+          )}
           <p className="is-muted">
             Nic nie zostanie zapisane — przyjęte ruchy trafiają do nowego wariantu, obok obecnych.
-            Każdy ruch zakłada, że ludzie są wymienni między kompetencjami; tego program nie jest w
-            stanie sprawdzić.
           </p>
           <div>
             <button type="button" className="atl-primary" onClick={api.run}>
@@ -143,6 +188,11 @@ export function PoolProposalDrawer({
               )}
             </div>
           </div>
+          <p className="atl-opt-footnote">
+            {mode === "real"
+              ? "tryb: wykonalne obecnym zespołem — ruchy tylko po ludziach łączących kompetencje"
+              : "tryb: docelowy skład — wskazówka rekrutacyjna, nie plan przesunięć"}
+          </p>
           {(before.impossible > 0 || now.impossible > 0) && (
             <p className={`atl-opt-impossible ${now.impossible < before.impossible ? "is-ok" : ""}`}>
               projekty niewykonalne: {before.impossible} → {now.impossible}

@@ -49,12 +49,22 @@ export const MIN_GAIN = 0.25;
  *  running the search four times faster than one-sim-per-tick would. */
 export const SIMS_PER_STEP = 4;
 
+/** Max total FTE movable from one capability to another. People are
+ *  interchangeable *within* a capability, never across — so a pair is movable
+ *  only when someone on the roster really holds both, and only up to what
+ *  those people currently give the donor side. An absent pair is not movable
+ *  at all. Omitting the whole map runs the theoretical mode: any pair, no cap
+ *  — the "what team would this portfolio want" question, a recruitment shape
+ *  rather than an executable plan. */
+export type TransferLimits = Partial<Record<Capability, Partial<Record<Capability, number>>>>;
+
 /** Everything the search needs, minus the pools it is searching over. The
  *  caller precomputes deadline months so the lib stays date-free — the same
  *  contract `earliestStart` already uses: `monthsFrom(nowMonth, deadlineDate)`
  *  per project, past deadlines included un-clamped. */
 export type PoolSearchInput = Omit<SimulateInput, "pools"> & {
   deadlineMonths: Record<string, number>;
+  transferLimits?: TransferLimits;
 };
 
 /** Lexicographic, compared field by field in declaration order. The
@@ -295,6 +305,10 @@ export interface SearchState {
   endsBefore: Record<string, number>;
   /** Σ cell days per capability — receivers without demand are pruned. */
   demand: CapabilityVector;
+  /** Gross FTE moved per `${from}>${to}` pair, for the transfer limits. A
+   *  reverse move restores capacity — the person shifted back is the person
+   *  shifted there — so remaining capacity is netted across both directions. */
+  movedByPair: Record<string, number>;
   moves: PoolMove[];
   blocked: BlockedPoolCandidate[];
   phase: "search" | "hiring" | "done";
@@ -309,7 +323,7 @@ export interface SearchState {
 
 export function createSearch(pools: CapabilityVector, input: PoolSearchInput): SearchState {
   const poolsBefore = { ...pools };
-  const { deadlineMonths, ...simInput } = input;
+  const { deadlineMonths, transferLimits: _limits, ...simInput } = input;
   const schedule = simulateCapabilitySchedule({ ...simInput, pools: poolsBefore });
   const score = scoreOf(schedule, deadlineMonths);
   const endsBefore: Record<string, number> = {};
@@ -325,6 +339,7 @@ export function createSearch(pools: CapabilityVector, input: PoolSearchInput): S
     scoreBefore: score,
     endsBefore,
     demand: totalCapabilityEffortDays(input.projects, input.cells),
+    movedByPair: {},
     moves: [],
     blocked: [],
     phase: "search",
@@ -335,6 +350,17 @@ export function createSearch(pools: CapabilityVector, input: PoolSearchInput): S
     simulations: 1,
     truncated: false,
   };
+}
+
+/** FTE still movable from→to under the input's limits — Infinity when the
+ *  limits are absent (theoretical mode). Netted: a reverse move restores the
+ *  capacity it consumed. */
+function transferLeft(state: SearchState, from: Capability, to: Capability): number {
+  const limits = state.input.transferLimits;
+  if (!limits) return Infinity;
+  const cap = limits[from]?.[to] ?? 0;
+  const net = (state.movedByPair[`${from}>${to}`] ?? 0) - (state.movedByPair[`${to}>${from}`] ?? 0);
+  return cap - net;
 }
 
 function buildRound(state: SearchState, step: number): Round {
@@ -351,6 +377,10 @@ function buildRound(state: SearchState, step: number): Round {
       // nothing. Donors are *not* demand-filtered: a pool with people and no
       // work is the ideal donor.
       if (state.demand[to] <= EPS) continue;
+      // Nobody on the roster links these two capabilities (or those who do
+      // are already fully shifted) — skipped silently, not blocked: the
+      // constraint is structural, not a finding of this search.
+      if (transferLeft(state, from, to) < step - EPS) continue;
       queue.push({ from, to });
     }
   }
@@ -361,7 +391,7 @@ function buildRound(state: SearchState, step: number): Round {
 export function stepSearch(state: SearchState): boolean {
   if (state.phase === "done") return true;
 
-  const { deadlineMonths, ...simInput } = state.input;
+  const { deadlineMonths, transferLimits: _limits, ...simInput } = state.input;
   const simulate = (pools: CapabilityVector): CapabilitySchedule => {
     state.simulations += 1;
     return simulateCapabilitySchedule({ ...simInput, pools });
@@ -441,8 +471,13 @@ export function stepSearch(state: SearchState): boolean {
   // lines burning four rounds of simulations and four of the move budget.
   let winner = round.best;
   const { from, to } = winner;
+  const pairLeft = transferLeft(state, from, to);
   let increments = 1;
-  while (increments <= MAX_EXTENSION && winner.pools[from] >= round.step - EPS) {
+  while (
+    increments <= MAX_EXTENSION &&
+    winner.pools[from] >= round.step - EPS &&
+    (increments + 1) * round.step <= pairLeft + EPS
+  ) {
     const trial = shifted(winner.pools, from, to, round.step);
     const trialSchedule = simulate(trial);
     const trialScore = scoreOf(trialSchedule, deadlineMonths);
@@ -466,6 +501,8 @@ export function stepSearch(state: SearchState): boolean {
   state.pools = winner.pools;
   state.schedule = winner.schedule;
   state.score = winner.score;
+  const pairKey = `${from}>${to}`;
+  state.movedByPair[pairKey] = (state.movedByPair[pairKey] ?? 0) + increments * round.step;
   state.rescued = false;
   const rejected = round.rejected;
   state.round = null;

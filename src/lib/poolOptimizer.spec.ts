@@ -208,6 +208,36 @@ describe("the pool search", () => {
   });
 });
 
+describe("transfer limits — interchangeability holds within a capability, not across", () => {
+  it("caps a move at what the people linking both capabilities can shift", () => {
+    // Same starving-BE fixture as above, but only half a person really links
+    // QA and BE — the transfer stops there even though more would help.
+    const i: PoolSearchInput = {
+      ...input([project("p1")], cellsFor({ p1: { BE: { days: 120, maxFte: 2 } } })),
+      transferLimits: { QA: { BE: 0.5 } },
+    };
+    const result = runSearch(pools({ BE: 1, QA: 1 }), i);
+
+    expectInvariants(result);
+    expect(result.moves).toHaveLength(1);
+    expect(result.moves[0]).toMatchObject({ from: "QA", to: "BE", fte: 0.5 });
+    expect(result.poolsAfter.QA).toBeCloseTo(0.5, 6);
+  });
+
+  it("proposes nothing when no one on the roster links the capabilities", () => {
+    const i: PoolSearchInput = {
+      ...input([project("p1")], cellsFor({ p1: { BE: { days: 120, maxFte: 2 } } })),
+      transferLimits: {},
+    };
+    const result = runSearch(pools({ BE: 1, QA: 1 }), i);
+
+    expect(result.moves).toEqual([]);
+    expect(compareScores(result.scoreAfter, result.scoreBefore)).toBe(0);
+    // The hiring report still runs — it is the lever that remains.
+    expect(result.hiring).toHaveLength(CAPABILITY_ORDER.length);
+  });
+});
+
 describe("scoring", () => {
   it("treats an end exactly on the deadline as met, and just past it as missed", () => {
     const cells = cellsFor({ p1: { BE: { days: 120, maxFte: 2 } } });

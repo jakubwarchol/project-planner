@@ -14,7 +14,7 @@ import {
 } from "../lib/estimation";
 import { newId } from "../lib/id";
 import { leaveFteByMonth } from "../lib/leaves";
-import type { PoolSearchInput } from "../lib/poolOptimizer";
+import type { PoolSearchInput, TransferLimits } from "../lib/poolOptimizer";
 import { simulateCapabilitySchedule } from "../lib/scheduling";
 import { usePlanner } from "../state/plannerContext";
 import type { CapabilityVector, Project } from "../types";
@@ -27,6 +27,7 @@ import {
   ZOOMS,
   buildAxis,
   fmt,
+  fmt2,
   monthLabel,
   optimizedLabel,
   plCount,
@@ -149,6 +150,41 @@ export function TimelineView({ projects, theme }: TimelineViewProps) {
     return map;
   }, [plannedProjects, nowMonth]);
 
+  // People are interchangeable within a capability, never across — so a pair
+  // of pools is movable only through people who really hold both, and only up
+  // to what they currently give the donor side. Derived from the live roster
+  // regardless of baseline: it is the only people data there is.
+  const transferLimits = useMemo<TransferLimits>(() => {
+    const limits: TransferLimits = {};
+    for (const person of people) {
+      if (person.allocations.length < 2) continue;
+      for (const a of person.allocations) {
+        if (a.fte <= 0) continue;
+        for (const b of person.allocations) {
+          if (a.capability === b.capability) continue;
+          const row = (limits[a.capability] ??= {});
+          row[b.capability] = (row[b.capability] ?? 0) + a.fte;
+        }
+      }
+    }
+    return limits;
+  }, [people]);
+
+  const availableTransfers = useMemo(() => {
+    const rows: string[] = [];
+    for (const from of CAPABILITY_ORDER) {
+      const row = transferLimits[from];
+      if (!row) continue;
+      for (const to of CAPABILITY_ORDER) {
+        const cap = row[to];
+        if (cap && cap > 0) rows.push(`${from} → ${to} do ${fmt2(cap)}`);
+      }
+    }
+    return rows;
+  }, [transferLimits]);
+
+  const [optimizerMode, setOptimizerMode] = useState<"real" | "free">("real");
+
   const optimizerInput = useMemo<PoolSearchInput>(
     () => ({
       projects: plannedProjects,
@@ -159,8 +195,9 @@ export function TimelineView({ projects, theme }: TimelineViewProps) {
       earliestStart,
       leaveFteByMonth: leaveDips,
       deadlineMonths,
+      transferLimits: optimizerMode === "real" ? transferLimits : undefined,
     }),
-    [plannedProjects, cells, edpm, earliestStart, leaveDips, settings.minStaffingFraction, settings.minCrewFte, deadlineMonths],
+    [plannedProjects, cells, edpm, earliestStart, leaveDips, settings.minStaffingFraction, settings.minCrewFte, deadlineMonths, optimizerMode, transferLimits],
   );
 
   // Calls the simulation through the lib directly — the shared schedule hook's
@@ -624,6 +661,9 @@ export function TimelineView({ projects, theme }: TimelineViewProps) {
           baselineLabel={baseline.label}
           projectById={projectById}
           insets={{ top: D.hdr, bottom: D.foot }}
+          mode={optimizerMode}
+          onModeChange={setOptimizerMode}
+          transfers={availableTransfers}
           onApply={applyProposal}
           onClose={() => setOptimizerOpen(false)}
         />
