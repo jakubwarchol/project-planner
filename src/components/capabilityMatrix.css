@@ -337,8 +337,9 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  width: 340px;
-  flex: none;
+  /* The one elastic column: every other width in the row is fixed, so any
+     spare viewport goes to project names, never to the suma/ref tail. */
+  flex: 1 0 340px;
   padding: 0 14px 0 34px;
   background: var(--surface-2);
   border-right: 1px solid var(--line);
@@ -481,8 +482,7 @@
   display: flex;
   align-items: center;
   gap: 9px;
-  width: 340px;
-  flex: none;
+  flex: 1 0 340px;
   padding: 0 14px 0 4px;
   background: var(--surface);
   border-right: 1px solid var(--line);
@@ -594,6 +594,21 @@
   height: 24px;
 }
 
+.cm2-days .cm2-input {
+  padding-right: 4px;
+}
+
+.cm2-days-unit {
+  flex: none;
+  padding-right: 8px;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  color: var(--ink-4);
+  user-select: none;
+  pointer-events: none;
+}
+
 .cm2-input {
   flex: 1;
   min-width: 0;
@@ -695,6 +710,12 @@
 
 .cm2-ceil:hover .cm2-slot.is-on,
 .cm2-ceil:focus-within .cm2-slot.is-on {
+  color: var(--surface);
+}
+
+/* The chosen stop carries its value at rest — the strip answers "how much"
+   without a hover, and half values get a name they never had as labels. */
+.cm2-slot.is-current {
   color: var(--surface);
 }
 

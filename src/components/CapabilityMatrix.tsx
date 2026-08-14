@@ -73,7 +73,7 @@ const HELP_ITEMS: { token: string; tone?: "accent" | "warn"; title: string; body
     token: "0,5–3",
     tone: "accent",
     title: "Pasek na dole: maksymalne obłożenie (FTE)",
-    body: "Ile najwięcej osób tej kompetencji ma sens pracować równolegle. Jeden segment paska to pół etatu, zakres 0,5–3,0 — kliknij segment, aby ustawić sufit; podpisy 1 / 2 / 3 pojawiają się pod kursorem. Nie budżet, a granica sensownego zrównoleglenia: 60 dni przy max 2 FTE to około półtora miesiąca.",
+    body: "Ile najwięcej osób tej kompetencji ma sens pracować równolegle. Jeden segment paska to pół etatu, zakres 0,5–3,0 — kliknij segment, aby ustawić sufit; wybrany segment zawsze pokazuje swoją wartość, a podpisy 1 / 2 / 3 pojawiają się pod kursorem. Nie budżet, a granica sensownego zrównoleglenia: 60 dni przy max 2 FTE to około półtora miesiąca.",
   },
   {
     token: "1,4",
@@ -862,6 +862,7 @@ export function CapabilityMatrix({
                                         )
                                       }
                                     />
+                                    {days > 0 && <span className="cm2-days-unit">dni</span>}
                                   </div>
 
                                   {days > 0 && (
@@ -907,7 +908,7 @@ export function CapabilityMatrix({
                                                   ? 0
                                                   : -1
                                               }
-                                              className={`cm2-slot ${on ? "is-on" : ""}`}
+                                              className={`cm2-slot ${on ? "is-on" : ""} ${current ? "is-current" : ""}`}
                                               title={`Ustaw maksymalne obłożenie ${CAPABILITY_LABELS[capability]} na ${fmt(v)} FTE.${
                                                 isPace
                                                   ? " Ta kompetencja pracuje na maksimum i wyznacza długość fazy — podniesienie jej sufitu skróci projekt."
@@ -919,7 +920,7 @@ export function CapabilityMatrix({
                                                 setCell(project.id, capability, { maxFte: v });
                                               }}
                                             >
-                                              {v % 1 === 0 ? v : ""}
+                                              {current ? fmt(v) : v % 1 === 0 ? v : ""}
                                             </button>
                                           );
                                         })}
