@@ -210,6 +210,13 @@ eksperyment potrzebował drobniej.
   (2) wspólna rodzina wizualna „Propozycje" (✦ na obu przyciskach); (3)
   docelowo ratownik (wyżej) jako wspólne wejście: jedna lista dźwigni z cenami
   i etykietą typu, każda aplikowana po swojemu.
+  **Rozmieszczenie (rozstrzygnięte):** NIE osobna zakładka — propozycja musi
+  widzieć za sobą to, co zmienia, a ekran bez własnych danych robi się martwym
+  dashboardem. Silnik mieszka przy swoich danych (sufity w Wycenach, skład
+  w Symulacjach), a parasol jako drawer „Przyspiesz…" na ekranie **Plan** —
+  tam widać objawy (terminy, czekania, bezczynne FTE) i stamtąd pozycje
+  rankingu nawigują z kontekstem do właściwego narzędzia. Siódma zakładka
+  zyska rację bytu dopiero przy snapshotach/kalibracji („Historia planu").
 - **Ostrzeżenie o produktywności obsady** — plan liczy stawkę ze *średniej*
   produktywności puli, a Obsada przypisuje *konkretnych* ludzi. Gdy ważony
   focus przypisanych odbiega istotnie od średniej użytej w planie, pokrycie
