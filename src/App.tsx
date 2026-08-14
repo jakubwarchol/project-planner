@@ -17,6 +17,21 @@ import "./components/timeline.css";
 
 export type ThemeChoice = "auto" | "light" | "dark";
 
+const THEME_KEY = "planner-theme";
+
+function savedTheme(): ThemeChoice {
+  const saved = localStorage.getItem(THEME_KEY);
+  return saved === "auto" || saved === "light" || saved === "dark" ? saved : "dark";
+}
+
+/** The current screen lives in the URL hash — `#/team`, `#/matrix` — so a
+ *  refresh stays where you were and the browser's back button walks screens. */
+function screenFromHash(): Screen {
+  const hash = window.location.hash.replace(/^#\/?/, "");
+  const match = SCREENS.find((s) => s.id === hash);
+  return match ? match.id : "backlog";
+}
+
 /** The footer's one derived number. Its own component so the schedule is only
  *  simulated while the footer line is actually on screen — a hook cannot be
  *  called conditionally, but a component can be rendered conditionally. */
@@ -31,8 +46,23 @@ function App() {
   // variants live only inside the projections view, which owns them itself.
   const { pools } = useRoster();
   const [showEstimates, setShowEstimates] = useState(true);
-  const [screen, setScreen] = useState<Screen>("backlog");
-  const [theme, setTheme] = useState<ThemeChoice>("dark");
+  const [screen, setScreen] = useState<Screen>(screenFromHash);
+  const [theme, setTheme] = useState<ThemeChoice>(savedTheme);
+
+  useEffect(() => {
+    const hash = `#/${screen}`;
+    if (window.location.hash !== hash) window.location.hash = hash;
+  }, [screen]);
+
+  useEffect(() => {
+    const onHashChange = () => setScreen(screenFromHash());
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(THEME_KEY, theme);
+  }, [theme]);
   // One-shot cross-screen intents — "go there AND open its proposals panel".
   // The two optimizer drawers are halves of one question, so each one's
   // saturation point links to the other with the panel already open. An
