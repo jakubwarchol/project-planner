@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef } from "react";
-import { CAPABILITY_LABELS, effortDrift } from "../lib/estimation";
+import { CAPABILITY_LABELS } from "../lib/estimation";
 import type { ScheduledProject, StreamSchedule } from "../lib/scheduling";
 import type { CapabilityVector, EstimationSettings } from "../types";
 import { fmt } from "./timelineChrome";
@@ -260,7 +260,6 @@ export function ProjectBreakdownTip({
   const hasPace = [...rows1, ...rows2].some((r) => r.setsPace);
   const hasBurst = [...rows1, ...rows2].some((r) => r.isBurst);
   const totalDays = [...rows1, ...rows2].reduce((sum, r) => sum + r.days, 0);
-  const drift = effortDrift(sp.project, sp.assignedEffortDays, settings);
 
   return (
     <div
@@ -318,16 +317,6 @@ export function ProjectBreakdownTip({
           <>
             <br />* za mało pracy, by rozłożyć ją na całą fazę — idzie krótkim zrywem i kończy
             wcześniej
-          </>
-        )}
-        {drift.isMaterial && (
-          <>
-            <br />
-            <span className="atl-tip-short">
-              rozmiar {sp.project.estimate} sugeruje {numFmt(drift.reference)} dni, a powyższe liczy{" "}
-              {numFmt(drift.assigned)} ({drift.delta > 0 ? "+" : ""}
-              {numFmt(drift.delta)} dni) — harmonogram idzie za macierzą
-            </span>
           </>
         )}
         {sp.isImpossible && (

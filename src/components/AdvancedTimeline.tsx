@@ -12,7 +12,6 @@ import {
   CEILING_FTE_EPS,
   CEILING_FTE_STEPS,
   ESTIMATE_ORDER,
-  effortDrift,
   focusByCapability,
 } from "../lib/estimation";
 import { assignOwnLanes, type ScheduledProject } from "../lib/scheduling";
@@ -201,7 +200,6 @@ export function AdvancedTimeline({ projects, pools, onOpenMatrix, theme }: Advan
       outLabelColor = "var(--warn)";
     }
 
-    const drift = effortDrift(project, sp.assignedEffortDays, settings);
     // The deadline is drawn, never scheduled around — so it is derived here in
     // the view and never reaches the scheduler. A month already past still
     // gets a marker, at t=0, rather than being clamped away like an expired
@@ -252,12 +250,8 @@ export function AdvancedTimeline({ projects, pools, onOpenMatrix, theme }: Advan
             </span>
           )}
           <span
-            className={`atl-size ${drift.isMaterial ? "is-drifted" : ""}`}
-            title={
-              drift.isMaterial
-                ? `${project.estimate} sugeruje ${fmt(drift.reference)} dni, a zaplanowano ${fmt(drift.assigned)} (${drift.delta > 0 ? "+" : ""}${fmt(drift.delta)}) — harmonogram liczy z macierzy, nie z rozmiaru`
-                : `${project.estimate} — ${fmt(sp.assignedEffortDays)} z ${fmt(drift.reference)} dni nakładu przypisanych`
-            }
+            className="atl-size"
+            title={`rozmiar ${project.estimate} · ${fmt(sp.assignedEffortDays)} dni nakładu w macierzy`}
           >
             <span className="atl-size-ticks">
               {ESTIMATE_ORDER.map((_, k) => (
@@ -271,7 +265,6 @@ export function AdvancedTimeline({ projects, pools, onOpenMatrix, theme }: Advan
               ))}
             </span>
             <span className="atl-size-label">{project.estimate}</span>
-            {drift.isMaterial && <TriangleAlert size={10} />}
           </span>
         </div>
 
@@ -456,13 +449,13 @@ export function AdvancedTimeline({ projects, pools, onOpenMatrix, theme }: Advan
   }
 
   function renderBand(band: BandModel) {
+    // Only the rare, actionable state is counted here. A "waiting" tally used
+    // to sit alongside it, but in a capacity-bound portfolio nearly every
+    // project waits for someone at some point, so it flagged the whole band
+    // and told you nothing you could act on.
     const overs = band.rows.filter((r) => r.sp.isOverPool || r.sp.isImpossible).length;
-    const waits = band.rows.filter((r) =>
-      r.sp.waits.some((w) => w.reason === "pool" || w.reason === "crew" || w.reason === "blocked"),
-    ).length;
     const warnBits: { icon: typeof TriangleAlert; text: string }[] = [];
     if (overs) warnBits.push({ icon: TriangleAlert, text: `${overs} przeciążonych` });
-    if (waits) warnBits.push({ icon: Clock, text: `${waits} czekających` });
 
     const spanEnd = band.rows.reduce(
       (max, r) => (Number.isFinite(r.sp.endMonths) ? Math.max(max, r.sp.endMonths) : max),

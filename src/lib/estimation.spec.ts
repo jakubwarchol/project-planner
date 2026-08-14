@@ -3,10 +3,8 @@ import type { Capability, Person, Project } from "../types";
 import {
   DEFAULT_ESTIMATION_SETTINGS,
   DEFAULT_PERSON_FOCUS_FACTOR,
-  EFFORT_DRIFT_EPSILON_DAYS,
   derivePoolsFromPeople,
   effectiveDaysByCapability,
-  effortDrift,
   focusByCapability,
   personEffectiveFte,
   referenceEffortDays,
@@ -37,63 +35,6 @@ describe("referenceEffortDays", () => {
     // L weighs 10, at the default 6 days per point.
     expect(referenceEffortDays(project("L"), settings)).toBe(60);
     expect(referenceEffortDays(project("XXL"), settings)).toBe(186);
-  });
-});
-
-describe("effortDrift", () => {
-  it("treats a row that matches its size as agreeing", () => {
-    const drift = effortDrift(project("L"), 60, settings);
-    expect(drift).toMatchObject({ reference: 60, assigned: 60, delta: 0 });
-    expect(drift.differs).toBe(false);
-    expect(drift.isMaterial).toBe(false);
-  });
-
-  it("ignores the floating-point dust left by splitting a total seven ways", () => {
-    // 24.000000000000004 vs 24 is the same number, not a data-quality problem.
-    const drift = effortDrift(project("M"), 24.000000000000004, settings);
-    expect(drift.differs).toBe(false);
-    expect(drift.isMaterial).toBe(false);
-  });
-
-  it("notices a small difference while editing without calling it material", () => {
-    // 3 days short of a 60-day L: visible in the matrix, not worth an alarm.
-    const drift = effortDrift(project("L"), 57, settings);
-    expect(drift.delta).toBe(-3);
-    expect(drift.differs).toBe(true);
-    expect(drift.isMaterial).toBe(false);
-  });
-
-  it("flags a difference past a tenth of the reference as material", () => {
-    const drift = effortDrift(project("L"), 45, settings); // -25%
-    expect(drift.delta).toBe(-15);
-    expect(drift.isMaterial).toBe(true);
-  });
-
-  it("flags a row that overshoots its size, not just one that falls short", () => {
-    const drift = effortDrift(project("L"), 80, settings);
-    expect(drift.delta).toBe(20);
-    expect(drift.isMaterial).toBe(true);
-  });
-
-  it("scales the tolerance with the project, so a big row isn't judged by a small one's yardstick", () => {
-    // The same 18 days adrift is nearly a third of an L but under a tenth of
-    // an XXL, so it is material for one and not the other.
-    expect(effortDrift(project("L"), 42, settings).isMaterial).toBe(true);
-    expect(effortDrift(project("XXL"), 168, settings).isMaterial).toBe(false);
-    expect(effortDrift(project("XXL"), 146, settings).isMaterial).toBe(true);
-  });
-
-  it("keeps a floor under the tolerance so a tiny project isn't judged by percentages alone", () => {
-    // 10% of an S (6 days) is 0.6, below the dust threshold — the floor wins,
-    // so an S is only material once it is off by more than half a day.
-    expect(effortDrift(project("S"), 6 - EFFORT_DRIFT_EPSILON_DAYS / 2, settings).isMaterial).toBe(false);
-    expect(effortDrift(project("S"), 3, settings).isMaterial).toBe(true);
-  });
-
-  it("reports a wholly unassigned row as materially adrift", () => {
-    const drift = effortDrift(project("XL"), 0, settings);
-    expect(drift.delta).toBe(-114);
-    expect(drift.isMaterial).toBe(true);
   });
 });
 

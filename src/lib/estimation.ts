@@ -123,58 +123,10 @@ export function emptyCapabilityVector(): CapabilityVector {
  * matrix, never an input to the plan. Nothing in `scheduling.ts` reads it: the
  * schedule is built entirely from each project's capability row, so the matrix
  * is the single source of truth for effort. The size is how you *arrive* at a
- * row and what you check it against afterwards; see `effortDrift`.
+ * row and what you check it against afterwards.
  */
 export function referenceEffortDays(project: Project, settings: EstimationSettings): number {
   return settings.estimateValues[project.estimate] * settings.daysPerValue;
-}
-
-/** Below this the two figures are the same number, and the difference is
- *  floating-point dust from splitting a total across seven capabilities. */
-export const EFFORT_DRIFT_EPSILON_DAYS = 0.5;
-
-/** Past this share of the reference it isn't a rounding difference any more —
- *  the size and the matrix are telling two different stories about the same
- *  project, and only one of them is being scheduled. */
-export const EFFORT_DRIFT_TOLERANCE = 0.1;
-
-export interface EffortDrift {
-  /** Days implied by the T-shirt size. */
-  reference: number;
-  /** Days actually assigned across capabilities — what gets scheduled. */
-  assigned: number;
-  /** assigned - reference; negative means the row is short of its size. */
-  delta: number;
-  /** Differs by more than floating-point dust — worth showing while editing. */
-  differs: boolean;
-  /** Differs enough that the plan no longer reflects the stated size. */
-  isMaterial: boolean;
-}
-
-/**
- * Compare a project's scheduled effort against the size it was given.
- *
- * Deliberately a warning rather than a block: a row is filled in one
- * capability at a time, so it is legitimately short of its reference for as
- * long as someone is editing it. Refusing to save a half-assigned row would
- * make the matrix unusable; what matters is that a row left disagreeing is
- * visible rather than silently scheduled.
- */
-export function effortDrift(
-  project: Project,
-  assignedDays: number,
-  settings: EstimationSettings,
-): EffortDrift {
-  const reference = referenceEffortDays(project, settings);
-  const delta = assignedDays - reference;
-  const magnitude = Math.abs(delta);
-  return {
-    reference,
-    assigned: assignedDays,
-    delta,
-    differs: magnitude > EFFORT_DRIFT_EPSILON_DAYS,
-    isMaterial: magnitude > Math.max(EFFORT_DRIFT_EPSILON_DAYS, reference * EFFORT_DRIFT_TOLERANCE),
-  };
 }
 
 /**

@@ -102,8 +102,7 @@ export interface ScheduledProject {
   isOverPool: boolean;
   overPoolCapabilities: Capability[];
   /** Sum of the row's assigned days — the effort this schedule was actually
-   *  built from. Feed it to `effortDrift` with the project's T-shirt size to
-   *  see whether the two still agree. */
+   *  built from. */
   assignedEffortDays: number;
   /** Row sums to 0 — nothing to schedule, not an error. */
   hasNoDemand: boolean;

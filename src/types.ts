@@ -75,8 +75,8 @@ export interface Person {
 export interface CapabilityCell {
   /** Effort in days assigned to this capability. 0 = capability not needed.
    *  These cells are what the scheduler plans from — the source of truth for
-   *  effort. They *should* sum to the project's `referenceEffortDays`, and
-   *  `effortDrift` (estimation.ts) flags it when they don't. */
+   *  effort. The project's `referenceEffortDays` is a sanity check beside
+   *  them, never a constraint on them. */
   days: number;
   /** The most people you would ever usefully put on this capability's share
    *  of this project at once — a **ceiling**, not a target.

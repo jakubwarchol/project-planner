@@ -564,16 +564,6 @@
   width: 22px;
 }
 
-/* The row is scheduled from effort that no longer matches its T-shirt size. */
-.atl-size.is-drifted .atl-size-label {
-  color: var(--warn);
-}
-
-.atl-size.is-drifted svg {
-  flex: none;
-  color: var(--warn);
-}
-
 .atl-row-track {
   position: relative;
   flex: none;
