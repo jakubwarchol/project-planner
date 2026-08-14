@@ -588,9 +588,11 @@
   color: var(--ink-4);
 }
 
+/* Baseline, not center: the unit reads as part of the number ("40 dni"),
+   so it sits on the digits' baseline instead of floating mid-cell. */
 .cm2-days {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   height: 24px;
 }
 
