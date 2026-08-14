@@ -33,6 +33,18 @@ function App() {
   const [showEstimates, setShowEstimates] = useState(true);
   const [screen, setScreen] = useState<Screen>("backlog");
   const [theme, setTheme] = useState<ThemeChoice>("dark");
+  // One-shot cross-screen intents — "go there AND open its proposals panel".
+  // The two optimizer drawers are halves of one question, so each one's
+  // saturation point links to the other with the panel already open. An
+  // intent survives only while its target screen is current, so a later
+  // manual visit opens the screen plain.
+  const [matrixProposalsIntent, setMatrixProposalsIntent] = useState(false);
+  const [compareOptimizerIntent, setCompareOptimizerIntent] = useState(false);
+
+  useEffect(() => {
+    if (screen !== "matrix") setMatrixProposalsIntent(false);
+    if (screen !== "compare") setCompareOptimizerIntent(false);
+  }, [screen]);
 
   useEffect(() => {
     document.body.style.overflow = screen === "backlog" ? "" : "hidden";
@@ -106,9 +118,29 @@ function App() {
 
       {screen === "team" && <TeamView theme={theme} />}
 
-      {screen === "matrix" && <CapabilityMatrix projects={projects} theme={theme} />}
+      {screen === "matrix" && (
+        <CapabilityMatrix
+          projects={projects}
+          theme={theme}
+          initialShowProposals={matrixProposalsIntent}
+          onOpenCompareOptimizer={() => {
+            setCompareOptimizerIntent(true);
+            setScreen("compare");
+          }}
+        />
+      )}
 
-      {screen === "compare" && <TimelineView projects={projects} theme={theme} />}
+      {screen === "compare" && (
+        <TimelineView
+          projects={projects}
+          theme={theme}
+          initialOptimizerOpen={compareOptimizerIntent}
+          onOpenMatrixProposals={() => {
+            setMatrixProposalsIntent(true);
+            setScreen("matrix");
+          }}
+        />
+      )}
 
       {screen === "advanced" && (
         <AdvancedTimeline

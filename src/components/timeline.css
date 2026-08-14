@@ -3022,3 +3022,9 @@
   display: flex;
   gap: 6px;
 }
+
+.atl-spark {
+  font-family: var(--atl-mono);
+  font-size: 11px;
+  line-height: 1;
+}

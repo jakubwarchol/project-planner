@@ -41,6 +41,12 @@ import "./timeline.css";
 interface TimelineViewProps {
   projects: Project[];
   theme: "auto" | "light" | "dark";
+  /** Arrive with the optimizer drawer already open — the cross-screen link
+   *  from the autopilot's "nobody to add" blocks in Wyceny. */
+  initialOptimizerOpen?: boolean;
+  /** The reverse link: the ceilings report's "raise it in Wyceny" button,
+   *  landing there with the proposals drawer open. */
+  onOpenMatrixProposals: () => void;
 }
 
 const WHOLE_PLAN = "Cała praca";
@@ -61,7 +67,12 @@ interface CompareBand {
   isWholePlan: boolean;
 }
 
-export function TimelineView({ projects, theme }: TimelineViewProps) {
+export function TimelineView({
+  projects,
+  theme,
+  initialOptimizerOpen,
+  onOpenMatrixProposals,
+}: TimelineViewProps) {
   // The one screen where variants apply — every other view plans on the live
   // roster, so the comparison owns its selection instead of the app shell.
   const variantsApi = useTeamVariants();
@@ -83,7 +94,7 @@ export function TimelineView({ projects, theme }: TimelineViewProps) {
   const [keyOpen, setKeyOpen] = useState(true);
   const [hover, setHover] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
-  const [optimizerOpen, setOptimizerOpen] = useState(false);
+  const [optimizerOpen, setOptimizerOpen] = useState(initialOptimizerOpen ?? false);
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -522,7 +533,7 @@ export function TimelineView({ projects, theme }: TimelineViewProps) {
                   : undefined
             }
           >
-            Optymalizuj…
+            <span className="atl-spark">✦</span> Optymalizuj…
           </button>
         </div>
 
@@ -665,6 +676,7 @@ export function TimelineView({ projects, theme }: TimelineViewProps) {
           onModeChange={setOptimizerMode}
           transfers={availableTransfers}
           onApply={applyProposal}
+          onOpenMatrixProposals={onOpenMatrixProposals}
           onClose={() => setOptimizerOpen(false)}
         />
       )}

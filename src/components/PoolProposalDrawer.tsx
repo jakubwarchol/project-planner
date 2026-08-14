@@ -24,6 +24,9 @@ interface PoolProposalDrawerProps {
   /** Human-readable executable directions, e.g. "BE → SEC do 0.5". */
   transfers: string[];
   onApply: (vector: CapabilityVector) => void;
+  /** Cross-screen link from the ceilings report: land in Wyceny with the
+   *  ceiling proposals drawer already open. */
+  onOpenMatrixProposals: () => void;
   onClose: () => void;
 }
 
@@ -45,6 +48,7 @@ export function PoolProposalDrawer({
   onModeChange,
   transfers,
   onApply,
+  onOpenMatrixProposals,
   onClose,
 }: PoolProposalDrawerProps) {
   const { status, result, found, simulations, accepted, preview } = api;
@@ -283,7 +287,11 @@ export function PoolProposalDrawer({
             <BlockedPoolRows blocked={result.blocked} />
 
             <HiringReport hiring={result.hiring} scoreAfter={result.scoreAfter} />
-            <CeilingsReport result={result} nameOf={nameOf} />
+            <CeilingsReport
+              result={result}
+              nameOf={nameOf}
+              onOpenMatrixProposals={onOpenMatrixProposals}
+            />
             <FloorReport before={result.floorBefore} after={result.floorAfter} />
 
             <p className="atl-opt-footnote">
@@ -358,9 +366,11 @@ function HiringReport({ hiring, scoreAfter }: { hiring: HiringEntry[]; scoreAfte
 function CeilingsReport({
   result,
   nameOf,
+  onOpenMatrixProposals,
 }: {
   result: PoolOptimizerResult;
   nameOf: (id: string) => string;
+  onOpenMatrixProposals: () => void;
 }) {
   const bound = result.ceilings.filter((c) => c.ceilingBound);
   const poolBound = result.ceilings.length - bound.length;
@@ -393,6 +403,13 @@ function CeilingsReport({
           {plCount(poolBound, "komórka nadaje tempo", "komórki nadają tempo", "komórek nadaje tempo")}{" "}
           z ograniczenia puli, nie sufitu
         </p>
+      )}
+      {bound.length > 0 && (
+        <div>
+          <button type="button" className="atl-ghost" onClick={onOpenMatrixProposals}>
+            <span className="atl-spark">✦</span> Otwórz Propozycje sufitów w Wycenach
+          </button>
+        </div>
       )}
     </div>
   );
