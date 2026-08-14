@@ -20,6 +20,10 @@
   --accent: #4b3691;
   --accent-line: #7c66cd;
   --accent-wash: rgba(75, 54, 145, 0.12);
+  /* The build phase's pace colour — far enough from accent to read apart at
+     a 20px-wide segment, and not the warn orange already spoken for. */
+  --pace2: #0f6b78;
+  --pace2-wash: rgba(15, 107, 120, 0.14);
   --warn: #8a3f10;
   --warn-wash: rgba(138, 63, 16, 0.14);
   --ok: #27603c;
@@ -52,6 +56,8 @@
     --accent: #bcaaff;
     --accent-line: #7a68cf;
     --accent-wash: rgba(188, 170, 255, 0.16);
+    --pace2: #6fd3e0;
+    --pace2-wash: rgba(111, 211, 224, 0.16);
     --warn: #f5ab74;
     --warn-wash: rgba(245, 171, 116, 0.16);
     --ok: #7fd0a1;
@@ -82,6 +88,8 @@
   --accent: #bcaaff;
   --accent-line: #7a68cf;
   --accent-wash: rgba(188, 170, 255, 0.16);
+  --pace2: #6fd3e0;
+  --pace2-wash: rgba(111, 211, 224, 0.16);
   --warn: #f5ab74;
   --warn-wash: rgba(245, 171, 116, 0.16);
   --ok: #7fd0a1;
@@ -593,11 +601,12 @@
 .cm2-days {
   display: flex;
   align-items: baseline;
-  height: 24px;
+  height: 28px;
 }
 
 .cm2-days .cm2-input {
   padding-right: 4px;
+  font-size: 17px;
 }
 
 .cm2-days-unit {
@@ -681,12 +690,31 @@
   border-right-color: color-mix(in oklab, var(--surface) 35%, transparent);
 }
 
-.cm2-ceil.is-pace .cm2-slot.is-on {
+/* Two phases, two pace-setters, two colours: accent for inicjacja, teal for
+   budowa. A capability that paces both (PM and TL straddle the split) gets a
+   strip split between them rather than an arbitrary winner. */
+.cm2-ceil.is-pace1 .cm2-slot.is-on {
   background: var(--accent);
 }
 
-.cm2-ceil.is-pace .cm2-slot:not(.is-on) {
+.cm2-ceil.is-pace1 .cm2-slot:not(.is-on) {
   background: var(--accent-wash);
+}
+
+.cm2-ceil.is-pace2 .cm2-slot.is-on {
+  background: var(--pace2);
+}
+
+.cm2-ceil.is-pace2 .cm2-slot:not(.is-on) {
+  background: var(--pace2-wash);
+}
+
+.cm2-ceil.is-pace1.is-pace2 .cm2-slot.is-on {
+  background: linear-gradient(160deg, var(--accent) 48%, var(--pace2) 52%);
+}
+
+.cm2-ceil.is-pace1.is-pace2 .cm2-slot:not(.is-on) {
+  background: linear-gradient(160deg, var(--accent-wash) 48%, var(--pace2-wash) 52%);
 }
 
 /* The stop under the cursor announces itself — a ring names the exact
@@ -991,6 +1019,37 @@
 
 .cm2-tally-item span {
   color: var(--ink-3);
+}
+
+/* Reads the strip's colours back: a swatch per phase plus the slack grey,
+   so "why are two cells lit" is answered without opening the help. */
+.cm2-legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cm2-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--ink-3);
+}
+
+.cm2-legend-chip {
+  width: 12px;
+  height: 8px;
+  flex: none;
+  border-radius: 1px;
+  background: var(--ink-2);
+}
+
+.cm2-legend-chip.is-pace1 {
+  background: var(--accent);
+}
+
+.cm2-legend-chip.is-pace2 {
+  background: var(--pace2);
 }
 
 /* ── drawers: help and proposals ────────────────────────────────────────── */

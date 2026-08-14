@@ -55,9 +55,11 @@ const CEIL_EPS = 0.001;
 const signed = (n: number) => `${n >= 0 ? "+" : "−"}${fmt(Math.abs(n))}`;
 
 /** What the scheduler made of one project × capability, folded across phases.
- *  PM and TL run in both, so the cell shows the larger crew and says so. */
+ *  PM and TL run in both, so the cell shows the larger crew and says so.
+ *  `pacePhases` keeps WHICH phase this capability holds — inicjacja and
+ *  budowa each have their own pace-setter, and the strip colours them apart. */
 interface CellPlan {
-  setsPace: boolean;
+  pacePhases: number[];
   crewFte: number;
   isBurst: boolean;
   phases: number[];
@@ -83,8 +85,8 @@ const HELP_ITEMS: { token: string; tone?: "accent" | "warn"; title: string; body
   {
     token: "▮",
     tone: "accent",
-    title: "Fioletowe wypełnienie wyznacza tempo",
-    body: "Pasek wypełnia się fioletem w komórce, która pracuje na swoim maksimum i wyznacza długość fazy — tylko podniesienie jej sufitu skróci projekt. Pozostałe komórki mają zapas, więc ich pasek zostaje szary i jego podniesienie niczego nie zmieni.",
+    title: "Kolor wypełnienia wyznacza tempo fazy",
+    body: "Projekt biegnie w dwóch fazach: inicjacja (PM, UX, TL) i budowa (PM, TL, BE, FE, QA, SEC). W każdej dokładnie jedna kompetencja pracuje na swoim maksimum i wyznacza jej długość — fiolet oznacza tempo inicjacji, morski tempo budowy. Dlatego w jednym wierszu mogą świecić dwa paski: to dwie różne odpowiedzi. Pozostałe komórki mają zapas, ich pasek zostaje szary i jego podniesienie niczego nie zmieni.",
   },
   {
     token: "≡",
@@ -147,13 +149,13 @@ export function CapabilityMatrix({
         const prev = map.get(key);
         if (!prev) {
           map.set(key, {
-            setsPace: stream.setsPace,
+            pacePhases: stream.setsPace ? [stream.phase] : [],
             crewFte: stream.crewFte,
             isBurst: stream.isBurst,
             phases: [stream.phase],
           });
         } else {
-          prev.setsPace = prev.setsPace || stream.setsPace;
+          if (stream.setsPace) prev.pacePhases.push(stream.phase);
           prev.crewFte = Math.max(prev.crewFte, stream.crewFte);
           prev.isBurst = prev.isBurst && stream.isBurst;
           prev.phases.push(stream.phase);
@@ -797,7 +799,9 @@ export function CapabilityMatrix({
                           const off = excluded.has(`${project.id}:${capability}`);
                           const flagged = !off && days > 0 && cell.maxFte <= 0;
                           const cp = cellPlan.get(`${project.id}:${capability}`);
-                          const isPace = cp?.setsPace ?? false;
+                          const isPace1 = cp?.pacePhases.includes(1) ?? false;
+                          const isPace2 = cp?.pacePhases.includes(2) ?? false;
+                          const isPace = isPace1 || isPace2;
                           // The strip's roving tabindex: the slot holding the
                           // current ceiling is the one Tab (and the grid walk)
                           // lands on; with no on-grid value, the first slot is.
@@ -886,7 +890,7 @@ export function CapabilityMatrix({
                                       )}
 
                                       <div
-                                        className={`cm2-ceil ${isPace ? "is-pace" : ""} ${flagged ? "is-flagged" : ""}`}
+                                        className={`cm2-ceil ${isPace1 ? "is-pace1" : ""} ${isPace2 ? "is-pace2" : ""} ${flagged ? "is-flagged" : ""}`}
                                         data-cm-row={rowIndexById[project.id]}
                                         data-cm-col={`${capability}:ceil`}
                                         role="radiogroup"
@@ -911,7 +915,13 @@ export function CapabilityMatrix({
                                               className={`cm2-slot ${on ? "is-on" : ""} ${current ? "is-current" : ""}`}
                                               title={`Ustaw maksymalne obłożenie ${CAPABILITY_LABELS[capability]} na ${fmt(v)} FTE.${
                                                 isPace
-                                                  ? " Ta kompetencja pracuje na maksimum i wyznacza długość fazy — podniesienie jej sufitu skróci projekt."
+                                                  ? ` Ta kompetencja pracuje na maksimum i wyznacza długość ${
+                                                      isPace1 && isPace2
+                                                        ? "obu faz"
+                                                        : isPace1
+                                                          ? "fazy inicjacji"
+                                                          : "fazy budowy"
+                                                    } — podniesienie jej sufitu skróci projekt.`
                                                   : ""
                                               }`}
                                               onClick={(e) => {
@@ -992,6 +1002,28 @@ export function CapabilityMatrix({
                     {signed(horizonDelta)}
                   </span>
                 )}
+              </span>
+              <span className="cm2-foot-rule" />
+              {/* Every project runs two phases and each has its own pace-setter,
+                  so a row can carry two coloured strips. The legend says which
+                  is which — otherwise "two purples" reads as a bug. */}
+              <span
+                className="cm2-legend"
+                title="Projekt biegnie w dwóch fazach. W każdej jedna kompetencja pracuje na swoim maksymalnym obłożeniu i wyznacza długość tej fazy — tylko jej sufit warto podnosić. Pozostałe mają zapas."
+              >
+                <span className="cm2-eyebrow">tempo fazy</span>
+                <span className="cm2-legend-item">
+                  <i className="cm2-legend-chip is-pace1" />
+                  <span>inicjacja · PM UX TL</span>
+                </span>
+                <span className="cm2-legend-item">
+                  <i className="cm2-legend-chip is-pace2" />
+                  <span>budowa · PM TL BE FE QA SEC</span>
+                </span>
+                <span className="cm2-legend-item">
+                  <i className="cm2-legend-chip" />
+                  <span>zapas</span>
+                </span>
               </span>
               <span className="cm2-foot-rule" />
               <span
