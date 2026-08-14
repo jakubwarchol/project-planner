@@ -63,16 +63,13 @@ function App() {
   useEffect(() => {
     localStorage.setItem(THEME_KEY, theme);
   }, [theme]);
-  // One-shot cross-screen intents — "go there AND open its proposals panel".
-  // The two optimizer drawers are halves of one question, so each one's
-  // saturation point links to the other with the panel already open. An
-  // intent survives only while its target screen is current, so a later
-  // manual visit opens the screen plain.
-  const [matrixProposalsIntent, setMatrixProposalsIntent] = useState(false);
+  // One-shot cross-screen intent — "go there AND open its panel". When the
+  // ceiling autopilot runs out of people to add, the answer is hiring, which
+  // lives in Symulacje. The intent survives only while its target screen is
+  // current, so a later manual visit opens the screen plain.
   const [compareOptimizerIntent, setCompareOptimizerIntent] = useState(false);
 
   useEffect(() => {
-    if (screen !== "matrix") setMatrixProposalsIntent(false);
     if (screen !== "compare") setCompareOptimizerIntent(false);
   }, [screen]);
 
@@ -152,7 +149,6 @@ function App() {
         <CapabilityMatrix
           projects={projects}
           theme={theme}
-          initialShowProposals={matrixProposalsIntent}
           onOpenCompareOptimizer={() => {
             setCompareOptimizerIntent(true);
             setScreen("compare");
@@ -165,10 +161,6 @@ function App() {
           projects={projects}
           theme={theme}
           initialOptimizerOpen={compareOptimizerIntent}
-          onOpenMatrixProposals={() => {
-            setMatrixProposalsIntent(true);
-            setScreen("matrix");
-          }}
         />
       )}
 

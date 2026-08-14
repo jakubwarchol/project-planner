@@ -28,9 +28,6 @@ import "./capabilityMatrix.css";
 interface CapabilityMatrixProps {
   projects: Project[];
   theme: "auto" | "light" | "dark";
-  /** Arrive with the proposals drawer already open — the cross-screen link
-   *  from the Symulacje optimizer's ceilings report. */
-  initialShowProposals?: boolean;
   /** The reverse link: when the autopilot is blocked on empty pools, the
    *  answer lives in Symulacje (transfers and hiring). */
   onOpenCompareOptimizer: () => void;
@@ -114,7 +111,6 @@ const HELP_ITEMS: { token: string; tone?: "accent" | "warn"; title: string; body
 export function CapabilityMatrix({
   projects,
   theme,
-  initialShowProposals,
   onOpenCompareOptimizer,
 }: CapabilityMatrixProps) {
   const { cells, setCell } = useCapabilityMatrix();
@@ -124,7 +120,7 @@ export function CapabilityMatrix({
   const { pools } = useRoster();
   const [tab, setTab] = useState<Tab>("days");
   const [showCrew, setShowCrew] = useState(false);
-  const [showProposals, setShowProposals] = useState(initialShowProposals ?? false);
+  const [showProposals, setShowProposals] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
 
   // The plan this screen is editing, priced against the real roster — the same
@@ -1270,8 +1266,8 @@ function ProposalsDrawer({
             {result.blocked.some((b) => b.reason === "pool") && (
               <div className="cm2-prop-section">
                 <button type="button" className="cm2-ghost" onClick={onOpenCompareOptimizer}>
-                  <span className="cm2-spark">✦</span> Nie ma kogo dołożyć? Przesunięcia i
-                  zatrudnienia — Symulacje
+                  <span className="cm2-spark">✦</span> Nie ma kogo dołożyć? Plan zatrudnienia —
+                  Symulacje
                 </button>
               </div>
             )}

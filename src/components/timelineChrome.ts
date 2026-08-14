@@ -139,7 +139,7 @@ export function weeksOf(months: number): number {
 /** "Optymalizacja: Wariant 2", suffixed "(2)", "(3)"… when taken — the same
  *  tidy-label spirit as the variant editor's "Wariant N". */
 export function optimizedLabel(existing: string[], baselineLabel: string): string {
-  const base = `Optymalizacja: ${baselineLabel}`;
+  const base = baselineLabel;
   if (!existing.includes(base)) return base;
   for (let n = 2; n <= existing.length + 2; n += 1) {
     const label = `${base} (${n})`;

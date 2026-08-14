@@ -1,25 +1,23 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTeamVariants } from "../hooks/useTeamVariants";
-import { usePoolProposal } from "../hooks/usePoolProposal";
+import { useHiringPlan } from "../hooks/useHiringPlan";
 import { earliestStartOffsets } from "../hooks/useCapabilitySchedule";
 import { monthKeyOf, monthsFrom, parseMonthKey } from "../lib/calendar";
 import {
-  CAPABILITY_LABELS,
   CAPABILITY_ORDER,
   effectiveDaysByCapability,
   isIncludedInPlan,
-  monthsNeeded,
   totalCapabilityEffortDays,
   type TeamVariant,
 } from "../lib/estimation";
 import { newId } from "../lib/id";
 import { leaveFteByMonth } from "../lib/leaves";
-import type { PoolSearchInput, TransferLimits } from "../lib/poolOptimizer";
+import type { CapabilityCaps, HiringPlanInput, HiringScenario } from "../lib/hiringPlanner";
 import { simulateCapabilitySchedule } from "../lib/scheduling";
 import { usePlanner } from "../state/plannerContext";
 import type { CapabilityVector, Project } from "../types";
 import { useZoomGesture } from "../hooks/useZoomGesture";
-import { PoolProposalDrawer } from "./PoolProposalDrawer";
+import { HiringPlanDrawer } from "./HiringPlanDrawer";
 import { VariantEditor } from "./VariantEditor";
 import {
   DENSITIES,
@@ -27,7 +25,6 @@ import {
   ZOOMS,
   buildAxis,
   fmt,
-  fmt2,
   monthLabel,
   optimizedLabel,
   plCount,
@@ -38,15 +35,36 @@ import {
 } from "./timelineChrome";
 import "./timeline.css";
 
+const CAPS_KEY = "planner-capability-caps";
+
+/** Caps live in localStorage rather than the database: they are a constraint on
+ *  a question ("we only ever want one TL"), not a fact about the roster, and
+ *  they should be triable without a schema migration. */
+function savedCaps(): CapabilityCaps {
+  try {
+    const raw = localStorage.getItem(CAPS_KEY);
+    if (!raw) return {};
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return {};
+    const out: CapabilityCaps = {};
+    for (const capability of CAPABILITY_ORDER) {
+      const value = (parsed as Record<string, unknown>)[capability];
+      if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+        out[capability] = value;
+      }
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
 interface TimelineViewProps {
   projects: Project[];
   theme: "auto" | "light" | "dark";
   /** Arrive with the optimizer drawer already open — the cross-screen link
    *  from the autopilot's "nobody to add" blocks in Wyceny. */
   initialOptimizerOpen?: boolean;
-  /** The reverse link: the ceilings report's "raise it in Wyceny" button,
-   *  landing there with the proposals drawer open. */
-  onOpenMatrixProposals: () => void;
 }
 
 const WHOLE_PLAN = "Cała praca";
@@ -71,7 +89,6 @@ export function TimelineView({
   projects,
   theme,
   initialOptimizerOpen,
-  onOpenMatrixProposals,
 }: TimelineViewProps) {
   // The one screen where variants apply — every other view plans on the live
   // roster, so the comparison owns its selection instead of the app shell.
@@ -161,42 +178,16 @@ export function TimelineView({
     return map;
   }, [plannedProjects, nowMonth]);
 
-  // People are interchangeable within a capability, never across — so a pair
-  // of pools is movable only through people who really hold both, and only up
-  // to what they currently give the donor side. Derived from the live roster
-  // regardless of baseline: it is the only people data there is.
-  const transferLimits = useMemo<TransferLimits>(() => {
-    const limits: TransferLimits = {};
-    for (const person of people) {
-      if (person.allocations.length < 2) continue;
-      for (const a of person.allocations) {
-        if (a.fte <= 0) continue;
-        for (const b of person.allocations) {
-          if (a.capability === b.capability) continue;
-          const row = (limits[a.capability] ??= {});
-          row[b.capability] = (row[b.capability] ?? 0) + a.fte;
-        }
-      }
-    }
-    return limits;
-  }, [people]);
+  // Per-capability ceilings on team size. The planner would otherwise happily
+  // staff four tech leads: nothing in the model knows that a team wants one.
+  // Kept on the client — this is a knob you turn while asking a question, not
+  // roster data, and it should not migrate the database to be tried out.
+  const [caps, setCaps] = useState<CapabilityCaps>(savedCaps);
+  useEffect(() => {
+    localStorage.setItem(CAPS_KEY, JSON.stringify(caps));
+  }, [caps]);
 
-  const availableTransfers = useMemo(() => {
-    const rows: string[] = [];
-    for (const from of CAPABILITY_ORDER) {
-      const row = transferLimits[from];
-      if (!row) continue;
-      for (const to of CAPABILITY_ORDER) {
-        const cap = row[to];
-        if (cap && cap > 0) rows.push(`${from} → ${to} do ${fmt2(cap)}`);
-      }
-    }
-    return rows;
-  }, [transferLimits]);
-
-  const [optimizerMode, setOptimizerMode] = useState<"real" | "free">("real");
-
-  const optimizerInput = useMemo<PoolSearchInput>(
+  const optimizerInput = useMemo<HiringPlanInput>(
     () => ({
       projects: plannedProjects,
       cells,
@@ -206,73 +197,68 @@ export function TimelineView({
       earliestStart,
       leaveFteByMonth: leaveDips,
       deadlineMonths,
-      transferLimits: optimizerMode === "real" ? transferLimits : undefined,
+      caps,
     }),
-    [plannedProjects, cells, edpm, earliestStart, leaveDips, settings.minStaffingFraction, settings.minCrewFte, deadlineMonths, optimizerMode, transferLimits],
+    [plannedProjects, cells, edpm, earliestStart, leaveDips, settings.minStaffingFraction, settings.minCrewFte, deadlineMonths, caps],
   );
 
   // Calls the simulation through the lib directly — the shared schedule hook's
   // tiny identity-keyed cache would thrash under hundreds of trial vectors.
-  const proposal = usePoolProposal(baseline.fte, optimizerInput);
-  const projectById = useMemo(
-    () => new Map(plannedProjects.map((p) => [p.id, p] as const)),
-    [plannedProjects],
-  );
+  const proposal = useHiringPlan(baseline.fte, optimizerInput);
   const baselineTotalFte = useMemo(
     () => CAPABILITY_ORDER.reduce((sum, c) => sum + (baseline.fte[c] ?? 0), 0),
     [baseline.fte],
   );
 
   const applyProposal = useCallback(
-    (vector: CapabilityVector) => {
+    (vector: CapabilityVector, scenario: HiringScenario) => {
       const id = newId("variant");
-      const label = optimizedLabel(variants.map((v) => v.label), baseline.label);
+      // The label carries the hire, because that is what distinguishes this
+      // variant from its siblings: "+3: BE×2 · UX" beats "Optymalizacja (4)".
+      const who = CAPABILITY_ORDER.filter((c) => (scenario.byCapability[c] ?? 0) > 0)
+        .map((c) => {
+          const n = scenario.byCapability[c] ?? 0;
+          return n > 1 ? `${c}×${n}` : c;
+        })
+        .join(" · ");
+      const label = optimizedLabel(
+        variants.map((v) => v.label),
+        `+${scenario.hires}: ${who}`,
+      );
       // Straight through addVariant, not createVariant — clampFte would
-      // re-round the composed vector and store a different plan than the one
-      // the drawer previewed.
+      // re-round the vector and store a different plan than the drawer showed.
       addVariant({ id, label, fte: vector, isRosterDerived: false });
       setVariantId(id);
       proposal.reset();
       setOptimizerOpen(false);
     },
-    [variants, baseline.label, addVariant, proposal],
+    [variants, addVariant, proposal],
   );
 
+  // One band, not eight. The per-capability bands answered "how long would BE's
+  // work take if BE were the only thing in the world" — a number no plan ever
+  // realises, since capabilities gate each other inside every phase. It read as
+  // seven competing forecasts next to the one real one.
   const bands: CompareBand[] = useMemo(() => {
-    const capabilityBands = CAPABILITY_ORDER.map((capability) => {
+    const fteMonths = CAPABILITY_ORDER.reduce((sum, capability) => {
       const days = totalsByCapability[capability] ?? 0;
-      const rows: VariantRow[] = variants.map((v) => {
-        const fte = v.fte[capability] ?? 0;
-        return {
+      return sum + (edpm[capability] > 0 ? days / edpm[capability] : 0);
+    }, 0);
+
+    return [
+      {
+        label: WHOLE_PLAN,
+        fteMonths,
+        rows: variants.map((v) => ({
           variant: v,
           hue: hueByVariant[v.id] ?? HUES[0],
-          fte,
-          months: days === 0 ? 0 : monthsNeeded(days, fte, edpm[capability]),
+          fte: CAPABILITY_ORDER.reduce((sum, c) => sum + (v.fte[c] ?? 0), 0),
+          months: wholePlanMonthsByVariant[v.id] ?? Infinity,
           isBaseline: v.id === baseline.id,
-        };
-      });
-      return {
-        label: CAPABILITY_LABELS[capability],
-        fteMonths: edpm[capability] > 0 ? days / edpm[capability] : 0,
-        rows,
-        isWholePlan: false,
-      };
-    });
-
-    const wholePlan: CompareBand = {
-      label: WHOLE_PLAN,
-      fteMonths: capabilityBands.reduce((sum, b) => sum + b.fteMonths, 0),
-      rows: variants.map((v) => ({
-        variant: v,
-        hue: hueByVariant[v.id] ?? HUES[0],
-        fte: CAPABILITY_ORDER.reduce((sum, c) => sum + (v.fte[c] ?? 0), 0),
-        months: wholePlanMonthsByVariant[v.id] ?? Infinity,
-        isBaseline: v.id === baseline.id,
-      })),
-      isWholePlan: true,
-    };
-
-    return [wholePlan, ...capabilityBands];
+        })),
+        isWholePlan: true,
+      },
+    ];
   }, [variants, totalsByCapability, hueByVariant, baseline.id, wholePlanMonthsByVariant, edpm]);
 
   const D = DENSITIES.find((d) => d.id === densityId) ?? DENSITIES[1];
@@ -586,7 +572,7 @@ export function TimelineView({
             <div className="atl-key-bar" style={{ borderStyle: "solid", borderColor: "var(--line-strong)" }}>
               <i style={{ left: 0, width: 20, height: 13, background: "var(--accent)", borderRadius: 1 }} />
             </div>
-            <span>jeden wiersz na wariant · długość = czas na daną kompetencję · liczba = FTE w puli</span>
+            <span>jeden wiersz na wariant · długość = kiedy kończy się cała praca · liczba = etaty w zespole</span>
           </div>
           <div className="atl-key-item">
             <div
@@ -601,7 +587,7 @@ export function TimelineView({
             <span className="atl-key-num" style={{ color: "var(--accent)" }}>
               −2 mies. · 30% szybciej
             </span>
-            <span>względem wariantu bazowego, dla każdej kompetencji</span>
+            <span>względem wariantu bazowego</span>
           </div>
           <div className="atl-key-item">
             <span className="atl-key-num">kliknij</span>
@@ -667,16 +653,14 @@ export function TimelineView({
       </footer>
 
       {optimizerOpen && (
-        <PoolProposalDrawer
+        <HiringPlanDrawer
           api={proposal}
           baselineLabel={baseline.label}
-          projectById={projectById}
+          baselineFte={baseline.fte}
           insets={{ top: D.hdr, bottom: D.foot }}
-          mode={optimizerMode}
-          onModeChange={setOptimizerMode}
-          transfers={availableTransfers}
+          caps={caps}
+          onCapsChange={setCaps}
           onApply={applyProposal}
-          onOpenMatrixProposals={onOpenMatrixProposals}
           onClose={() => setOptimizerOpen(false)}
         />
       )}

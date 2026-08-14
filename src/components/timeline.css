@@ -3176,3 +3176,241 @@
   border-color: var(--accent-line);
   background: var(--accent-wash);
 }
+
+/* ── hiring planner drawer ──────────────────────────────────────────────── */
+
+/* The base plan the scenarios are measured against, as plain rows: three
+   numbers with names, not a before/after arrow — there is no "after" until you
+   pick a scenario. */
+.atl-opt-summary.is-rows,
+.atl-opt-sum-row {
+  font-family: var(--atl-mono);
+}
+
+.atl-opt-sum-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  font-size: 10.5px;
+  color: var(--ink-3);
+}
+
+.atl-opt-sum-row b {
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.atl-opt-sum-row.is-warn b {
+  color: var(--warn);
+}
+
+.atl-opt-summary {
+  flex-direction: column;
+  gap: 4px;
+}
+
+.atl-opt-empty {
+  margin: 0;
+  padding: 12px 14px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--ink-3);
+}
+
+/* One hire count. The count itself is the anchor on the left, so the column
+   reads as a ladder — which is the point: where does the gain stop. */
+.atl-opt-scenario {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line-soft);
+}
+
+.atl-opt-hires {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  font-family: var(--atl-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.atl-opt-scenario-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.atl-opt-scenario-who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.atl-opt-tag {
+  padding: 1px 5px;
+  border-radius: 2px;
+  background: var(--accent-wash);
+  color: var(--accent);
+  font-family: var(--atl-mono);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.atl-opt-added {
+  font-family: var(--atl-mono);
+  font-size: 9.5px;
+  color: var(--ink-4);
+}
+
+.atl-opt-scenario-gain {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  font-family: var(--atl-mono);
+  font-size: 10.5px;
+}
+
+.atl-opt-scenario-gain .is-good {
+  color: var(--ok);
+  font-weight: 600;
+}
+
+.atl-opt-scenario-sub {
+  font-family: var(--atl-mono);
+  font-size: 9.5px;
+}
+
+.atl-opt-badge {
+  padding: 0 4px;
+  border-radius: 2px;
+  font-size: 9px;
+  letter-spacing: 0.03em;
+}
+
+.atl-opt-badge.is-good {
+  background: color-mix(in oklab, var(--ok) 16%, transparent);
+  color: var(--ok);
+}
+
+.atl-opt-blocked {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 0;
+  border-top: 1px solid var(--line-soft);
+  font-family: var(--atl-mono);
+  font-size: 10px;
+  color: var(--ink-3);
+}
+
+.atl-opt-blocked b {
+  color: var(--ink-2);
+}
+
+/* Caps: one row per capability, the ceiling picked from a fixed set for the
+   same reason ceilings are picked in the matrix — this is a headcount
+   judgement, and typing invites precision the number does not have. */
+.atl-caps {
+  display: flex;
+  flex-direction: column;
+  margin: 4px 0 2px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.atl-caps-head,
+.atl-caps-row {
+  display: grid;
+  grid-template-columns: 1fr 38px auto;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+}
+
+.atl-caps-head {
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line);
+  font-family: var(--atl-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+}
+
+.atl-caps-head span:nth-child(2),
+.atl-caps-pool {
+  text-align: right;
+}
+
+.atl-caps-row + .atl-caps-row {
+  border-top: 1px solid var(--line-soft);
+}
+
+.atl-caps-name {
+  font-family: var(--atl-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.atl-caps-pool {
+  font-family: var(--atl-mono);
+  font-size: 10px;
+  color: var(--ink-4);
+}
+
+.atl-caps-input {
+  display: flex;
+  gap: 2px;
+}
+
+.atl-caps-opt {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--ink-3);
+  font-family: var(--atl-mono);
+  font-size: 9.5px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.atl-caps-opt:hover {
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+.atl-caps-opt.is-on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--surface);
+  font-weight: 600;
+}
+
+.atl-opt-saturated {
+  margin: 8px 0 0;
+  padding-top: 7px;
+  border-top: 1px solid var(--line-soft);
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--ink-3);
+}
