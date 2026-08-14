@@ -467,8 +467,11 @@
   border-top-color: var(--accent);
 }
 
+/* Cells of a hidden project render empty, so the name column is all the
+   height the row needs — just enough for the eye that brings it back. */
 .cm2-row.is-out-of-plan {
   opacity: 0.5;
+  min-height: 26px;
 }
 
 .cm2-name {
@@ -667,6 +670,16 @@
 
 .cm2-ceil.is-pace .cm2-slot:not(.is-on) {
   background: var(--accent-wash);
+}
+
+/* The stop under the cursor announces itself — a ring names the exact
+   rectangle a click would set, on filled and empty segments alike. */
+.cm2-slot:hover {
+  box-shadow: inset 0 0 0 1.5px var(--accent-line);
+}
+
+.cm2-slot:not(.is-on):hover {
+  background: var(--line-soft);
 }
 
 /* A flagged strip is all-empty; letting the cell's warn wash bleed through

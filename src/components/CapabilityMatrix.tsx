@@ -780,6 +780,18 @@ export function CapabilityMatrix({
                         </div>
 
                         {CAPABILITY_ORDER.map((capability) => {
+                          // A project parked outside the plan keeps only its
+                          // name row — no numbers, no strip. The eye at the
+                          // name brings it back, and everything reappears.
+                          if (!inPlan) {
+                            return (
+                              <div
+                                key={capability}
+                                className="cm2-cell"
+                                title={`${project.name} — poza planem. Kliknij oko przy nazwie, aby przywrócić do harmonogramu.`}
+                              />
+                            );
+                          }
                           const cell = row?.[capability] ?? { days: 0, maxFte: 0 };
                           const days = cellDays(project.id, capability);
                           const off = excluded.has(`${project.id}:${capability}`);
@@ -920,25 +932,29 @@ export function CapabilityMatrix({
                           );
                         })}
 
-                        <div
-                          className="cm2-ref"
-                          title={
-                            noDemand
-                              ? "brak przypisanych kompetencji — projekt nie trafia do harmonogramu"
-                              : `planowane jest ${fmt(sum)} dni — rozmiar ${project.estimate} sugerował ${fmt(reference)}`
-                          }
-                        >
-                          <div className="cm2-ref-nums">
-                            <b className={silentlyUnscheduled ? "is-warn" : ""}>{fmt(sum)}</b>
-                            <span className="cm2-ref-of">/ {fmt(reference)}</span>
+                        {inPlan ? (
+                          <div
+                            className="cm2-ref"
+                            title={
+                              noDemand
+                                ? "brak przypisanych kompetencji — projekt nie trafia do harmonogramu"
+                                : `planowane jest ${fmt(sum)} dni — rozmiar ${project.estimate} sugerował ${fmt(reference)}`
+                            }
+                          >
+                            <div className="cm2-ref-nums">
+                              <b className={silentlyUnscheduled ? "is-warn" : ""}>{fmt(sum)}</b>
+                              <span className="cm2-ref-of">/ {fmt(reference)}</span>
+                            </div>
+                            <div className="cm2-ref-track">
+                              <div
+                                className="cm2-ref-fill"
+                                style={{ width: `${Math.min(100, ratio * 100)}%` }}
+                              />
+                            </div>
                           </div>
-                          <div className="cm2-ref-track">
-                            <div
-                              className="cm2-ref-fill"
-                              style={{ width: `${Math.min(100, ratio * 100)}%` }}
-                            />
-                          </div>
-                        </div>
+                        ) : (
+                          <div className="cm2-ref" />
+                        )}
                       </div>
                     );
                   })}
