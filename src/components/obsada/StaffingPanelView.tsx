@@ -189,6 +189,11 @@ export function StaffingPanelView({ ctx, people, staffing, selection, onSelect }
     if (list) list.push(item);
     else byProject.set(item.projectId, [item]);
   }
+  // Plan order, not "biggest hole first": `projectById` is built from the
+  // ordered projects array, so key position IS the project's rank — the same
+  // priority the scheduler honours. You staff what the plan wants done first;
+  // each row's gap still shows where it hurts.
+  const projectRank = new Map([...ctx.projectById.keys()].map((id, i) => [id, i] as const));
   const queue = [...byProject.entries()]
     .map(([projectId, groupItems]) => {
       const gap = groupItems.reduce((sum, i) => sum + gapOf(i), 0);
@@ -206,7 +211,10 @@ export function StaffingPanelView({ ctx, people, staffing, selection, onSelect }
         items: expanded ? groupItems.slice().sort((a, b) => gapOf(b) - gapOf(a)) : [],
       };
     })
-    .sort((a, b) => b.gap - a.gap);
+    .sort(
+      (a, b) =>
+        (projectRank.get(a.projectId) ?? Infinity) - (projectRank.get(b.projectId) ?? Infinity),
+    );
 
   // Flat render order, for the arrow keys — a project row counts as one stop.
   const flat: ObsadaSelection[] = queue.flatMap((group) => [
