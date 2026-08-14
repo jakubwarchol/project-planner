@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { useRoster } from "../hooks/useRoster";
 import {
@@ -11,7 +11,7 @@ import {
 } from "../lib/estimation";
 import type { Capability, Person, TeamCode } from "../types";
 import { NumberField } from "./NumberField";
-import { CAPABILITY_HUES, MOD, fmt, plCount, solid } from "./timelineChrome";
+import { CAPABILITY_HUES, MOD, fmt, fmt2, plCount, solid } from "./timelineChrome";
 import "./timeline.css";
 
 interface TeamViewProps {
@@ -35,6 +35,74 @@ function emptyDraft(teamId: TeamCode): Omit<Person, "id"> {
     allocations: [{ capability: "PM", fte: 1 }],
     focusFactor: DEFAULT_PERSON_FOCUS_FACTOR,
   };
+}
+
+/** The quarter steps every staffing decision is quantized to — an allocation
+ *  is picked, not typed, so nothing finer can even be entered. */
+const FTE_OPTIONS = [0.25, 0.5, 0.75, 1];
+
+/** Click-to-pick FTE: the value is a button, the choices are a small popover
+ *  of quarters. Removal stays on the chip's own X, so the picker never needs
+ *  a zero option. */
+function FtePicker({
+  value,
+  label,
+  onPick,
+}: {
+  value: number;
+  label: string;
+  onPick: (fte: number) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLSpanElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    function onPointerDown(event: PointerEvent) {
+      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false);
+    }
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onPointerDown);
+    };
+  }, [open]);
+
+  return (
+    <span className="tw-fte" ref={ref}>
+      <button
+        type="button"
+        className={`tw-fte-btn ${open ? "is-on" : ""}`}
+        aria-label={label}
+        aria-expanded={open}
+        title="Kliknij, aby wybrać część etatu"
+        onClick={() => setOpen((v) => !v)}
+      >
+        {fmt2(value)}
+      </button>
+      {open && (
+        <span className="tw-fte-pop">
+          {FTE_OPTIONS.map((option) => (
+            <button
+              key={option}
+              type="button"
+              className={`tw-fte-opt ${Math.abs(option - value) < 0.005 ? "is-active" : ""}`}
+              onClick={() => {
+                onPick(option);
+                setOpen(false);
+              }}
+            >
+              {fmt2(option)}
+            </button>
+          ))}
+        </span>
+      )}
+    </span>
+  );
 }
 
 /**
@@ -128,11 +196,11 @@ export function TeamView({ theme }: TeamViewProps) {
             <span
               key={capability}
               className="tw-pool"
-              title={`${CAPABILITY_LABELS[capability]} — ${fmt(pools[capability])} FTE w puli`}
+              title={`${CAPABILITY_LABELS[capability]} — ${fmt2(pools[capability])} FTE w puli`}
             >
               <span className="tw-pool-head">
                 <span className="tw-pool-label">{CAPABILITY_LABELS[capability]}</span>
-                <b>{fmt(pools[capability])}</b>
+                <b>{fmt2(pools[capability])}</b>
               </span>
               <span className="tw-pool-track">
                 <span
@@ -199,13 +267,11 @@ export function TeamView({ theme }: TeamViewProps) {
                               style={{ background: capColor(allocation.capability) }}
                             />
                             <b>{CAPABILITY_LABELS[allocation.capability]}</b>
-                            <NumberField
+                            <FtePicker
                               key={`${person.id}-${allocation.capability}`}
-                              initial={allocation.fte}
+                              value={allocation.fte}
                               label={`${CAPABILITY_LABELS[allocation.capability]} — FTE dla ${person.name}`}
-                              max={1}
-                              decimals={2}
-                              onCommit={(value) =>
+                              onPick={(value) =>
                                 setAllocation(person.id, allocation.capability, value)
                               }
                             />
@@ -228,9 +294,10 @@ export function TeamView({ theme }: TeamViewProps) {
                             aria-label={`Dodaj kompetencję dla ${person.name}`}
                             onChange={(e) => {
                               if (!e.target.value) return;
-                              // Whatever is left of them, so the common "split
-                              // the rest onto a second capability" needs no maths.
-                              const rest = Math.max(0.1, Math.round((1 - total) * 100) / 100);
+                              // Whatever is left of them, in quarters, so the
+                              // common "split the rest onto a second
+                              // capability" needs no maths.
+                              const rest = Math.max(0.25, Math.round((1 - total) * 4) / 4);
                               setAllocation(person.id, e.target.value as Capability, rest);
                             }}
                           >

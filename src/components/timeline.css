@@ -3028,3 +3028,69 @@
   font-size: 11px;
   line-height: 1;
 }
+
+/* click-to-pick quarter FTE in the roster's allocation chips */
+
+.tw-fte {
+  position: relative;
+  display: inline-flex;
+}
+
+.tw-fte-btn {
+  font: inherit;
+  font-family: var(--atl-mono);
+  font-size: 12px;
+  width: 44px;
+  padding: 4px 0;
+  text-align: center;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.tw-fte-btn:hover,
+.tw-fte-btn.is-on {
+  border-color: var(--accent-line);
+}
+
+.tw-fte-pop {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  box-shadow: var(--shadow);
+}
+
+.tw-fte-opt {
+  font: inherit;
+  font-family: var(--atl-mono);
+  font-size: 12px;
+  min-width: 40px;
+  padding: 5px 6px;
+  color: var(--ink-2);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tw-fte-opt:hover {
+  background: var(--row-hover);
+  color: var(--ink);
+}
+
+.tw-fte-opt.is-active {
+  color: var(--accent);
+  border-color: var(--accent-line);
+  background: var(--accent-wash);
+}
