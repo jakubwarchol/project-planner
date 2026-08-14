@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, DragEvent, KeyboardEvent as ReactKeyboardEvent } from "react";
-import { ArrowUpToLine, Eye, EyeOff, GripVertical, HelpCircle, X } from "lucide-react";
+import { Eye, EyeOff, GripVertical, HelpCircle, X } from "lucide-react";
 import { useCapabilityMatrix } from "../hooks/useCapabilityMatrix";
 import { useCapabilitySchedule, earliestStartOffsets } from "../hooks/useCapabilitySchedule";
 import { useCeilingProposal, type CeilingProposalApi } from "../hooks/useCeilingProposal";
@@ -44,6 +44,14 @@ const sizeColor = (estimate: Estimate) => `var(--size-${estimate.toLowerCase()})
  *  that — a dash reads as "no number to show", which is the truth. */
 const fmtM = (n: number) => (Number.isFinite(n) ? fmt(n) : "—");
 
+/** The six stops of the ceiling strip. Half a person is the finest cut a
+ *  ceiling can mean — it is a judgement about headcount, so the strip offers
+ *  exactly the values worth choosing and nothing between them. A stored value
+ *  off this grid (legacy, or an autopilot ceiling above 3) still renders as
+ *  its filled length; the first click rewrites it onto the grid. */
+const CEIL_STEPS = [0.5, 1, 1.5, 2, 2.5, 3];
+const CEIL_EPS = 0.001;
+
 const signed = (n: number) => `${n >= 0 ? "+" : "−"}${fmt(Math.abs(n))}`;
 
 /** What the scheduler made of one project × capability, folded across phases.
@@ -62,10 +70,10 @@ const HELP_ITEMS: { token: string; tone?: "accent" | "warn"; title: string; body
     body: "Ile dni pracy tej kompetencji wymaga projekt. To jedyna liczba, którą naprawdę szacujesz — reszta komórki z niej wynika.",
   },
   {
-    token: "max",
+    token: "0,5–3",
     tone: "accent",
-    title: "max — maksymalne obłożenie (FTE)",
-    body: "Ile najwięcej osób tej kompetencji ma sens pracować równolegle. Nie budżet, a granica sensownego zrównoleglenia: 60 dni przy max 2 FTE to około półtora miesiąca.",
+    title: "Pasek na dole: maksymalne obłożenie (FTE)",
+    body: "Ile najwięcej osób tej kompetencji ma sens pracować równolegle. Jeden segment paska to pół etatu, zakres 0,5–3,0 — kliknij segment, aby ustawić sufit; podpisy 1 / 2 / 3 pojawiają się pod kursorem. Nie budżet, a granica sensownego zrównoleglenia: 60 dni przy max 2 FTE to około półtora miesiąca.",
   },
   {
     token: "1,4",
@@ -73,10 +81,10 @@ const HELP_ITEMS: { token: string; tone?: "accent" | "warn"; title: string; body
     body: "Faktyczna liczba FTE, jaką harmonogram przydzielił. Włącz ją przełącznikiem „załoga” w nagłówku. Gwiazdka oznacza krótki zryw: strumień kończy przed fazą.",
   },
   {
-    token: "▲",
+    token: "▮",
     tone: "accent",
-    title: "Wiersz max pokazuje się tylko tam, gdzie działa",
-    body: "Widzisz go w komórce, która pracuje na swoim maksimum i wyznacza długość fazy — tylko jej podniesienie skróci projekt. Pozostałe mają zapas, więc ich max jest ukryty.",
+    title: "Fioletowe wypełnienie wyznacza tempo",
+    body: "Pasek wypełnia się fioletem w komórce, która pracuje na swoim maksimum i wyznacza długość fazy — tylko podniesienie jej sufitu skróci projekt. Pozostałe komórki mają zapas, więc ich pasek zostaje szary i jego podniesienie niczego nie zmieni.",
   },
   {
     token: "≡",
@@ -87,7 +95,7 @@ const HELP_ITEMS: { token: string; tone?: "accent" | "warn"; title: string; body
     token: "0",
     tone: "warn",
     title: "Pomarańczowa komórka",
-    body: "Są dni, ale max wynosi 0 — nie ma z czego dobrać załogi, więc ta praca nigdy nie trafi do harmonogramu.",
+    body: "Są dni, ale maksymalne obłożenie wynosi 0 — pasek jest pusty i nie ma z czego dobrać załogi, więc ta praca nigdy nie trafi do harmonogramu. Kliknięcie segmentu paska to naprawia.",
   },
   {
     token: "⇧",
@@ -370,14 +378,31 @@ export function CapabilityMatrix({
     if (!from) return;
     const rowCount = Object.keys(rowIndexById).length;
     for (let row = Number(from.dataset.cmRow) + step; row >= 0 && row < rowCount; row += step) {
-      const next = gridRef.current?.querySelector<HTMLInputElement>(
-        `[data-cm-row="${row}"][data-cm-col="${from.dataset.cmCol}"] input`,
+      // The days column lands on its input; the ceiling column lands on the
+      // strip's one tabbable slot (the roving-tabindex current value).
+      const next = gridRef.current?.querySelector<HTMLElement>(
+        `[data-cm-row="${row}"][data-cm-col="${from.dataset.cmCol}"] :is(input, button[tabindex="0"])`,
       );
       if (next) {
         event.preventDefault();
         next.focus();
         return;
       }
+    }
+  }
+
+  // Left/right walk the strip's six stops without committing anything — the
+  // standard radio-group roving pattern. Space (or a click) commits; Enter
+  // stays with the grid convention above and moves down a row.
+  function handleSlotKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+    if (step === 0) return;
+    const slots = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>("button"));
+    const index = slots.indexOf(event.target as HTMLButtonElement);
+    const next = index === -1 ? undefined : slots[index + step];
+    if (next) {
+      event.preventDefault();
+      next.focus();
     }
   }
 
@@ -761,6 +786,12 @@ export function CapabilityMatrix({
                           const flagged = !off && days > 0 && cell.maxFte <= 0;
                           const cp = cellPlan.get(`${project.id}:${capability}`);
                           const isPace = cp?.setsPace ?? false;
+                          // The strip's roving tabindex: the slot holding the
+                          // current ceiling is the one Tab (and the grid walk)
+                          // lands on; with no on-grid value, the first slot is.
+                          const ceilCurrent = CEIL_STEPS.find(
+                            (v) => Math.abs(cell.maxFte - v) < CEIL_EPS,
+                          );
                           return (
                             <div
                               key={capability}
@@ -823,37 +854,6 @@ export function CapabilityMatrix({
 
                                   {days > 0 && (
                                     <>
-                                      <div
-                                        className={`cm2-ceil ${isPace ? "is-pace" : ""} ${flagged ? "is-flagged" : ""}`}
-                                        data-cm-row={rowIndexById[project.id]}
-                                        data-cm-col={`${capability}:ceil`}
-                                        title={
-                                          isPace
-                                            ? "Maksymalne obłożenie: ile najwięcej FTE tej kompetencji wolno pracować równolegle. Ta kompetencja pracuje na maksimum i wyznacza długość fazy — jedyna komórka w tym wierszu, której podniesienie skróci projekt."
-                                            : "Maksymalne obłożenie: ile najwięcej FTE tej kompetencji wolno pracować równolegle. Tu jest zapas — załoga jest zwolniona, żeby skończyć razem z resztą, więc podniesienie tej liczby niczego nie zmieni."
-                                        }
-                                      >
-                                        <span className="cm2-ceil-k">
-                                          <ArrowUpToLine size={11} strokeWidth={2.2} />
-                                          <span>max</span>
-                                        </span>
-                                        <NumberField
-                                          key={`${project.id}-${capability}-max`}
-                                          initial={cell.maxFte}
-                                          label={`Maksymalne obłożenie ${CAPABILITY_LABELS[capability]} (FTE) dla ${project.name}`}
-                                          max={99}
-                                          decimals={2}
-                                          className="cm2-input"
-                                          placeholder="0"
-                                          blankZero
-                                          deferCommit
-                                          selectOnFocus
-                                          onCommit={(value) =>
-                                            setCell(project.id, capability, { maxFte: value })
-                                          }
-                                        />
-                                      </div>
-
                                       {showCrew && (
                                         <div
                                           className="cm2-crew"
@@ -871,6 +871,47 @@ export function CapabilityMatrix({
                                           </span>
                                         </div>
                                       )}
+
+                                      <div
+                                        className={`cm2-ceil ${isPace ? "is-pace" : ""} ${flagged ? "is-flagged" : ""}`}
+                                        data-cm-row={rowIndexById[project.id]}
+                                        data-cm-col={`${capability}:ceil`}
+                                        role="radiogroup"
+                                        aria-label={`Maksymalne obłożenie ${CAPABILITY_LABELS[capability]} (FTE) dla ${project.name}`}
+                                        onKeyDown={handleSlotKeyDown}
+                                      >
+                                        {CEIL_STEPS.map((v) => {
+                                          const on = cell.maxFte >= v - CEIL_EPS;
+                                          const current = ceilCurrent === v;
+                                          return (
+                                            <button
+                                              key={v}
+                                              type="button"
+                                              role="radio"
+                                              aria-checked={current}
+                                              tabIndex={
+                                                current ||
+                                                (ceilCurrent === undefined && v === CEIL_STEPS[0])
+                                                  ? 0
+                                                  : -1
+                                              }
+                                              className={`cm2-slot ${on ? "is-on" : ""}`}
+                                              title={`Ustaw maksymalne obłożenie ${CAPABILITY_LABELS[capability]} na ${fmt(v)} FTE.${
+                                                isPace
+                                                  ? " Ta kompetencja pracuje na maksimum i wyznacza długość fazy — podniesienie jej sufitu skróci projekt."
+                                                  : ""
+                                              }`}
+                                              onClick={(e) => {
+                                                // Shift + klik belongs to the cell: toggle off.
+                                                if (e.shiftKey) return;
+                                                setCell(project.id, capability, { maxFte: v });
+                                              }}
+                                            >
+                                              {v % 1 === 0 ? v : ""}
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
                                     </>
                                   )}
                                 </>

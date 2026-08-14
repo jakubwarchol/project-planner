@@ -619,60 +619,75 @@
   opacity: 1;
 }
 
-/* Every cell with effort carries an editable max band. The pace cell is the
-   only one whose ceiling constrains the plan today, so it alone gets the
-   accent treatment — the rest stay quiet but stay writable, because lowering
-   a slack ceiling is a real edit even when raising it would change nothing. */
+/* Every cell with effort carries the ceiling strip on its bottom edge: six
+   half-FTE stops (0,5–3,0) drawn as one continuous bar — the filled length is
+   the ceiling, one segment is half a person. Whole-FTE labels surface only on
+   hover, so a resting cell shows just days and fill. The pace cell is the
+   only one whose ceiling constrains the plan today, so it alone fills in
+   accent — the rest stay ink, but stay writable, because lowering a slack
+   ceiling is a real edit even when raising it would change nothing. */
 .cm2-ceil {
   display: flex;
-  align-items: center;
-  gap: 4px;
-  height: 24px;
+  align-items: stretch;
+  height: 18px;
+  margin-top: auto;
   border-top: 1px solid var(--line-soft);
 }
 
-.cm2-ceil.is-pace {
+.cm2-slot {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-right: 1px solid var(--line-soft);
+  background: var(--surface-2);
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1;
+  color: transparent;
+  cursor: pointer;
+}
+
+.cm2-slot:last-child {
+  border-right: 0;
+}
+
+.cm2-slot.is-on {
+  background: var(--ink-2);
+  border-right-color: color-mix(in oklab, var(--surface) 35%, transparent);
+}
+
+.cm2-ceil.is-pace .cm2-slot.is-on {
+  background: var(--accent);
+}
+
+.cm2-ceil.is-pace .cm2-slot:not(.is-on) {
   background: var(--accent-wash);
 }
 
-.cm2-ceil-k {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  padding-left: 7px;
+/* A flagged strip is all-empty; letting the cell's warn wash bleed through
+   reads as "nothing set here yet" better than six neutral stubs would. */
+.cm2-ceil.is-flagged .cm2-slot {
+  background: transparent;
+}
+
+.cm2-ceil:hover .cm2-slot,
+.cm2-ceil:focus-within .cm2-slot {
   color: var(--ink-3);
 }
 
-.cm2-ceil.is-pace .cm2-ceil-k {
-  color: var(--accent);
+.cm2-ceil:hover .cm2-slot.is-on,
+.cm2-ceil:focus-within .cm2-slot.is-on {
+  color: var(--surface);
 }
 
-.cm2-ceil.is-flagged .cm2-ceil-k {
-  color: var(--warn);
-}
-
-.cm2-ceil-k span {
-  font-family: var(--mono);
-  font-size: 9px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  user-select: none;
-}
-
-.cm2-ceil .cm2-input {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--ink-2);
-  padding: 0 8px 0 0;
-}
-
-.cm2-ceil.is-pace .cm2-input {
-  color: var(--accent);
-}
-
-.cm2-ceil.is-flagged .cm2-input {
-  color: var(--warn);
+.cm2-slot:focus-visible {
+  outline: 2px solid var(--accent-line);
+  outline-offset: -2px;
 }
 
 .cm2-crew {
