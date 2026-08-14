@@ -200,6 +200,16 @@ eksperyment potrzebował drobniej.
   zmiana składu / zaparkowanie projektu / nowy realny termin), każda z ceną
   z diffu dwóch symulacji. Ma sens dopiero, gdy istnieją pojedyncze
   optymalizatory, z których czerpie.
+- **Zszycie autopilota sufitów z optymalizatorem składu** (UX, nie silnik) —
+  to dwie połówki „jak przyspieszyć plan" na dwóch ekranach. NIE łączyć w
+  jeden Apply: sufity zmieniają realne dane (Wyceny), skład tworzy hipotezę
+  (wariant); różna też semantyka akceptacji (twierdzenie-do-weryfikacji vs
+  decyzja kadrowa). Zamiast tego: (1) nawigacja z kontekstem — raport sufitów
+  w Symulacjach otwiera drawer Propozycji w Wycenach jednym przyciskiem,
+  a blokada „pula X — nie ma kogo dołożyć" w autopilocie odsyła do Symulacji;
+  (2) wspólna rodzina wizualna „Propozycje" (✦ na obu przyciskach); (3)
+  docelowo ratownik (wyżej) jako wspólne wejście: jedna lista dźwigni z cenami
+  i etykietą typu, każda aplikowana po swojemu.
 - **Ostrzeżenie o produktywności obsady** — plan liczy stawkę ze *średniej*
   produktywności puli, a Obsada przypisuje *konkretnych* ludzi. Gdy ważony
   focus przypisanych odbiega istotnie od średniej użytej w planie, pokrycie
