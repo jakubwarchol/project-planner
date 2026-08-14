@@ -12,6 +12,8 @@ import {
   CAPABILITY_LABELS,
   CAPABILITY_ORDER,
   CATEGORY_ORDER,
+  CEILING_FTE_EPS as CEIL_EPS,
+  CEILING_FTE_STEPS as CEIL_STEPS,
   ESTIMATE_ORDER,
   effectiveDaysByCapability,
   isIncludedInPlan,
@@ -43,14 +45,6 @@ const sizeColor = (estimate: Estimate) => `var(--size-${estimate.toLowerCase()})
 /** `fmt` renders Infinity literally, and an impossible plan produces exactly
  *  that — a dash reads as "no number to show", which is the truth. */
 const fmtM = (n: number) => (Number.isFinite(n) ? fmt(n) : "—");
-
-/** The six stops of the ceiling strip. Half a person is the finest cut a
- *  ceiling can mean — it is a judgement about headcount, so the strip offers
- *  exactly the values worth choosing and nothing between them. A stored value
- *  off this grid (legacy, or an autopilot ceiling above 3) still renders as
- *  its filled length; the first click rewrites it onto the grid. */
-const CEIL_STEPS = [0.5, 1, 1.5, 2, 2.5, 3];
-const CEIL_EPS = 0.001;
 
 const signed = (n: number) => `${n >= 0 ? "+" : "−"}${fmt(Math.abs(n))}`;
 

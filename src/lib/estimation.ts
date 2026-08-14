@@ -44,6 +44,15 @@ const DEFAULT_MIN_STAFFING_FRACTION = 0.4;
  *  `crew.ts`'s import of this module one-directional. */
 export const DEFAULT_MIN_CREW_FTE = 0.1;
 
+/** Every value a ceiling (`maxFte`) may be set to, anywhere in the app. Half a
+ *  person is the finest cut the number can honestly mean — it is a judgement
+ *  about headcount, not a measurement — and three is as many as one project
+ *  can usefully run in parallel on one capability. Shared so the matrix strip
+ *  and the plan popover cannot drift apart. Values off this grid (legacy rows,
+ *  or an autopilot ceiling above 3) still display; the first edit lands on it. */
+export const CEILING_FTE_STEPS = [0.5, 1, 1.5, 2, 2.5, 3];
+export const CEILING_FTE_EPS = 0.001;
+
 export const DEFAULT_ESTIMATION_SETTINGS: EstimationSettings = {
   estimateValues: DEFAULT_ESTIMATE_VALUES,
   daysPerValue: DEFAULT_DAYS_PER_VALUE,

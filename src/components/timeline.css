@@ -799,16 +799,89 @@
 
 .atl-pop-cell {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  flex-direction: column;
+  gap: 3px;
   font-size: 11px;
   color: var(--ink-2);
+}
+
+.atl-pop-cell-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.atl-pop-cell-top b {
+  font-family: var(--atl-mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ink);
 }
 
 .atl-pop-cell i {
   font-style: normal;
   color: var(--ink-4);
+}
+
+/* The ceiling's six stops, same idiom as the matrix strip: filled length is
+   the value, the chosen stop carries its number. Full width of the popover so
+   a 32px target survives on a touchpad. */
+.atl-fte {
+  display: flex;
+  align-items: stretch;
+  height: 17px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.atl-fte-slot {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-right: 1px solid var(--line);
+  background: var(--surface-2);
+  font-family: var(--atl-mono);
+  font-size: 8.5px;
+  line-height: 1;
+  color: transparent;
+  cursor: pointer;
+}
+
+.atl-fte-slot:last-child {
+  border-right: 0;
+}
+
+.atl-fte-slot.is-on {
+  background: var(--ink-2);
+  border-right-color: color-mix(in oklab, var(--surface) 35%, transparent);
+}
+
+.atl-fte-slot.is-current {
+  color: var(--surface);
+}
+
+.atl-fte:hover .atl-fte-slot {
+  color: var(--ink-3);
+}
+
+.atl-fte:hover .atl-fte-slot.is-on {
+  color: var(--surface);
+}
+
+.atl-fte-slot:hover {
+  box-shadow: inset 0 0 0 1.5px var(--accent-line);
+}
+
+.atl-fte-slot:not(.is-on):hover {
+  background: var(--line-soft);
+}
+
+.atl-fte-slot:focus-visible {
+  outline: 2px solid var(--accent-line);
+  outline-offset: -2px;
 }
 
 /* Hover breakdown — faza 1 / faza 2 side by side, with the FTE arithmetic. */

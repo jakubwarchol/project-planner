@@ -9,6 +9,8 @@ import {
   CAPABILITY_LABELS,
   CAPABILITY_ORDER,
   CATEGORY_ORDER,
+  CEILING_FTE_EPS,
+  CEILING_FTE_STEPS,
   ESTIMATE_ORDER,
   effortDrift,
   focusByCapability,
@@ -16,7 +18,6 @@ import {
 import { assignOwnLanes, type ScheduledProject } from "../lib/scheduling";
 import { usePlanner } from "../state/plannerContext";
 import type { CapabilityVector, Project } from "../types";
-import { NumberField } from "./NumberField";
 import { ProjectBreakdownTip, type TipAnchor } from "./ProjectBreakdownTip";
 import {
   DENSITIES,
@@ -383,19 +384,40 @@ export function AdvancedTimeline({ projects, pools, onOpenMatrix, theme }: Advan
                 {CAPABILITY_ORDER.map((capability) => {
                   const cell = cells[project.id]?.[capability] ?? { days: 0, maxFte: 0 };
                   if (cell.days <= 0) return null;
+                  // The same six stops as the matrix strip, from one shared
+                  // list — a ceiling is a headcount judgement, so the popover
+                  // offers exactly the values worth choosing and nothing else.
                   return (
                     <div className="atl-pop-cell" key={capability}>
-                      <span>
-                        {CAPABILITY_LABELS[capability]} <i>{fmt(cell.days)} dni</i>
+                      <span className="atl-pop-cell-top">
+                        <span>
+                          {CAPABILITY_LABELS[capability]} <i>{fmt(cell.days)} dni</i>
+                        </span>
+                        <b>{fmt(cell.maxFte)} FTE</b>
                       </span>
-                      <NumberField
-                        key={`${project.id}-${capability}`}
-                        initial={cell.maxFte}
-                        label={`Maks. obsada ${capability}`}
-                        max={99}
-                        decimals={2}
-                        onCommit={(value) => setCell(project.id, capability, { maxFte: value })}
-                      />
+                      <span
+                        className="atl-fte"
+                        role="radiogroup"
+                        aria-label={`Maks. obsada ${CAPABILITY_LABELS[capability]}`}
+                      >
+                        {CEILING_FTE_STEPS.map((v) => {
+                          const on = cell.maxFte >= v - CEILING_FTE_EPS;
+                          const current = Math.abs(cell.maxFte - v) < CEILING_FTE_EPS;
+                          return (
+                            <button
+                              key={v}
+                              type="button"
+                              role="radio"
+                              aria-checked={current}
+                              className={`atl-fte-slot ${on ? "is-on" : ""} ${current ? "is-current" : ""}`}
+                              title={`Ustaw maks. obsadę ${CAPABILITY_LABELS[capability]} na ${fmt(v)} FTE`}
+                              onClick={() => setCell(project.id, capability, { maxFte: v })}
+                            >
+                              {fmt(v)}
+                            </button>
+                          );
+                        })}
+                      </span>
                     </div>
                   );
                 })}
