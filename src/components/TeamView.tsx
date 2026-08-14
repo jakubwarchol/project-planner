@@ -22,8 +22,10 @@ const TEAM_ORDER: TeamCode[] = ["ZWO", "ZP", "Inni"];
 
 /** Below this share of the bar a segment has no room for its own label, and
  *  below the second one not even for the capability code — the tooltip carries
- *  it instead. Truncated text in a 12px slot is noise, not information. */
-const SEGMENT_LABEL_MIN = 0.28;
+ *  it instead. Truncated text in a 12px slot is noise, not information. The
+ *  label threshold sits just under a quarter so the smallest pickable
+ *  allocation still shows its number. */
+const SEGMENT_LABEL_MIN = 0.22;
 const SEGMENT_CODE_MIN = 0.16;
 
 const capColor = (capability: Capability) => solid(CAPABILITY_HUES[capability] ?? 232);
@@ -125,10 +127,10 @@ function SplitBar({ person, over }: { person: Person; over: boolean }) {
             key={allocation.capability}
             className="tw-split-seg"
             style={{ width: `${share * 100}%`, background: capColor(allocation.capability) }}
-            title={`${CAPABILITY_LABELS[allocation.capability]} · ${fmt(allocation.fte)} FTE`}
+            title={`${CAPABILITY_LABELS[allocation.capability]} · ${fmt2(allocation.fte)} FTE`}
           >
             {share >= SEGMENT_LABEL_MIN
-              ? `${CAPABILITY_LABELS[allocation.capability]} ${fmt(allocation.fte)}`
+              ? `${CAPABILITY_LABELS[allocation.capability]} ${fmt2(allocation.fte)}`
               : share >= SEGMENT_CODE_MIN
                 ? CAPABILITY_LABELS[allocation.capability]
                 : ""}
@@ -229,7 +231,7 @@ export function TeamView({ theme }: TeamViewProps) {
                   {plCount(members.length, "osoba", "osoby", "osób")}
                 </span>
                 <span style={{ flex: 1 }} />
-                <span className="tw-band-fte">{fmt(bandFte)} FTE</span>
+                <span className="tw-band-fte">{fmt2(bandFte)} FTE</span>
               </div>
 
               <div className="tw-colhead">
@@ -314,7 +316,7 @@ export function TeamView({ theme }: TeamViewProps) {
 
                     <span
                       className={`tw-prod tw-c-prod ${person.focusFactor < 1 ? "is-reduced" : ""}`}
-                      title={`Produktywność ${fmt(person.focusFactor * 100)}% — z ${fmt(total)} FTE zostaje ${fmt(personEffectiveFte(person))} FTE pracy projektowej`}
+                      title={`Produktywność ${fmt(person.focusFactor * 100)}% — z ${fmt2(total)} FTE zostaje ${fmt2(personEffectiveFte(person))} FTE pracy projektowej`}
                     >
                       <NumberField
                         key={`${person.id}-focus`}
@@ -334,11 +336,11 @@ export function TeamView({ theme }: TeamViewProps) {
                       className={`tw-total tw-c-total ${over ? "is-over" : ""}`}
                       title={
                         over
-                          ? `${fmt(total)} FTE — więcej niż jedna osoba; rozdziel na mniejsze części`
-                          : `${fmt(total)} FTE łącznie · ${fmt(personEffectiveFte(person))} FTE po produktywności`
+                          ? `${fmt2(total)} FTE — więcej niż jedna osoba; rozdziel na mniejsze części`
+                          : `${fmt2(total)} FTE łącznie · ${fmt2(personEffectiveFte(person))} FTE po produktywności`
                       }
                     >
-                      {fmt(total)}
+                      {fmt2(total)}
                     </span>
 
                     <span className="bv-crud tw-c-act">
@@ -418,7 +420,7 @@ export function TeamView({ theme }: TeamViewProps) {
       <footer className="atl-footer" style={{ height: 32 }}>
         <span>{plCount(people.length, "osoba", "osoby", "osób")} w zespole</span>
         <span>
-          {fmt(totalFte)} FTE łącznie · {fmt(effectiveFte)} FTE po produktywności
+          {fmt2(totalFte)} FTE łącznie · {fmt2(effectiveFte)} FTE po produktywności
         </span>
         {overCount > 0 && (
           <span style={{ color: "var(--warn)" }}>
