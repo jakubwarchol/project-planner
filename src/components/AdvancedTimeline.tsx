@@ -384,6 +384,22 @@ export function AdvancedTimeline({ projects, pools, onOpenMatrix, theme }: Advan
                 {CAPABILITY_ORDER.map((capability) => {
                   const cell = cells[project.id]?.[capability] ?? { days: 0, maxFte: 0 };
                   if (cell.days <= 0) return null;
+                  // Same reading as the matrix strip, from the same simulation:
+                  // each phase has one capability pinned at its ceiling, and
+                  // that is the only one whose ceiling is worth touching. The
+                  // colours mean here exactly what they mean in Wyceny.
+                  const pacePhases = sp.streams
+                    .filter((s) => s.capability === capability && s.setsPace)
+                    .map((s) => s.phase);
+                  const isPace1 = pacePhases.includes(1);
+                  const isPace2 = pacePhases.includes(2);
+                  const paceNote = isPace1 && isPace2
+                    ? "wyznacza tempo obu faz"
+                    : isPace1
+                      ? "wyznacza tempo inicjacji"
+                      : isPace2
+                        ? "wyznacza tempo budowy"
+                        : "";
                   // The same six stops as the matrix strip, from one shared
                   // list — a ceiling is a headcount judgement, so the popover
                   // offers exactly the values worth choosing and nothing else.
@@ -396,9 +412,14 @@ export function AdvancedTimeline({ projects, pools, onOpenMatrix, theme }: Advan
                         <b>{fmt(cell.maxFte)} FTE</b>
                       </span>
                       <span
-                        className="atl-fte"
+                        className={`atl-fte ${isPace1 ? "is-pace1" : ""} ${isPace2 ? "is-pace2" : ""}`}
                         role="radiogroup"
-                        aria-label={`Maks. obsada ${CAPABILITY_LABELS[capability]}`}
+                        aria-label={`Maks. obsada ${CAPABILITY_LABELS[capability]}${paceNote ? ` — ${paceNote}` : ""}`}
+                        title={
+                          paceNote
+                            ? `${CAPABILITY_LABELS[capability]} pracuje na maksimum i ${paceNote} — podniesienie tego sufitu skróci projekt.`
+                            : `${CAPABILITY_LABELS[capability]} ma zapas — załoga jest zwolniona, żeby skończyć razem z resztą, więc podniesienie tego sufitu niczego nie zmieni.`
+                        }
                       >
                         {CEILING_FTE_STEPS.map((v) => {
                           const on = cell.maxFte >= v - CEILING_FTE_EPS;

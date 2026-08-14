@@ -20,6 +20,9 @@
   --accent-soft: #c6bbe8;
   --accent-line: #8a76d4;
   --accent-wash: rgba(86, 64, 158, 0.1);
+  /* The build phase's pace colour — matches the matrix strip so the two
+     screens say the same thing with the same hue. */
+  --pace2: #0f6b78;
   --bar-l: 44%;
   --bar-c: 0.095;
   --bar-soft-l: 74%;
@@ -64,6 +67,7 @@
     --accent-soft: #3a2f6b;
     --accent-line: #6f5ec0;
     --accent-wash: rgba(176, 155, 255, 0.14);
+    --pace2: #6fd3e0;
     --bar-l: 72%;
     --bar-c: 0.11;
     --bar-soft-l: 45%;
@@ -103,6 +107,7 @@
   --accent-soft: #3a2f6b;
   --accent-line: #6f5ec0;
   --accent-wash: rgba(176, 155, 255, 0.14);
+  --pace2: #6fd3e0;
   --bar-l: 72%;
   --bar-c: 0.11;
   --bar-soft-l: 45%;
@@ -857,6 +862,20 @@
 .atl-fte-slot.is-on {
   background: var(--ink-2);
   border-right-color: color-mix(in oklab, var(--surface) 35%, transparent);
+}
+
+/* Parity with the matrix strip: accent = paces inicjacja, teal = paces
+   budowa, plain ink = slack. Same simulation, same colours, same meaning. */
+.atl-fte.is-pace1 .atl-fte-slot.is-on {
+  background: var(--accent);
+}
+
+.atl-fte.is-pace2 .atl-fte-slot.is-on {
+  background: var(--pace2);
+}
+
+.atl-fte.is-pace1.is-pace2 .atl-fte-slot.is-on {
+  background: linear-gradient(160deg, var(--accent) 48%, var(--pace2) 52%);
 }
 
 .atl-fte-slot.is-current {
