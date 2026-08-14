@@ -22,7 +22,7 @@ import {
 import { usePlanner } from "../state/plannerContext";
 import type { Capability, CapabilityCell, Estimate, EstimationSettings, Project } from "../types";
 import { NumberField } from "./NumberField";
-import { MOD, fmt, fmt2, plCount, weeksOf } from "./timelineChrome";
+import { MOD, fmt, fmt2, plCount } from "./timelineChrome";
 import "./capabilityMatrix.css";
 
 interface CapabilityMatrixProps {
@@ -57,20 +57,7 @@ interface CellPlan {
   crewFte: number;
   isBurst: boolean;
   phases: number[];
-  /** The crew this cell wants is bigger than the whole capability pool — the
-   *  ceiling is fiction, nobody can staff it. Straight from the scheduler's
-   *  own over-pool verdict, so the matrix and the plan chart agree. */
-  overPool: boolean;
-  /** Months this project would shorten if the ceiling were raised to each of
-   *  `CEIL_STEPS`, aligned by index. Phase arithmetic, not a simulation: it
-   *  answers "how much faster does THIS project run", never "how much shorter
-   *  is the whole plan" — queuing across the portfolio needs the autopilot. */
-  stepGain: number[];
 }
-
-/** A gain below this is model noise, not a decision — the same week-ish floor
- *  the pool optimizer uses before it will propose a move. */
-const GAIN_FLOOR_MONTHS = 0.25;
 
 const HELP_ITEMS: { token: string; tone?: "accent" | "warn"; title: string; body: string }[] = [
   {
@@ -94,17 +81,6 @@ const HELP_ITEMS: { token: string; tone?: "accent" | "warn"; title: string; body
     tone: "accent",
     title: "Kolor wypełnienia wyznacza tempo fazy",
     body: "Projekt biegnie w dwóch fazach: inicjacja (PM, UX, TL) i budowa (PM, TL, BE, FE, QA, SEC). W każdej dokładnie jedna kompetencja pracuje na swoim maksimum i wyznacza jej długość — fiolet oznacza tempo inicjacji, morski tempo budowy. Dlatego w jednym wierszu mogą świecić dwa paski: to dwie różne odpowiedzi. Pozostałe komórki mają zapas, ich pasek zostaje szary i jego podniesienie niczego nie zmieni.",
-  },
-  {
-    token: "▯",
-    title: "Zielone pole: tu warto dołożyć",
-    body: "Wolne pole paska świeci na zielono, jeśli podniesienie sufitu do tej wartości skróci projekt o co najmniej tydzień, a pula zespołu ma kogo tam postawić. Liczy skrócenie tego projektu, nie całego planu — kolejkę portfela liczą dopiero Propozycje sufitów. W stopce widzisz największy taki zysk na całej planszy.",
-  },
-  {
-    token: "///",
-    tone: "warn",
-    title: "Kreskowane pole: ponad pulę zespołu",
-    body: "Tylu ludzi tej kompetencji zespół po prostu nie ma. Kreskowana część paska to obsada, której nie da się zebrać — sufit rośnie, plan nie. Obwódka wokół całego paska oznacza, że już teraz projekt chce więcej ludzi niż jest w puli. Lekarstwem jest zatrudnienie albo przesunięcie etatów (Symulacje), nie wyższy sufit.",
   },
   {
     token: "≡",
@@ -161,44 +137,9 @@ export function CapabilityMatrix({
    *  actually run at. Both come from the simulation, never from the cell. */
   const cellPlan = useMemo(() => {
     const map = new Map<string, CellPlan>();
-    const rates = effectiveDaysByCapability(people, settings);
     for (const sp of schedule.scheduled) {
-      const overPool = new Set(sp.overPoolCapabilities);
-      // A phase is as long as its slowest stream at full ceiling, so the gain
-      // from raising one ceiling is capped by whoever is second-slowest — past
-      // that point the pace simply changes hands and the phase stops shrinking.
-      const fastestByPhase = new Map<number, { capability: Capability; months: number }[]>();
-      for (const stream of sp.streams) {
-        const rate = rates[stream.capability];
-        if (!(rate > 0) || !(stream.maxFte > 0) || stream.demandDays <= 0) continue;
-        const list = fastestByPhase.get(stream.phase) ?? [];
-        list.push({
-          capability: stream.capability,
-          months: stream.demandDays / (stream.maxFte * rate),
-        });
-        fastestByPhase.set(stream.phase, list);
-      }
       for (const stream of sp.streams) {
         const key = `${sp.project.id}:${stream.capability}`;
-        const rate = rates[stream.capability];
-        // What this phase would cost with this one ceiling moved to each stop.
-        const stepGain = CEIL_STEPS.map((v) => {
-          if (!stream.setsPace || !(rate > 0) || stream.demandDays <= 0) return 0;
-          const others = (fastestByPhase.get(stream.phase) ?? []).filter(
-            (s) => s.capability !== stream.capability,
-          );
-          const now = Math.max(
-            stream.demandDays / (stream.maxFte * rate),
-            ...others.map((s) => s.months),
-            0,
-          );
-          const raised = Math.max(
-            stream.demandDays / (v * rate),
-            ...others.map((s) => s.months),
-            0,
-          );
-          return Math.max(0, now - raised);
-        });
         const prev = map.get(key);
         if (!prev) {
           map.set(key, {
@@ -206,43 +147,17 @@ export function CapabilityMatrix({
             crewFte: stream.crewFte,
             isBurst: stream.isBurst,
             phases: [stream.phase],
-            overPool: overPool.has(stream.capability),
-            stepGain,
           });
         } else {
           if (stream.setsPace) prev.pacePhases.push(stream.phase);
           prev.crewFte = Math.max(prev.crewFte, stream.crewFte);
           prev.isBurst = prev.isBurst && stream.isBurst;
           prev.phases.push(stream.phase);
-          // Phases run back to back, so a capability pacing both shortens the
-          // project by what it saves in each.
-          prev.stepGain = prev.stepGain.map((g, i) => g + stepGain[i]);
         }
       }
     }
     return map;
-  }, [schedule, people, settings]);
-
-  /** The single biggest win on the board, for the footer — "where do I get the
-   *  most for one more person" answered without hunting cell by cell. */
-  const bestGain = useMemo(() => {
-    let best: { projectId: string; capability: Capability; to: number; months: number } | null =
-      null;
-    for (const [key, cp] of cellPlan) {
-      const [projectId, capability] = key.split(":") as [string, Capability];
-      const pool = pools[capability] ?? 0;
-      cp.stepGain.forEach((months, i) => {
-        // Only wins the team could actually staff: a ceiling above the pool
-        // buys nothing but a bigger number in a box.
-        if (CEIL_STEPS[i] > pool + CEIL_EPS) return;
-        if (months < GAIN_FLOOR_MONTHS) return;
-        if (!best || months > best.months) {
-          best = { projectId, capability, to: CEIL_STEPS[i], months };
-        }
-      });
-    }
-    return best as { projectId: string; capability: Capability; to: number; months: number } | null;
-  }, [cellPlan, pools]);
+  }, [schedule]);
 
   // The horizon as it stood when the screen opened, so the footer can show what
   // this editing session has cost or bought rather than a bare number.
@@ -881,8 +796,6 @@ export function CapabilityMatrix({
                           const isPace1 = cp?.pacePhases.includes(1) ?? false;
                           const isPace2 = cp?.pacePhases.includes(2) ?? false;
                           const isPace = isPace1 || isPace2;
-                          const capPool = pools[capability] ?? 0;
-                          const overPool = cp?.overPool ?? false;
                           // The strip's roving tabindex: the slot holding the
                           // current ceiling is the one Tab (and the grid walk)
                           // lands on; with no on-grid value, the first slot is.
@@ -971,31 +884,16 @@ export function CapabilityMatrix({
                                       )}
 
                                       <div
-                                        className={`cm2-ceil ${isPace1 ? "is-pace1" : ""} ${isPace2 ? "is-pace2" : ""} ${flagged ? "is-flagged" : ""} ${overPool ? "is-overburdened" : ""}`}
+                                        className={`cm2-ceil ${isPace1 ? "is-pace1" : ""} ${isPace2 ? "is-pace2" : ""} ${flagged ? "is-flagged" : ""}`}
                                         data-cm-row={rowIndexById[project.id]}
                                         data-cm-col={`${capability}:ceil`}
                                         role="radiogroup"
                                         aria-label={`Maksymalne obłożenie ${CAPABILITY_LABELS[capability]} (FTE) dla ${project.name}`}
                                         onKeyDown={handleSlotKeyDown}
                                       >
-                                        {CEIL_STEPS.map((v, stepIndex) => {
+                                        {CEIL_STEPS.map((v) => {
                                           const on = cell.maxFte >= v - CEIL_EPS;
                                           const current = ceilCurrent === v;
-                                          // Everything to the right of the
-                                          // current value answers "what if we
-                                          // add more FTE" — so that is where
-                                          // the answer gets drawn.
-                                          // Only marked where the question is
-                                          // live — on a pace cell someone may
-                                          // actually reach for. A slack cell is
-                                          // over pool too, but raising it was
-                                          // never going to do anything, so
-                                          // saying so in every row is noise.
-                                          const beyondPool =
-                                            isPace && !on && v > capPool + CEIL_EPS;
-                                          const gain = cp?.stepGain[stepIndex] ?? 0;
-                                          const isWin =
-                                            !on && v <= capPool + CEIL_EPS && gain >= GAIN_FLOOR_MONTHS;
                                           return (
                                             <button
                                               key={v}
@@ -1008,7 +906,7 @@ export function CapabilityMatrix({
                                                   ? 0
                                                   : -1
                                               }
-                                              className={`cm2-slot ${on ? "is-on" : ""} ${current ? "is-current" : ""} ${beyondPool ? "is-overpool" : ""} ${isWin ? "is-win" : ""}`}
+                                              className={`cm2-slot ${on ? "is-on" : ""} ${current ? "is-current" : ""}`}
                                               title={`Ustaw maksymalne obłożenie ${CAPABILITY_LABELS[capability]} na ${fmt(v)} FTE.${
                                                 isPace
                                                   ? ` Ta kompetencja pracuje na maksimum i wyznacza długość ${
@@ -1017,16 +915,8 @@ export function CapabilityMatrix({
                                                         : isPace1
                                                           ? "fazy inicjacji"
                                                           : "fazy budowy"
-                                                    }.`
+                                                    } — podniesienie jej sufitu skróci projekt.`
                                                   : ""
-                                              }${
-                                                beyondPool
-                                                  ? ` Ponad pulę zespołu (${fmt(capPool)} FTE w ${CAPABILITY_LABELS[capability]}) — nie ma kogo tu postawić, więc ten sufit niczego nie przyspieszy.`
-                                                  : gain >= GAIN_FLOOR_MONTHS
-                                                    ? ` Skróciłoby ten projekt o ${fmt(gain)} mies. (${plCount(weeksOf(gain), "tydzień", "tygodnie", "tygodni")}).`
-                                                    : !on && isPace
-                                                      ? " Nie skraca projektu zauważalnie — tempo przejmuje inna kompetencja."
-                                                      : ""
                                               }`}
                                               onClick={(e) => {
                                                 // Shift + klik belongs to the cell: toggle off.
@@ -1115,28 +1005,18 @@ export function CapabilityMatrix({
                 className="cm2-legend"
                 title="Projekt biegnie w dwóch fazach. W każdej jedna kompetencja pracuje na swoim maksymalnym obłożeniu i wyznacza długość tej fazy — tylko jej sufit warto podnosić. Pozostałe mają zapas."
               >
-                <span className="cm2-eyebrow">pasek</span>
-                <span className="cm2-legend-item" title="Ta kompetencja pracuje na maksimum i wyznacza długość fazy inicjacji (PM, UX, TL) — tylko jej sufit warto podnosić.">
+                <span className="cm2-eyebrow">tempo fazy</span>
+                <span className="cm2-legend-item">
                   <i className="cm2-legend-chip is-pace1" />
-                  <span>inicjacja</span>
+                  <span>inicjacja · PM UX TL</span>
                 </span>
-                <span className="cm2-legend-item" title="Ta kompetencja wyznacza długość fazy budowy (PM, TL, BE, FE, QA, SEC). Obie fazy mają własne tempo, dlatego w wierszu mogą świecić dwa paski.">
+                <span className="cm2-legend-item">
                   <i className="cm2-legend-chip is-pace2" />
-                  <span>budowa</span>
+                  <span>budowa · PM TL BE FE QA SEC</span>
                 </span>
-                <span
-                  className="cm2-legend-item"
-                  title="Wolne pole, którego zajęcie skróciłoby ten projekt o co najmniej tydzień — i pula zespołu ma kogo tam postawić."
-                >
-                  <i className="cm2-legend-chip is-win" />
-                  <span>warto podnieść</span>
-                </span>
-                <span
-                  className="cm2-legend-item"
-                  title="Sufit ponad pulę zespołu: tylu ludzi tej kompetencji po prostu nie ma, więc podniesienie tu niczego nie przyspieszy. Lekarstwem jest zatrudnienie albo przesunięcie etatów, nie wyższy sufit."
-                >
-                  <i className="cm2-legend-chip is-overpool" />
-                  <span>ponad pulę</span>
+                <span className="cm2-legend-item">
+                  <i className="cm2-legend-chip" />
+                  <span>zapas</span>
                 </span>
               </span>
               <span className="cm2-foot-rule" />
@@ -1156,27 +1036,9 @@ export function CapabilityMatrix({
                   <span>—</span>
                 )}
               </span>
-              {bestGain && (
-                <>
-                  <span className="cm2-foot-rule" />
-                  <span
-                    className="cm2-bestgain"
-                    title="Największy pojedynczy zysk na planszy: podniesienie tego sufitu do tej wartości skraca ten projekt najbardziej ze wszystkich możliwych podniesień, których pula zespołu jeszcze udźwignie. Skraca projekt — nie cały plan; kolejkę portfela liczą Propozycje sufitów."
-                  >
-                    <span className="cm2-eyebrow">warto podnieść</span>
-                    <b>{projectById.get(bestGain.projectId)?.name ?? bestGain.projectId}</b>
-                    <span>
-                      {bestGain.capability} → {fmt(bestGain.to)}
-                    </span>
-                    <span className="cm2-bestgain-v">−{fmt(bestGain.months)} mies.</span>
-                  </span>
-                </>
-              )}
             </div>
             <span style={{ flex: 1 }} />
-            <span className="cm2-foot-hint">
-              tab i ↑↓ po komórkach · shift + klik wyłącza kompetencję
-            </span>
+            <span>tab i ↑↓ po komórkach · shift + klik wyłącza kompetencję</span>
           </>
         )}
       </footer>

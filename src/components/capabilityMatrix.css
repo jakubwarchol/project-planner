@@ -717,31 +717,6 @@
   background: linear-gradient(160deg, var(--accent-wash) 48%, var(--pace2-wash) 52%);
 }
 
-/* Empty stops answer "what if we add more FTE". A stop worth taking — it
-   shortens the project by a week or more and the pool can actually staff it —
-   goes green; the eye lands on the wins without reading a single number. */
-.cm2-slot.is-win:not(.is-on) {
-  background: var(--ok-wash);
-  box-shadow: inset 0 -2px 0 var(--ok);
-}
-
-/* Past the pool the ceiling is fiction: nobody exists to stand there. Hatched
-   rather than tinted, because this is "unavailable", not "worse" — and kept
-   quiet, since it is background context next to the green it sits beside. */
-.cm2-slot.is-overpool {
-  background: repeating-linear-gradient(
-    -45deg,
-    var(--warn-wash) 0 2px,
-    var(--surface-2) 2px 5px
-  );
-}
-
-/* A ceiling the team cannot fill at all — flagged on the whole strip, since
-   the problem is the cell's number, not one stop of it. */
-.cm2-ceil.is-overburdened {
-  box-shadow: inset 0 0 0 1px var(--warn);
-}
-
 /* The stop under the cursor announces itself — a ring names the exact
    rectangle a click would set, on filled and empty segments alike. */
 .cm2-slot:hover {
@@ -963,8 +938,6 @@
 
 /* ── footer ─────────────────────────────────────────────────────────────── */
 
-/* One line, always: the footer carries more than fits on a narrow window, so
-   it clips from the least important end rather than wrapping into the grid. */
 .cm2-footer {
   flex: none;
   display: flex;
@@ -978,8 +951,6 @@
   font-size: 10.5px;
   letter-spacing: 0.04em;
   color: var(--ink-2);
-  white-space: nowrap;
-  overflow: hidden;
 }
 
 .cm2-foot-group {
@@ -987,15 +958,6 @@
   align-items: center;
   gap: 14px;
   min-width: 0;
-  /* The measurements hold their width; the keyboard hint at the far end is
-     boilerplate, so it is what gives way when the window gets narrow. */
-  flex-shrink: 0;
-}
-
-.cm2-foot-hint {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .cm2-eyebrow {
@@ -1088,36 +1050,6 @@
 
 .cm2-legend-chip.is-pace2 {
   background: var(--pace2);
-}
-
-.cm2-legend-chip.is-win {
-  background: var(--ok-wash);
-  box-shadow: inset 0 -2px 0 var(--ok);
-}
-
-.cm2-legend-chip.is-overpool {
-  background: repeating-linear-gradient(-45deg, var(--warn) 0 2px, transparent 2px 4px);
-}
-
-.cm2-bestgain {
-  display: flex;
-  align-items: baseline;
-  gap: 5px;
-  color: var(--ink-3);
-}
-
-.cm2-bestgain b {
-  max-width: 190px;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  color: var(--ink);
-  font-weight: 600;
-}
-
-.cm2-bestgain-v {
-  color: var(--ok);
-  font-weight: 600;
 }
 
 /* ── drawers: help and proposals ────────────────────────────────────────── */
