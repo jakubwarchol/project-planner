@@ -65,8 +65,10 @@
 /* One focus ring for everything keyboard-reachable; never removed without a
    replacement. Controls sitting flush in tight rows or clipped containers pull
    the ring inward with a negative offset instead of opting out. */
-.atl :focus-visible,
-.bv :focus-visible {
+/* :where keeps this at (0,1,0), so a control's own :focus-visible override
+   wins regardless of which stylesheet the bundler emits first. */
+.atl :where(:focus-visible),
+.bv :where(:focus-visible) {
   outline: var(--focus-ring);
   outline-offset: 1px;
 }
@@ -230,9 +232,13 @@
   -webkit-font-smoothing: antialiased;
 }
 
-.atl button,
-.bv button {
-  font-family: inherit;
+/* Zero-specificity reset (:where), so any class that states its own font
+   still wins: the old `.atl button` form was (0,1,1) and silently beat
+   single-class rules like .tw-fte-btn's mono. Inputs and selects are included
+   because they never inherit fonts on their own — without this, an unstyled
+   .obs-search renders in the browser's Arial. */
+:where(.atl, .bv) :where(button, input, select, textarea) {
+  font: inherit;
 }
 
 /* Header */

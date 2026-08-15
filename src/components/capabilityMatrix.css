@@ -52,7 +52,7 @@
 
 /* One focus ring for everything keyboard-reachable; tight in-row controls pull
    it inward with a negative offset rather than opting out. */
-.cm2 :focus-visible {
+.cm2 :where(:focus-visible) {
   outline: var(--focus-ring);
   outline-offset: 1px;
 }
@@ -143,9 +143,10 @@
   overflow: hidden;
 }
 
-.cm2 button,
-.cm2 input {
-  font-family: inherit;
+/* Zero-specificity (:where) so .nf-grid's mono and friends win over the
+   reset; the old `.cm2 input` form was (0,1,1) and beat them. */
+:where(.cm2) :where(button, input, select, textarea) {
+  font: inherit;
 }
 
 .cm2 input[type="text"] {
