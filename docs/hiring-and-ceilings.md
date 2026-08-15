@@ -69,6 +69,13 @@ Te 2,6 miesiąca różnicy między 8,9 a 6,3 to cała racja bytu tego trybu.
   nikt nie ruszał, nie realne ograniczenie projektowe.
 - **Górna granica podniesień: 3,0 na projekt** — górny stop paska sufitów w
   Wycenach. Planer nie proponuje sufitu powyżej tej wartości.
+- **Sufity w macierzy to propozycje obsady, nie twarde estymaty.** Zostały
+  wpisane jako „tylu ludzi możemy tu dziś postawić" — jeśli zatrudnimy nowych,
+  wolno próbować dokładać. Podniesienie sufitu jest więc zwykłym ruchem
+  planistycznym, nie nadpisaniem czyjejś świadomej decyzji; wystarczy lista
+  zmian przy wariancie, bez osobnego oznaczania „zmiana estymaty". Wyjątkiem są
+  UX, TL i SEC — tam jedynka opisuje projekt, dlatego stoją na liście
+  zakazanych.
 - Stan macierzy to potwierdza: wszystkie 13 komórek UX i 26 komórek TL stoi dziś
   dokładnie na 1,0. Powyżej jedynki wychodzą tylko BE (do 2,5) i FE (do 1,5).
 - **Podniesione sufity zapisują się w wariancie** i są widoczne na ekranie —
@@ -134,9 +141,5 @@ Skutki uboczne do przemyślenia przy wdrożeniu:
   trzeba zdecydować, czy da się je stamtąd „wypchnąć" do macierzy jednym
   kliknięciem, czy tylko przeczytać i przepisać ręcznie.
 
-## Otwarte pytania
-
-1. **Czy podniesienie sufitu to zmiana estymaty?** Jeśli „max 1 UX" opisuje
-   projekt, a nie zespół, to propozycja podniesienia jest twierdzeniem o tym, że
-   pracę da się pokroić inaczej. Ekran powinien to mówić wprost, zamiast po
-   cichu przepisywać liczby, które ktoś świadomie wpisał.
+Otwartych pytań nie ma — wszystkie trzy z pierwszej wersji notatki zostały
+rozstrzygnięte i przeniesione do ustaleń powyżej.
