@@ -100,37 +100,53 @@ na projekt i limit na zespół to dwie różne rzeczy i obie są potrzebne:
 - **limit projektowy** (do zrobienia) — ilu ma sens na jednym projekcie naraz
   („jeden UX na projekt").
 
-## Szkic algorytmu
+## Algorytm (rozstrzygnięty po krytyce)
 
 Sufity są **darmowe**, etaty **kosztują**. To rozstrzyga strukturę: oś drabinki
 zostaje „ile osób zatrudniamy", a przekrojenie pracy dzieje się przy okazji, na
-każdym szczeblu.
+każdym szczeblu. Pierwotny szkic („beam z trybu 1 + pętla autopilota naraz")
+przeszedł krytykę i cztery rzeczy zostały rozstrzygnięte inaczej:
 
-Runda dla poziomu N:
+**1. Zachłannie, szerokość 1 — nie beam.** Beam trzyma cztery różne zespoły na
+poziom; „wyczerp sufity na obecnym zespole" nie ma wtedy adresata, a pętla
+sufitowa na każdy węzeł to minuty zamiast sekund. Tryb 2 prowadzi jedną ścieżkę.
+Ubezpieczenie, które dawał beam (etat opłacalny dopiero w towarzystwie), w
+dużej mierze przejmują sufity: to one przywracają gradient, przez którego brak
+drabinka trybu 1 była płaska.
 
-1. Wyczerp opłacalne podniesienia sufitów na obecnym zespole — po jednym kroku
-   (0,5), tylko na komórkach wyznaczających tempo, każde zweryfikowane pełną
-   symulacją. To dokładnie pętla z `autopilot.ts`, więc do napisania jest
-   wpięcie, nie nowa matematyka.
-2. Dołóż najlepszy jeden etat (dzisiejszy beam z `hiringPlanner.ts`).
-3. Wróć do 1 — nowa osoba mogła właśnie uczynić kolejny sufit obsadzalnym.
+**2. Sufity liczone od zera na każdym szczeblu.** Podniesienia NIE kumulują się
+między szczeblami: szczebel N dostaje pętlę sufitową od czystej macierzy dla
+swojego zespołu. Powód: podniesienie opłacalne przy małym zespole może szkodzić
+przy większym (próg otwarcia fazy — pomiar ×1,5 vs ×2), a pętla umie tylko
+podnosić. Bez kumulacji nie ma czego odkręcać, a każdy szczebel jest
+samodzielną odpowiedzią: „N etatów + ten komplet podniesień". Konsekwencja:
+komplety z sąsiednich szczebli nie muszą się zawierać — ekran pokazuje komplet
+szczebla w całości, bez narracji „i jeszcze jedno podniesienie".
 
-Wiersz wyniku brzmi wtedy: *„4 etaty — UX×2, BE, FE — plus sufity: ACMS·BE 2→3,
+**3. Budżet symulacji.** Uczciwy rachunek pełnej wersji (~1300 symulacji ≈ 20 s
+przy ~14 ms/symulację) nie mieści się w budżecie ekranu (~2 s), a „licz sufity
+dopiero po kliknięciu szczebla" łamie własną rację bytu trybu: bez sufitów
+etaty 2–7 są remisowe, więc dobór ludzi byłby losowy. Środek: pętla sufitowa ma
+mały budżet na szczebel (`MAX_MOVES_PER_RUNG`, ~6), kandydaci na etat są
+punktowani jedną symulacją na tle podniesionych sufitów rodzica, plus jedna
+symulacja podpowiedzi: pętla sufitowa raportuje ruchy zablokowane pulą
+(`blocked: "pool"`), więc etat, który taki ruch odblokowuje, testujemy razem z
+nim. Cel: ~500–600 symulacji, krokowo jak dziś (`SIMS_PER_STEP`).
+
+**4. Szczebel zero istnieje.** Wiersz „0 etatów, same podniesienia" — pętla
+sufitowa na dzisiejszym zespole potrafi znaleźć realne skróty (wiersz „same
+sufity gorzej" w tabeli wyżej mierzył skalowanie hurtem, nie ruchy po kroku).
+
+Runda dla szczebla N (dla jasności, po rozstrzygnięciach):
+
+1. weź zespół szczebla N−1 plus najlepszy jeden etat (punktacja jak w pkt. 3),
+2. od czystej macierzy wyczerp opłacalne podniesienia dla tego zespołu
+   (`ceilingRaiseBlock` + `compareScores` z `planRules.ts`, tylko komórki
+   wyznaczające tempo, każde zweryfikowane pełną symulacją),
+3. zapisz szczebel: zespół, komplet podniesień, `PlanScore`.
+
+Wiersz wyniku brzmi: *„4 etaty — UX×2, BE, FE — plus sufity: ACMS·BE 2→3,
 WTR·BE 2→2,5 → 6,3 mies."*.
-
-Kandydaci na podniesienie:
-
-- tylko to, co przepuści `ceilingRaiseBlock` z `planRules.ts` (lista zakazana,
-  granica 3,0, strażnik puli),
-- tylko komórki, które faktycznie wyznaczają tempo fazy — podniesienie sufitu z
-  zapasem nie zmienia niczego i autopilot już to wie,
-- podniesienie, które czyni projekt niewykonalnym, odpada samo — poziom
-  `impossible` w `PlanScore` jest nadrzędny.
-
-Koszt: ruchy sufitowe są ograniczone (`MAX_MOVES`), a drabinka ma 7 szczebli.
-Trzeba zmierzyć, czy mieści się w budżecie UX-owym dzisiejszego trybu (~2 s przy
-~120 symulacjach). Jeśli nie — liczyć sufity tylko na wybranym szczeblu, na
-żądanie, zamiast na wszystkich siedmiu.
 
 ## Trwałość i ekran
 
@@ -147,6 +163,10 @@ Skutki uboczne do przemyślenia przy wdrożeniu:
 - wariant z nadpisaniami powinien to widocznie sygnalizować — licznik przy
   nazwie i lista zmian („ACMS · BE 2 → 3") na ekranie,
 - wariant roster-derived (`variant-1`) nadpisań nie ma i mieć nie powinien,
+- **nadpisanie działa tylko w górę**: przechowywana jest wartość bezwzględna,
+  więc gdy ktoś później podniesie realną macierz ponad nadpisanie, stare
+  nadpisanie stałoby się po cichu *obniżeniem* — dlatego nadpisanie niższe lub
+  równe bazie jest ignorowane (i można je przy okazji sprzątnąć),
 - Wyceny pokazują macierz **realną**; nadpisania żyją tylko w Symulacjach, więc
   trzeba zdecydować, czy da się je stamtąd „wypchnąć" do macierzy jednym
   kliknięciem, czy tylko przeczytać i przepisać ręcznie.
