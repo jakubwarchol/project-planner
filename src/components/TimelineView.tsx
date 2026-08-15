@@ -197,17 +197,21 @@ export function TimelineView({
     localStorage.setItem(CAPS_KEY, JSON.stringify(caps));
   }, [caps]);
 
-  // The optimizer plans in the baseline variant's world: the matrix with its
-  // ceiling overrides laid on top — the same cells its comparison row uses.
-  const baselineCells = useMemo(
-    () => applyCeilingOverrides(cells, baseline.ceilings),
-    [cells, baseline.ceilings],
+  // The optimizer always plans from today's real team — the roster-derived
+  // variant — no matter which variant the timeline currently compares
+  // against. Planning from a selected variant compounded hypothetical worlds:
+  // a "+4" built on one baseline carried that baseline's people and overrides
+  // into its label and its numbers, and two rows became incomparable.
+  const roster = variants.find((v) => v.isRosterDerived) ?? variants[0];
+  const rosterCells = useMemo(
+    () => applyCeilingOverrides(cells, roster.ceilings),
+    [cells, roster.ceilings],
   );
 
   const optimizerInput = useMemo<HiringPlanInput>(
     () => ({
       projects: plannedProjects,
-      cells: baselineCells,
+      cells: rosterCells,
       effectiveDaysPerMonth: edpm,
       minStaffingFraction: settings.minStaffingFraction,
       minCrewFte: settings.minCrewFte,
@@ -216,20 +220,20 @@ export function TimelineView({
       deadlineMonths,
       caps,
     }),
-    [plannedProjects, baselineCells, edpm, earliestStart, leaveDips, settings.minStaffingFraction, settings.minCrewFte, deadlineMonths, caps],
+    [plannedProjects, rosterCells, edpm, earliestStart, leaveDips, settings.minStaffingFraction, settings.minCrewFte, deadlineMonths, caps],
   );
 
   // Calls the simulation through the lib directly — the shared schedule hook's
   // tiny identity-keyed cache would thrash under hundreds of trial vectors.
-  const proposal = useHiringPlan(baseline.fte, optimizerInput);
-  const ladder = useHiringLadder(baseline.fte, optimizerInput);
+  const proposal = useHiringPlan(roster.fte, optimizerInput);
+  const ladder = useHiringLadder(roster.fte, optimizerInput);
   const projectNameOf = useCallback(
     (id: string) => projects.find((p) => p.id === id)?.name ?? id,
     [projects],
   );
-  const baselineTotalFte = useMemo(
-    () => CAPABILITY_ORDER.reduce((sum, c) => sum + (baseline.fte[c] ?? 0), 0),
-    [baseline.fte],
+  const rosterTotalFte = useMemo(
+    () => CAPABILITY_ORDER.reduce((sum, c) => sum + (roster.fte[c] ?? 0), 0),
+    [roster.fte],
   );
 
   const applyProposal = useCallback(
@@ -254,30 +258,29 @@ export function TimelineView({
       );
       // Straight through addVariant, not createVariant — clampFte would
       // re-round the vector and store a different plan than the drawer showed.
-      // A mode-1 scenario keeps the baseline's overrides: it was simulated on
-      // exactly those cells.
+      // The roster variant never carries overrides, so a mode-1 scenario
+      // starts from the bare matrix — no inherited ceilings.
       addVariant({
         id,
         label,
         fte: vector,
         isRosterDerived: false,
-        ceilings: structuredClone(baseline.ceilings),
+        ceilings: structuredClone(roster.ceilings),
       });
       setVariantId(id);
       proposal.reset();
       setOptimizerOpen(false);
     },
-    [variants, addVariant, proposal, baseline.ceilings],
+    [variants, addVariant, proposal, roster.ceilings],
   );
 
   const applyRung = useCallback(
     (rung: LadderRung) => {
       const id = newId("variant");
-      // The rung's raises were computed on top of the baseline's overrides,
-      // so the new variant carries both: the old set with the rung's final
-      // per-cell values written over it. Moves chain (1→1.5, 1.5→2); applied
-      // in order, the last write per cell is the rung's final ceiling.
-      const ceilings = structuredClone(baseline.ceilings);
+      // Moves chain per cell (1→1.5, 1.5→2); applied in order, the last write
+      // per cell is the rung's final ceiling. The roster variant they were
+      // computed against never carries overrides of its own.
+      const ceilings = structuredClone(roster.ceilings);
       for (const move of rung.ceilingMoves) {
         (ceilings[move.projectId] ??= {})[move.capability] = move.to;
       }
@@ -304,7 +307,7 @@ export function TimelineView({
       ladder.reset();
       setOptimizerOpen(false);
     },
-    [variants, addVariant, ladder, baseline.ceilings],
+    [variants, addVariant, ladder, roster.ceilings],
   );
 
   // One band, not eight. The per-capability bands answered "how long would BE's
@@ -574,8 +577,8 @@ export function TimelineView({
                   onClick={() => setVariantId(v.id)}
                   title={
                     overrides > 0
-                      ? `${plCount(overrides, "nadpisany sufit", "nadpisane sufity", "nadpisanych sufitów")} — szczegóły w Edytuj…`
-                      : undefined
+                      ? `${v.label} — ${plCount(overrides, "nadpisany sufit", "nadpisane sufity", "nadpisanych sufitów")}, szczegóły w Edytuj…`
+                      : v.label
                   }
                 >
                   {v.label}
@@ -591,9 +594,9 @@ export function TimelineView({
             type="button"
             className={`atl-btn ${optimizerOpen ? "is-on" : ""}`}
             onClick={() => setOptimizerOpen(true)}
-            disabled={baselineTotalFte <= 0 || plannedProjects.length === 0}
+            disabled={rosterTotalFte <= 0 || plannedProjects.length === 0}
             title={
-              baselineTotalFte <= 0
+              rosterTotalFte <= 0
                 ? "Wariant bez ludzi — nie ma czego przesuwać"
                 : plannedProjects.length === 0
                   ? "Brak projektów w planie"
@@ -737,8 +740,8 @@ export function TimelineView({
         <HiringPlanDrawer
           api={proposal}
           ladder={ladder}
-          baselineLabel={baseline.label}
-          baselineFte={baseline.fte}
+          baselineLabel={roster.label}
+          baselineFte={roster.fte}
           insets={{ top: D.hdr, bottom: D.foot }}
           caps={caps}
           onCapsChange={setCaps}
