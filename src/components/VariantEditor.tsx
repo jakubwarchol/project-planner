@@ -10,6 +10,7 @@ interface VariantEditorProps {
   /** The variant the timeline is showing — also the one being edited, so
    *  changes land on the chart behind the dialog as they're typed. */
   activeId: string;
+  projectNameOf: (id: string) => string;
   onActivate: (id: string) => void;
   onClose: () => void;
 }
@@ -18,8 +19,57 @@ function totalFte(variant: TeamVariant): number {
   return CAPABILITY_ORDER.reduce((sum, capability) => sum + (variant.fte[capability] ?? 0), 0);
 }
 
-export function VariantEditor({ api, activeId, onActivate, onClose }: VariantEditorProps) {
-  const { variants, createVariant, renameVariant, setVariantFte, copyFromRoster, deleteVariant } = api;
+/** The variant's ceiling overrides, one line per cell — the part that makes
+ *  it more than an FTE vector. Read-only here: the set comes whole from a
+ *  ladder rung, so the only edit that makes sense is dropping it. */
+function CeilingOverrides({
+  variant,
+  projectNameOf,
+  onClear,
+}: {
+  variant: TeamVariant;
+  projectNameOf: (id: string) => string;
+  onClear: () => void;
+}) {
+  const rows = Object.entries(variant.ceilings).flatMap(([projectId, row]) =>
+    CAPABILITY_ORDER.filter((capability) => row[capability] !== undefined).map((capability) => ({
+      projectId,
+      capability,
+      maxFte: row[capability]!,
+    })),
+  );
+  if (rows.length === 0) return null;
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+        <p className="ve-field-label" style={{ margin: 0 }}>
+          Nadpisane sufity obłożenia ({rows.length})
+        </p>
+        <button type="button" className="ve-copy" onClick={onClear}>
+          Wyczyść
+        </button>
+      </div>
+      <div className="ve-rows">
+        {rows.map((row) => (
+          <div className="ve-row" key={`${row.projectId}:${row.capability}`}>
+            <span className="ve-row-label" title={projectNameOf(row.projectId)}>
+              {projectNameOf(row.projectId)} · {CAPABILITY_LABELS[row.capability]}
+            </span>
+            <span className="ve-list-meta">→ {fmt(row.maxFte)} FTE</span>
+          </div>
+        ))}
+      </div>
+      <p className="ve-field-label" style={{ margin: 0 }}>
+        Ten wariant planuje te komórki inaczej niż macierz w Wycenach. Nadpisanie działa tylko w
+        górę — gdy macierz je przerośnie, wygasa samo.
+      </p>
+    </div>
+  );
+}
+
+export function VariantEditor({ api, activeId, projectNameOf, onActivate, onClose }: VariantEditorProps) {
+  const { variants, createVariant, renameVariant, setVariantFte, copyFromRoster, clearCeilings, deleteVariant } = api;
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const selected = variants.find((v) => v.id === activeId) ?? variants[0];
@@ -115,6 +165,12 @@ export function VariantEditor({ api, activeId, onActivate, onClose }: VariantEdi
                 </div>
               ))}
             </div>
+
+            <CeilingOverrides
+              variant={selected}
+              projectNameOf={projectNameOf}
+              onClear={() => clearCeilings(selected.id)}
+            />
 
             <div className="ve-footer">
               <button

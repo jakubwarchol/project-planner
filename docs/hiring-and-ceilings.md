@@ -107,12 +107,18 @@ zostaje „ile osób zatrudniamy", a przekrojenie pracy dzieje się przy okazji,
 każdym szczeblu. Pierwotny szkic („beam z trybu 1 + pętla autopilota naraz")
 przeszedł krytykę i cztery rzeczy zostały rozstrzygnięte inaczej:
 
-**1. Zachłannie, szerokość 1 — nie beam.** Beam trzyma cztery różne zespoły na
-poziom; „wyczerp sufity na obecnym zespole" nie ma wtedy adresata, a pętla
-sufitowa na każdy węzeł to minuty zamiast sekund. Tryb 2 prowadzi jedną ścieżkę.
-Ubezpieczenie, które dawał beam (etat opłacalny dopiero w towarzystwie), w
-dużej mierze przejmują sufity: to one przywracają gradient, przez którego brak
-drabinka trybu 1 była płaska.
+**1. Zespoły z beama trybu 1 — nie własny wybór etatów.** (Rewizja po
+pomiarze.) Pierwsza wersja prowadziła jedną zachłanną ścieżkę: sama wybierała
+najlepszy pojedynczy etat na tle podniesionych sufitów, z podpowiedzią z ruchów
+zablokowanych pulą. Na realnym portfelu zdegenerowała się całkowicie:
+pojedyncze etaty są płaskie nawet na podniesionych sufitach — pary jak TL+BE
+płacą dopiero razem — więc remis rozstrzygał porządek kompetencji i planer
+zatrudniał PM siedem razy. Przetrwanie płaskich poziomów to dokładnie to, po co
+istnieje beam trybu 1, więc tryb 2 bierze zespół każdego szczebla wprost z
+niego; własną robotą trybu 2 jest świeża pętla sufitowa na każdym z tych
+zespołów. Zaakceptowany kompromis: beam optymalizuje skład przy dzisiejszych
+sufitach, więc skład najlepszy dopiero-z-sufitami może umknąć — wersja dokładna
+(pętla sufitowa na każdego kandydata beama) kosztuje minuty, nie sekundy.
 
 **2. Sufity liczone od zera na każdym szczeblu.** Podniesienia NIE kumulują się
 między szczeblami: szczebel N dostaje pętlę sufitową od czystej macierzy dla
@@ -123,15 +129,13 @@ samodzielną odpowiedzią: „N etatów + ten komplet podniesień". Konsekwencja
 komplety z sąsiednich szczebli nie muszą się zawierać — ekran pokazuje komplet
 szczebla w całości, bez narracji „i jeszcze jedno podniesienie".
 
-**3. Budżet symulacji.** Uczciwy rachunek pełnej wersji (~1300 symulacji ≈ 20 s
-przy ~14 ms/symulację) nie mieści się w budżecie ekranu (~2 s), a „licz sufity
-dopiero po kliknięciu szczebla" łamie własną rację bytu trybu: bez sufitów
-etaty 2–7 są remisowe, więc dobór ludzi byłby losowy. Środek: pętla sufitowa ma
-mały budżet na szczebel (`MAX_MOVES_PER_RUNG`, ~6), kandydaci na etat są
-punktowani jedną symulacją na tle podniesionych sufitów rodzica, plus jedna
-symulacja podpowiedzi: pętla sufitowa raportuje ruchy zablokowane pulą
-(`blocked: "pool"`), więc etat, który taki ruch odblokowuje, testujemy razem z
-nim. Cel: ~500–600 symulacji, krokowo jak dziś (`SIMS_PER_STEP`).
+**3. Budżet symulacji.** Kształt po rewizji: beam trybu 1 (~150 symulacji) plus
+osiem świeżych pętli sufitowych z małym budżetem ruchów na szczebel
+(`MAX_MOVES_PER_RUNG` = 6). Zmierzone na realnym portfelu (28 projektów w
+planie): ~1100 symulacji, ~38 s — dużo ponad budżet 2 s starego ekranu, więc
+liczy się krokowo z paskiem postępu i przyciskiem „Przerwij". Do rozważenia
+kiedyś: szybsza symulacja albo pętle sufitowe liczone leniwie od najniższych
+szczebli.
 
 **4. Szczebel zero istnieje.** Wiersz „0 etatów, same podniesienia" — pętla
 sufitowa na dzisiejszym zespole potrafi znaleźć realne skróty (wiersz „same
@@ -139,7 +143,7 @@ sufity gorzej" w tabeli wyżej mierzył skalowanie hurtem, nie ruchy po kroku).
 
 Runda dla szczebla N (dla jasności, po rozstrzygnięciach):
 
-1. weź zespół szczebla N−1 plus najlepszy jeden etat (punktacja jak w pkt. 3),
+1. zespół szczebla N = najlepszy rozdział N etatów według beama trybu 1,
 2. od czystej macierzy wyczerp opłacalne podniesienia dla tego zespołu
    (`ceilingRaiseBlock` + `compareScores` z `planRules.ts`, tylko komórki
    wyznaczające tempo, każde zweryfikowane pełną symulacją),
@@ -147,6 +151,13 @@ Runda dla szczebla N (dla jasności, po rozstrzygnięciach):
 
 Wiersz wyniku brzmi: *„4 etaty — UX×2, BE, FE — plus sufity: ACMS·BE 2→3,
 WTR·BE 2→2,5 → 6,3 mies."*.
+
+Zmierzone po zbudowaniu, na realnym portfelu: baza 12,3 mies.; szczebel 0
+(same podniesienia) 10,6; 5 etatów bez sufitów 8,7, z sufitami **7,7** — lepiej
+niż 7 etatów bez sufitów (7,6 vs 7,3 z sufitami). Obie dźwignie faktycznie
+składają się w jedną propozycję. Szczeble nie muszą być monotoniczne (szczebel
+3 bywa odrobinę gorszy od 2 na sumie końców — artefakt kompromisu z pkt. 1);
+ekran i tak przycina wiersze, które nic nie kupują.
 
 ## Trwałość i ekran
 

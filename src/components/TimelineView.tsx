@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTeamVariants } from "../hooks/useTeamVariants";
 import { useHiringPlan } from "../hooks/useHiringPlan";
+import { useHiringLadder } from "../hooks/useHiringLadder";
+import type { LadderRung } from "../lib/hirePlusCeilings";
 import { earliestStartOffsets } from "../hooks/useCapabilitySchedule";
 import { monthKeyOf, monthsFrom, parseMonthKey } from "../lib/calendar";
 import {
@@ -37,6 +39,11 @@ import {
 import "./timeline.css";
 
 const CAPS_KEY = "planner-capability-caps";
+
+/** How many project × capability cells this variant plans differently. */
+function ceilingOverrideCount(variant: TeamVariant): number {
+  return Object.values(variant.ceilings).reduce((sum, row) => sum + Object.keys(row).length, 0);
+}
 
 /** Caps live in localStorage rather than the database: they are a constraint on
  *  a question ("we only ever want one TL"), not a fact about the roster, and
@@ -190,10 +197,17 @@ export function TimelineView({
     localStorage.setItem(CAPS_KEY, JSON.stringify(caps));
   }, [caps]);
 
+  // The optimizer plans in the baseline variant's world: the matrix with its
+  // ceiling overrides laid on top — the same cells its comparison row uses.
+  const baselineCells = useMemo(
+    () => applyCeilingOverrides(cells, baseline.ceilings),
+    [cells, baseline.ceilings],
+  );
+
   const optimizerInput = useMemo<HiringPlanInput>(
     () => ({
       projects: plannedProjects,
-      cells,
+      cells: baselineCells,
       effectiveDaysPerMonth: edpm,
       minStaffingFraction: settings.minStaffingFraction,
       minCrewFte: settings.minCrewFte,
@@ -202,12 +216,17 @@ export function TimelineView({
       deadlineMonths,
       caps,
     }),
-    [plannedProjects, cells, edpm, earliestStart, leaveDips, settings.minStaffingFraction, settings.minCrewFte, deadlineMonths, caps],
+    [plannedProjects, baselineCells, edpm, earliestStart, leaveDips, settings.minStaffingFraction, settings.minCrewFte, deadlineMonths, caps],
   );
 
   // Calls the simulation through the lib directly — the shared schedule hook's
   // tiny identity-keyed cache would thrash under hundreds of trial vectors.
   const proposal = useHiringPlan(baseline.fte, optimizerInput);
+  const ladder = useHiringLadder(baseline.fte, optimizerInput);
+  const projectNameOf = useCallback(
+    (id: string) => projects.find((p) => p.id === id)?.name ?? id,
+    [projects],
+  );
   const baselineTotalFte = useMemo(
     () => CAPABILITY_ORDER.reduce((sum, c) => sum + (baseline.fte[c] ?? 0), 0),
     [baseline.fte],
@@ -230,12 +249,56 @@ export function TimelineView({
       );
       // Straight through addVariant, not createVariant — clampFte would
       // re-round the vector and store a different plan than the drawer showed.
-      addVariant({ id, label, fte: vector, isRosterDerived: false, ceilings: {} });
+      // A mode-1 scenario keeps the baseline's overrides: it was simulated on
+      // exactly those cells.
+      addVariant({
+        id,
+        label,
+        fte: vector,
+        isRosterDerived: false,
+        ceilings: structuredClone(baseline.ceilings),
+      });
       setVariantId(id);
       proposal.reset();
       setOptimizerOpen(false);
     },
-    [variants, addVariant, proposal],
+    [variants, addVariant, proposal, baseline.ceilings],
+  );
+
+  const applyRung = useCallback(
+    (rung: LadderRung) => {
+      const id = newId("variant");
+      // The rung's raises were computed on top of the baseline's overrides,
+      // so the new variant carries both: the old set with the rung's final
+      // per-cell values written over it. Moves chain (1→1.5, 1.5→2); applied
+      // in order, the last write per cell is the rung's final ceiling.
+      const ceilings = structuredClone(baseline.ceilings);
+      for (const move of rung.ceilingMoves) {
+        (ceilings[move.projectId] ??= {})[move.capability] = move.to;
+      }
+      const raisedCells = new Set(
+        rung.ceilingMoves.map((m) => `${m.projectId}:${m.capability}`),
+      ).size;
+      const who = CAPABILITY_ORDER.filter((c) => (rung.byCapability[c] ?? 0) > 0)
+        .map((c) => {
+          const n = rung.byCapability[c] ?? 0;
+          return n > 1 ? `${c}×${n}` : c;
+        })
+        .join(" · ");
+      const core =
+        rung.hires === 0
+          ? `sufity ×${raisedCells}`
+          : `+${rung.hires}: ${who}${raisedCells > 0 ? ` · sufity ×${raisedCells}` : ""}`;
+      const label = optimizedLabel(
+        variants.map((v) => v.label),
+        core,
+      );
+      addVariant({ id, label, fte: rung.pools, isRosterDerived: false, ceilings });
+      setVariantId(id);
+      ladder.reset();
+      setOptimizerOpen(false);
+    },
+    [variants, addVariant, ladder, baseline.ceilings],
   );
 
   // One band, not eight. The per-capability bands answered "how long would BE's
@@ -495,16 +558,25 @@ export function TimelineView({
             bazowy
           </span>
           <div className="atl-seg">
-            {variants.map((v) => (
-              <button
-                key={v.id}
-                type="button"
-                className={`atl-seg-text ${v.id === variantId ? "is-active" : ""}`}
-                onClick={() => setVariantId(v.id)}
-              >
-                {v.label}
-              </button>
-            ))}
+            {variants.map((v) => {
+              const overrides = ceilingOverrideCount(v);
+              return (
+                <button
+                  key={v.id}
+                  type="button"
+                  className={`atl-seg-text ${v.id === variantId ? "is-active" : ""}`}
+                  onClick={() => setVariantId(v.id)}
+                  title={
+                    overrides > 0
+                      ? `${plCount(overrides, "nadpisany sufit", "nadpisane sufity", "nadpisanych sufitów")} — szczegóły w Edytuj…`
+                      : undefined
+                  }
+                >
+                  {v.label}
+                  {overrides > 0 ? ` ▲${overrides}` : ""}
+                </button>
+              );
+            })}
           </div>
           <button type="button" className="atl-btn" onClick={() => setEditorOpen(true)}>
             Edytuj…
@@ -658,12 +730,15 @@ export function TimelineView({
       {optimizerOpen && (
         <HiringPlanDrawer
           api={proposal}
+          ladder={ladder}
           baselineLabel={baseline.label}
           baselineFte={baseline.fte}
           insets={{ top: D.hdr, bottom: D.foot }}
           caps={caps}
           onCapsChange={setCaps}
           onApply={applyProposal}
+          onApplyRung={applyRung}
+          projectNameOf={projectNameOf}
           onClose={() => setOptimizerOpen(false)}
         />
       )}
@@ -672,6 +747,7 @@ export function TimelineView({
         <VariantEditor
           api={variantsApi}
           activeId={baseline.id}
+          projectNameOf={projectNameOf}
           onActivate={setVariantId}
           onClose={() => setEditorOpen(false)}
         />

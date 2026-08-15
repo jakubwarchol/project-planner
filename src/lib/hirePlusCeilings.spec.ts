@@ -89,10 +89,10 @@ describe("hirePlusCeilings", () => {
   it("rung 0 re-cuts today's work before anyone is hired", () => {
     // The textbook autopilot case: BE pinned at 1 with pool to spare.
     const cells = cellsFor({ a: { BE: { days: 120, maxFte: 1 } } });
-    const result = runLadder(pools({ BE: 4 }), input([project("a")], cells, { maxHires: 0 }));
+    const result = runLadder(pools({ BE: 4 }), input([project("a")], cells, { maxHires: 1 }));
 
     expectInvariants(result);
-    expect(result.rungs).toHaveLength(1);
+    expect(result.rungs[0].hires).toBe(0);
     expect(result.rungs[0].ceilingMoves.length).toBeGreaterThan(0);
     expect(result.rungs[0].deltaHorizon).toBeLessThan(0);
   });
@@ -111,21 +111,26 @@ describe("hirePlusCeilings", () => {
     expect(compareScores(rung.score, result.rungs[0].score)).toBeLessThan(0);
   });
 
-  it("the pool-blocked hint steers the hire to the capability that unblocks a raise", () => {
-    // Both hires look flat on the raised cells alone: BE is the pace and its
-    // ceiling binds, FE is de-rated with room to spare. Only the hint — "a
-    // second BE lets the blocked 1→1.5 raise through" — separates them.
+  it("finds the pair that only pays together, because the beam picks the teams", () => {
+    // UX gates faza 1 and BE gates faza 2; neither single hire fixes the
+    // plan, only the pair does (here the pair literally heals the project —
+    // one person cannot open a phase whose ceiling-3 crew needs 1.2 FTE).
+    // The greedy width-1 interleave this module first shipped with could
+    // never see a pair — the beam can, which is why the teams come from
+    // mode 1.
     const cells = cellsFor({
-      a: { BE: { days: 300, maxFte: 1 }, FE: { days: 60, maxFte: 3 } },
+      a: { UX: { days: 300, maxFte: 3 }, BE: { days: 300, maxFte: 3 } },
     });
     const result = runLadder(
-      pools({ BE: 1, FE: 1 }),
-      input([project("a")], cells, { maxHires: 1 }),
+      pools({ UX: 1, BE: 1 }),
+      input([project("a")], cells, { maxHires: 2 }),
     );
 
     expectInvariants(result);
-    expect(result.rungs[1].addedCapability).toBe("BE");
-    expect(result.rungs[1].deltaHorizon).toBeLessThan(0);
+    const two = result.rungs[2];
+    expect(two.byCapability.UX).toBe(1);
+    expect(two.byCapability.BE).toBe(1);
+    expect(compareScores(two.score, result.base.score)).toBeLessThan(0);
   });
 
   it("computes every rung's raises fresh from the pristine matrix", () => {

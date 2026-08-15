@@ -34,13 +34,15 @@ export interface TeamVariantsApi {
   setVariantFte: (id: string, capability: Capability, fte: number) => void;
   /** Overwrites the variant's capabilities from the live roster. */
   copyFromRoster: (id: string) => void;
+  /** Drops every ceiling override — back to planning on the bare matrix. */
+  clearCeilings: (id: string) => void;
   /** No-op when it would empty the list — there is always at least one variant. */
   deleteVariant: (id: string) => void;
 }
 
 export function useTeamVariants(): TeamVariantsApi {
   const planner = usePlanner();
-  const { variants, addVariant, renameVariant, setVariantFte, resetVariantFromRoster, deleteVariant } = planner;
+  const { variants, addVariant, renameVariant, setVariantFte, setVariantCeilings, resetVariantFromRoster, deleteVariant } = planner;
 
   const createVariant = useCallback(
     (seed?: TeamVariant) => {
@@ -74,12 +76,18 @@ export function useTeamVariants(): TeamVariantsApi {
     [setVariantFte],
   );
 
+  const clearCeilings = useCallback(
+    (id: string) => setVariantCeilings(id, {}),
+    [setVariantCeilings],
+  );
+
   return {
     variants,
     createVariant,
     renameVariant,
     setVariantFte: setFte,
     copyFromRoster: resetVariantFromRoster,
+    clearCeilings,
     deleteVariant: guardedDelete,
   };
 }
