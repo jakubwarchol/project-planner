@@ -76,22 +76,38 @@ export function useHiringLadder(
     fteKeyAtSearch.current = fteKey(baselineFte);
     const state = createLadder(baselineFte, input);
 
+    // Each macrotask runs steps until ~30 ms of simulation work has
+    // accumulated, and progress is published at most a few times a second —
+    // a progress write re-renders the whole Symulacje screen, which costs
+    // more than a search-fidelity simulation does. The yield between slices
+    // goes through a MessageChannel rather than setTimeout: it hands the
+    // frame back just the same, but a backgrounded tab clamps timer chains
+    // to one per second (and later one per minute), which turned a
+    // seconds-long search into minutes the moment the user switched tabs.
+    let lastProgressAt = 0;
+    const channel = new MessageChannel();
     const tick = () => {
       if (runId.current !== id) return;
-      // One ladder step is either a whole raise-loop round or a single hire
-      // trial — both a handful of simulations, the same frame budget the
-      // other searches keep.
-      const done = stepLadder(state);
-      setSolved(state.rungs.length);
-      setSimulations(state.simulations);
+      const sliceStart = performance.now();
+      let done = stepLadder(state);
+      while (!done && performance.now() - sliceStart < 30) done = stepLadder(state);
       if (done) {
+        setSolved(state.rungs.length);
+        setSimulations(state.simulations);
         setResult(ladderResult(state));
         setStatus("ready");
         return;
       }
-      setTimeout(tick, 0);
+      const now = performance.now();
+      if (now - lastProgressAt >= 500) {
+        lastProgressAt = now;
+        setSolved(state.rungs.length);
+        setSimulations(state.simulations);
+      }
+      channel.port2.postMessage(null);
     };
-    setTimeout(tick, 0);
+    channel.port1.onmessage = tick;
+    channel.port2.postMessage(null);
   }, [baselineFte, input]);
 
   const cancel = useCallback(() => {

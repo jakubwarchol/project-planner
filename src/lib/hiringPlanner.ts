@@ -55,7 +55,8 @@ export const MAX_HIRES = 7;
 export const BEAM_WIDTH = 4;
 
 /** Simulations per animation tick — the main thread has to stay answerable.
- *  One simulation is ~14 ms on a real portfolio, so this is ~56 ms of work. */
+ *  One search-fidelity simulation is ~4 ms on a real portfolio, so this is
+ *  ~16 ms of work. */
 export const SIMS_PER_STEP = 4;
 
 /** Max total FTE a capability may reach on the team, existing pool included.
@@ -159,9 +160,13 @@ export interface PlanState {
   done: boolean;
 }
 
+// Beam nodes only ever race each other, so they are scored under the cheap
+// "search" fidelity — every comparison carries the same modest pessimism.
+// Callers that put a number in front of a human (the ladder's base score,
+// its rung scores) re-simulate that final answer at "exact" themselves.
 function simulate(state: PlanState, pools: CapabilityVector): PlanScore {
   const { deadlineMonths: _d, caps: _c, maxHires: _m, ...simInput } = state.input;
-  const schedule = simulateCapabilitySchedule({ ...simInput, pools });
+  const schedule = simulateCapabilitySchedule({ ...simInput, pools, fidelity: "search" });
   state.simulations += 1;
   return scoreOf(schedule, state.input.deadlineMonths);
 }

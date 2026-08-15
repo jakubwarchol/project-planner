@@ -195,6 +195,21 @@ export interface SimulateInput {
    *  variant pool larger than the roster keeps its hypothetical extras — they
    *  have nobody to be away. */
   leaveFteByMonth?: Partial<Record<Capability, number[]>>;
+  /** How much post-processing the schedule gets. "exact" (the default, and
+   *  the only thing a human should ever see) runs `relaxReleases` after the
+   *  contiguity fixed point settles. "search" skips it: the contiguity
+   *  invariant still holds — the forward fixed point alone guarantees a
+   *  gap-free schedule — but the pushes it applied are not bisected back
+   *  down, so starts (and the ends downstream of them) can sit modestly
+   *  later than the exact schedule would place them.
+   *
+   *  It exists because relaxation is ~97% of a schedule's cost (the forward
+   *  pass is ~5 `simulateOnce` runs; relaxation is ~160 more) and the
+   *  optimizer searches burn >1000 schedules comparing candidates against
+   *  each other. Both sides of every such comparison carry the same modest
+   *  pessimism, so the ranking survives — and each search re-simulates its
+   *  final answer at "exact" before anything is shown or applied. */
+  fidelity?: "exact" | "search";
 }
 
 function sum(values: number[]): number {
@@ -352,6 +367,9 @@ const MAX_CONTIGUITY_ROUNDS = 200;
  * minimum — order-dependent and not guaranteed globally optimal — but it
  * directly targets the overshoot instead of leaving every push exactly as
  * large as its first, worst-case measurement.
+ *
+ * `fidelity: "search"` skips exactly that cleanup and nothing else — see the
+ * field's doc on `SimulateInput` for why the optimizer searches want it.
  */
 export function simulateCapabilitySchedule(input: SimulateInput): CapabilitySchedule {
   const release = new Map<string, number>();
@@ -373,7 +391,9 @@ export function simulateCapabilitySchedule(input: SimulateInput): CapabilitySche
   }
 
   if (result === baseline) return result;
-  if (!result.truncated) result = relaxReleases(input, release, result);
+  if (!result.truncated && input.fidelity !== "search") {
+    result = relaxReleases(input, release, result);
+  }
   return { ...result, scheduled: withContiguityDelay(result.scheduled, baseline.scheduled) };
 }
 
@@ -812,13 +832,21 @@ function simulateOnce(input: SimulateInput, releaseAt: Map<string, number>): Cap
   // The gang-started, sticky part of a phase: every capability it still owes
   // work on. Both split capabilities' phase-2 shares are ordinary crew here
   // — the TL residue that used to be exempt is gone (see SPLIT_CAPABILITIES).
+  // Cached per slice (`capsGen` stamps which slice a row belongs to): the
+  // remaining-work buckets it reads only move at slice end, and the slice
+  // loop asks for the same project's caps more than once.
+  const capsBuf: number[][] = Array.from({ length: m }, () => []);
+  const capsGen = new Array<number>(m).fill(-1);
   function crewCapsOf(j: number): number[] {
-    const caps: number[] = [];
+    const caps = capsBuf[j];
+    if (capsGen[j] === iteration) return caps;
+    caps.length = 0;
     if (phase[j] === 1) {
       for (const k of phase1CapIndexes) if (R1[j][k] > EPS) caps.push(k);
     } else if (phase[j] === 2) {
       for (const k of phase2CapIndexes) if (R2[j][k] > EPS) caps.push(k);
     }
+    capsGen[j] = iteration;
     return caps;
   }
 
@@ -850,9 +878,18 @@ function simulateOnce(input: SimulateInput, releaseAt: Map<string, number>): Cap
   // FTE each stream currently holds — the persistent state that makes
   // allocation sticky. Zeroed the instant a stream finishes or its phase
   // flips, so `pool - sum(held)` is always exactly the free capacity.
-  const held: number[][] = Array.from({ length: m }, () => new Array(CAPABILITY_ORDER.length).fill(0));
+  const K = CAPABILITY_ORDER.length;
+  const held: number[][] = Array.from({ length: m }, () => new Array(K).fill(0));
   const isOpen = new Array<boolean>(m).fill(false);
   let freedLastSlice: { j: number; k: number; fte: number }[] = [];
+  // Buffers reused across slices. The slice loop runs a few hundred times per
+  // simulation and the optimizer searches run thousands of simulations, so
+  // fresh arrays here are real drawer latency, not style.
+  const desired: number[][] = Array.from({ length: m }, () => new Array(K).fill(0));
+  const poolLeft = new Array<number>(K).fill(0);
+  const dipPoolBuf = new Array<number>(K).fill(0);
+  const remaining: number[] = [];
+  const notDone: number[] = [];
   // Every slice either forces a stream to zero — a project has at most 9 (PM
   // and TL twice each, UX, BE, FE, QA, SEC) — or advances to a `notBefore`
   // boundary, of which a project has at most two (its faza 1 deferral and its
@@ -869,12 +906,109 @@ function simulateOnce(input: SimulateInput, releaseAt: Map<string, number>): Cap
     isOpen[j] = false;
   }
 
+  function freeForPool(k: number): number {
+    return Math.max(0, poolLeft[k]);
+  }
+
+  // The future moment capability `k` will next hold at least `minNeeded`
+  // free, found by a small lookahead simulation of only currently-
+  // committed sticky holders (every project in `notDone` other than
+  // `forJ`) — no new admissions, exactly like the real slice loop but
+  // restricted to work already under way. As each committed holder's
+  // bucket empties, its FTE returns to the pool and is redistributed to
+  // whoever's still running and under target, in rank order, precisely
+  // like the real top-up rule (3b's `isOpen` branch) — a holder ranked
+  // above `forJ` gets first claim (mirroring the real per-slice walk),
+  // and only what's left after that counts toward `forJ`'s own threshold.
+  // A committed holder can therefore finish *earlier* than its current
+  // rate implies, because it will run faster once topped up — treating
+  // today's rate as constant (the old approach) systematically predicts a
+  // later, more pessimistic readiness than the real schedule delivers.
+  //
+  // The holders live in four parallel, reused arrays rather than an array of
+  // objects: this runs tens of thousands of times per simulation. `hRank` is
+  // filled from `notDone`, which is already in backlog rank order, so array
+  // order doubles as priority order for redistribution; every compaction
+  // below preserves it.
+  const hRank: number[] = [];
+  const hRate: number[] = [];
+  const hRemaining: number[] = [];
+  const hTarget: number[] = [];
+  function futureReadyAt(forJ: number, k: number, minNeeded: number): number {
+    let free = Math.max(0, poolLeft[k]);
+    if (free >= minNeeded - EPS) return t;
+
+    hRank.length = 0;
+    hRate.length = 0;
+    hRemaining.length = 0;
+    hTarget.length = 0;
+    for (const owner of notDone) {
+      if (owner === forJ || held[owner][k] <= EPS) continue;
+      hRank.push(owner);
+      hRate.push(held[owner][k]);
+      hRemaining.push((phase[owner] === 1 ? R1[owner] : R2[owner])[k]);
+      hTarget.push(tgt(owner, k));
+    }
+
+    let count = hRank.length;
+    let horizon = t;
+    while (count > 0) {
+      let dt = Infinity;
+      for (let i = 0; i < count; i++) dt = Math.min(dt, hRemaining[i] / (hRate[i] * EDPM[k]));
+      for (let i = 0; i < count; i++) hRemaining[i] -= hRate[i] * EDPM[k] * dt;
+      horizon += dt;
+
+      // Order-preserving compaction of the finished holders — rank order is
+      // priority order, so a swap-remove would corrupt the walks below.
+      let released = 0;
+      let w = 0;
+      for (let i = 0; i < count; i++) {
+        if (hRemaining[i] <= EPS) {
+          released += hRate[i];
+          continue;
+        }
+        hRank[w] = hRank[i];
+        hRate[w] = hRate[i];
+        hRemaining[w] = hRemaining[i];
+        hTarget[w] = hTarget[i];
+        w++;
+      }
+      count = w;
+      free += released;
+
+      // Holders ranked above `forJ` get first claim on the freed capacity
+      // — the real per-slice walk would top them up before ever reaching
+      // `forJ`'s position.
+      for (let i = 0; i < count; i++) {
+        if (hRank[i] >= forJ || free <= EPS) continue;
+        const room = hTarget[i] - hRate[i];
+        if (room <= EPS) continue;
+        const take = Math.min(room, free);
+        hRate[i] += take;
+        free -= take;
+      }
+      if (free >= minNeeded - EPS) return horizon;
+
+      // `forJ` still isn't ready — the real sim wouldn't leave the rest
+      // idle either, so still-open lower-ranked holders may keep it.
+      for (let i = 0; i < count; i++) {
+        if (free <= EPS) break;
+        const room = hTarget[i] - hRate[i];
+        if (room <= EPS) continue;
+        const take = Math.min(room, free);
+        hRate[i] += take;
+        free -= take;
+      }
+    }
+    return free >= minNeeded - EPS ? horizon : Infinity;
+  }
+
   while (true) {
     // "remaining" (unfinished) drives termination; "notDone" (unfinished AND
     // not still held by a blocker) is who actually competes for pools this
     // slice. A root of any blockedBy chain has no blocker of its own, so
     // notDone is never empty while remaining still has projects in it.
-    const remaining: number[] = [];
+    remaining.length = 0;
     for (let j = 0; j < m; j++) if (phase[j] !== DONE) remaining.push(j);
     if (remaining.length === 0) break;
     if (iteration >= maxIterations) {
@@ -883,21 +1017,21 @@ function simulateOnce(input: SimulateInput, releaseAt: Map<string, number>): Cap
     }
     iteration++;
 
-    const notDone = remaining.filter((j) => {
+    notDone.length = 0;
+    for (const j of remaining) {
       const bj = blockerLocalIdx[j];
-      if (bj !== -1 && phase[bj] !== DONE) return false;
+      if (bj !== -1 && phase[bj] !== DONE) continue;
       // Held back either by an external earliest start or by the contiguity
       // pass sliding faza 1 up against faza 2 — see `notBefore`.
-      if (t < notBefore(j) - EPS) return false;
-      return true;
-    });
+      if (t < notBefore(j) - EPS) continue;
+      notDone.push(j);
+    }
 
-    const desired: number[][] = Array.from({ length: m }, () => new Array(CAPABILITY_ORDER.length).fill(0));
-
-    const poolNow = CAPABILITY_ORDER.map((_, k) => poolNowAt(k, t));
-    const poolLeft = poolNow.slice();
+    const poolNow = hasLeaveDips ? dipPoolBuf : poolByIndex;
+    if (hasLeaveDips) for (let k = 0; k < K; k++) dipPoolBuf[k] = poolNowAt(k, t);
+    for (let k = 0; k < K; k++) poolLeft[k] = poolNow[k];
     for (const j of remaining) {
-      for (let k = 0; k < CAPABILITY_ORDER.length; k++) poolLeft[k] -= held[j][k];
+      for (let k = 0; k < K; k++) poolLeft[k] -= held[j][k];
     }
     // A month can open with less pool than the crews already hold — the pool
     // *is* the people, and some of them are away. De-rate every holder of the
@@ -905,7 +1039,7 @@ function simulateOnce(input: SimulateInput, releaseAt: Map<string, number>): Cap
     // back to strength the moment the dip ends. Under-target time this causes
     // is reported as a "pool" wait like any other shortage.
     if (hasLeaveDips) {
-      for (let k = 0; k < CAPABILITY_ORDER.length; k++) {
+      for (let k = 0; k < K; k++) {
         if (poolLeft[k] >= -EPS) continue;
         let heldSum = 0;
         for (const j of remaining) heldSum += held[j][k];
@@ -916,76 +1050,8 @@ function simulateOnce(input: SimulateInput, releaseAt: Map<string, number>): Cap
     }
 
     for (const j of notDone) {
+      desired[j].fill(0);
       for (const k of crewCapsOf(j)) desired[j][k] = tgt(j, k);
-    }
-
-    // The future moment capability `k` will next hold at least `minNeeded`
-    // free, found by a small lookahead simulation of only currently-
-    // committed sticky holders (every project in `notDone` other than
-    // `forJ`) — no new admissions, exactly like the real slice loop but
-    // restricted to work already under way. As each committed holder's
-    // bucket empties, its FTE returns to the pool and is redistributed to
-    // whoever's still running and under target, in rank order, precisely
-    // like the real top-up rule (3b's `isOpen` branch) — a holder ranked
-    // above `forJ` gets first claim (mirroring the real per-slice walk),
-    // and only what's left after that counts toward `forJ`'s own threshold.
-    // A committed holder can therefore finish *earlier* than its current
-    // rate implies, because it will run faster once topped up — treating
-    // today's rate as constant (the old approach) systematically predicts a
-    // later, more pessimistic readiness than the real schedule delivers.
-    function futureReadyAt(forJ: number, k: number, minNeeded: number): number {
-      let free = Math.max(0, poolLeft[k]);
-      if (free >= minNeeded - EPS) return t;
-
-      // `notDone` is already in backlog rank order, so array order below
-      // doubles as priority order for redistribution.
-      const holders = notDone
-        .filter((owner) => owner !== forJ && held[owner][k] > EPS)
-        .map((owner) => ({
-          rank: owner,
-          rate: held[owner][k],
-          remaining: (phase[owner] === 1 ? R1[owner] : R2[owner])[k],
-          target: tgt(owner, k),
-        }));
-
-      let horizon = t;
-      while (holders.length > 0) {
-        let dt = Infinity;
-        for (const h of holders) dt = Math.min(dt, h.remaining / (h.rate * EDPM[k]));
-        for (const h of holders) h.remaining -= h.rate * EDPM[k] * dt;
-        horizon += dt;
-
-        let released = 0;
-        for (let i = holders.length - 1; i >= 0; i--) {
-          if (holders[i].remaining <= EPS) released += holders.splice(i, 1)[0].rate;
-        }
-        free += released;
-
-        // Holders ranked above `forJ` get first claim on the freed capacity
-        // — the real per-slice walk would top them up before ever reaching
-        // `forJ`'s position.
-        for (const h of holders) {
-          if (h.rank >= forJ || free <= EPS) continue;
-          const room = h.target - h.rate;
-          if (room <= EPS) continue;
-          const take = Math.min(room, free);
-          h.rate += take;
-          free -= take;
-        }
-        if (free >= minNeeded - EPS) return horizon;
-
-        // `forJ` still isn't ready — the real sim wouldn't leave the rest
-        // idle either, so still-open lower-ranked holders may keep it.
-        for (const h of holders) {
-          if (free <= EPS) break;
-          const room = h.target - h.rate;
-          if (room <= EPS) continue;
-          const take = Math.min(room, free);
-          h.rate += take;
-          free -= take;
-        }
-      }
-      return free >= minNeeded - EPS ? horizon : Infinity;
     }
 
     // 3b. One pass down the backlog: top up open streams towards their
@@ -1016,13 +1082,12 @@ function simulateOnce(input: SimulateInput, releaseAt: Map<string, number>): Cap
     const gains: { j: number; k: number; fte: number }[] = [];
     for (const j of notDone) {
       const caps = crewCapsOf(j);
-      const freeFor = (k: number) => Math.max(0, poolLeft[k]);
 
       if (isOpen[j]) {
         // Top up towards the full crew, but uniformly: a running phase comes
         // back up to strength as one team. Letting BE alone reach target
         // while QA stayed short would put their finish dates back out of step.
-        const scale = crewScale(j, caps, freeFor);
+        const scale = crewScale(j, caps, freeForPool);
         for (const k of caps) {
           const take = desired[j][k] * scale - held[j][k];
           if (take <= EPS) continue;
@@ -1033,7 +1098,14 @@ function simulateOnce(input: SimulateInput, releaseAt: Map<string, number>): Cap
         continue;
       }
 
-      if (caps.every((k) => freeFor(k) >= minOf(j, k) - EPS)) {
+      let clearsMinimum = true;
+      for (const k of caps) {
+        if (freeForPool(k) < minOf(j, k) - EPS) {
+          clearsMinimum = false;
+          break;
+        }
+      }
+      if (clearsMinimum) {
         // Safe only if, for every capability any higher-ranked reservation
         // also needs, this project's own draw on it would be done again
         // before *that* reservation — otherwise "free now" would just
@@ -1041,7 +1113,7 @@ function simulateOnce(input: SimulateInput, releaseAt: Map<string, number>): Cap
         // The crew this project would actually open at, which is what its
         // finish dates have to be judged on — not a per-capability maximum it
         // will never run at, since the whole team moves at one scale.
-        const openScale = crewScale(j, caps, freeFor);
+        const openScale = crewScale(j, caps, freeForPool);
         const overlap = new Set<number>();
         for (const res of reservations) {
           for (const k of caps) {
@@ -1069,7 +1141,7 @@ function simulateOnce(input: SimulateInput, releaseAt: Map<string, number>): Cap
       } else {
         crewWaits.set(
           j,
-          caps.filter((k) => freeFor(k) < minOf(j, k) - EPS).map((k) => CAPABILITY_ORDER[k]),
+          caps.filter((k) => freeForPool(k) < minOf(j, k) - EPS).map((k) => CAPABILITY_ORDER[k]),
         );
         let readyAt = t;
         for (const k of caps) readyAt = Math.max(readyAt, futureReadyAt(j, k, minOf(j, k)));
@@ -1118,7 +1190,7 @@ function simulateOnce(input: SimulateInput, releaseAt: Map<string, number>): Cap
     let binding: { j: number; k: number }[] = [];
     for (const j of notDone) {
       const bucket = phase[j] === 1 ? R1[j] : R2[j];
-      for (let k = 0; k < CAPABILITY_ORDER.length; k++) {
+      for (let k = 0; k < K; k++) {
         if (bucket[k] <= EPS || held[j][k] <= EPS) continue;
         const finish = bucket[k] / (held[j][k] * EDPM[k]);
         if (finish < dt - EPS) {
@@ -1160,7 +1232,7 @@ function simulateOnce(input: SimulateInput, releaseAt: Map<string, number>): Cap
     if (!Number.isFinite(dt)) break; // nobody funded anywhere — stuck for good
 
     // 3f. Idle capacity and demanded-but-unfunded shortfall, per capability.
-    for (let k = 0; k < CAPABILITY_ORDER.length; k++) {
+    for (let k = 0; k < K; k++) {
       if (poolLeft[k] > EPS) {
         idleAcc[k].push({
           capability: CAPABILITY_ORDER[k],
@@ -1186,7 +1258,7 @@ function simulateOnce(input: SimulateInput, releaseAt: Map<string, number>): Cap
         continue;
       }
       const caps: Capability[] = [];
-      for (let k = 0; k < CAPABILITY_ORDER.length; k++) {
+      for (let k = 0; k < K; k++) {
         if (desired[j][k] > EPS && held[j][k] < desired[j][k] - EPS) caps.push(CAPABILITY_ORDER[k]);
       }
       if (caps.length > 0) {
@@ -1203,7 +1275,7 @@ function simulateOnce(input: SimulateInput, releaseAt: Map<string, number>): Cap
       const bySeg = isPhase1 ? segments1[j] : segments2[j];
       let totalAlloc = 0;
       let fullyStaffed = true;
-      for (let k = 0; k < CAPABILITY_ORDER.length; k++) {
+      for (let k = 0; k < K; k++) {
         if (held[j][k] <= EPS) continue;
         totalAlloc += held[j][k];
         if (desired[j][k] > EPS && held[j][k] < desired[j][k] - EPS) fullyStaffed = false;

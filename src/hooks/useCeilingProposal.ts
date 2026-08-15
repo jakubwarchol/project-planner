@@ -84,10 +84,22 @@ export function useCeilingProposal(cells: Cells, input: AutopilotInput): Ceiling
     cellsAtSearch.current = cells;
     const state = createSearch(cells, input);
 
+    // Publishing progress re-renders the whole screen, which costs more than
+    // a search round does — so it is throttled, and never blocks a round.
+    // The yield between rounds is a MessageChannel macrotask, not rAF or
+    // setTimeout: rAF stops entirely in a background tab, and timer chains
+    // there are clamped to one per second — either would leave a proposal
+    // crawling half-finished the moment you switch away.
+    let lastProgressAt = 0;
+    const channel = new MessageChannel();
     const tick = () => {
       if (runId.current !== id) return;
       const done = stepSearch(state);
-      setFound(state.moves.length);
+      const now = performance.now();
+      if (done || now - lastProgressAt >= 500) {
+        lastProgressAt = now;
+        setFound(state.moves.length);
+      }
       if (done) {
         const finished = searchResult(state);
         setResult(finished);
@@ -96,11 +108,10 @@ export function useCeilingProposal(cells: Cells, input: AutopilotInput): Ceiling
         setStatus("ready");
         return;
       }
-      // A macrotask, not rAF: rAF is throttled in a background tab and would
-      // leave a proposal half-finished the moment you switch away.
-      setTimeout(tick, 0);
+      channel.port2.postMessage(null);
     };
-    setTimeout(tick, 0);
+    channel.port1.onmessage = tick;
+    channel.port2.postMessage(null);
   }, [cells, input]);
 
   const cancel = useCallback(() => {

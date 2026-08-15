@@ -36,6 +36,7 @@
  * the bulk of the gap.
  */
 import { createSearch, stepSearch, type SearchState } from "./autopilot";
+import { simulateCapabilitySchedule } from "./scheduling";
 import { CAPABILITY_ORDER } from "./estimation";
 import {
   createPlan,
@@ -158,6 +159,8 @@ function finishRaise(state: LadderState): void {
   const raise = state.raise!;
   const team = teamOf(state, state.rungIndex);
   state.simulations = state.raiseBaseSims + raise.simulations;
+  // A finished search's schedule is its "exact" finalization re-simulation
+  // (see stepSearch), so this rung's score is display-grade as it stands.
   const score = scoreOf(raise.schedule, state.input.deadlineMonths);
   const hires = CAPABILITY_ORDER.reduce((sum, c) => sum + (team.byCapability[c] ?? 0), 0);
 
@@ -196,8 +199,15 @@ export function stepLadder(state: LadderState): boolean {
       const result = planResult(state.plan);
       state.scenarios = result.scenarios;
       state.blocked = result.blocked;
-      state.baseScore = result.base.score;
-      state.simulations = state.plan.simulations;
+      // The beam scores itself under "search" fidelity — cheap, and fair,
+      // because its nodes only ever race each other. Every rung the drawer
+      // shows is scored from an "exact" schedule though, and every delta on
+      // it is measured against this base — so the base has to be exact too.
+      state.baseScore = scoreOf(
+        simulateCapabilitySchedule({ ...autopilotInput(state, state.base), cells: state.pristine }),
+        state.input.deadlineMonths,
+      );
+      state.simulations = state.plan.simulations + 1;
       startRaise(state);
     } else {
       state.simulations = state.plan.simulations;

@@ -40,7 +40,11 @@ export interface CeilingMove {
   capability: Capability;
   from: number;
   to: number;
-  /** Portfolio horizon after this move, with every earlier move applied. */
+  /** Portfolio horizon after this move, with every earlier move applied.
+   *  This and the two deltas below are measured under the search's own
+   *  evaluator (`fidelity: "search"`), so they are consistent with each
+   *  other but can sit a hair off the exact `horizonBefore`/`horizonAfter`
+   *  pair on the result — those two are re-simulated at "exact". */
   horizonAfter: number;
   /** Negative is an improvement — months off the whole plan. */
   deltaHorizon: number;
@@ -153,8 +157,17 @@ function endOf(
 export interface SearchState {
   input: AutopilotInput;
   cells: Cells;
+  /** While the search runs: the current best plan at "search" fidelity, the
+   *  evaluator every candidate is compared under. Once `done`, it is replaced
+   *  by an "exact" re-simulation of the final cells, so everything a caller
+   *  reads off a finished search is display-grade. */
   schedule: ReturnType<typeof simulateCapabilitySchedule>;
-  horizonBefore: number;
+  /** Untouched copy of the cells the search started from, for the exact
+   *  "before" re-simulation in `searchResult`. */
+  originalCells: Cells;
+  /** Exact-fidelity horizon of `originalCells`, computed lazily by
+   *  `searchResult` and cached here. */
+  exactHorizonBefore?: number | null;
   moves: CeilingMove[];
   blocked: BlockedCandidate[];
   simulations: number;
@@ -171,12 +184,12 @@ export function createSearch(
   maxMoves: number = MAX_MOVES,
 ): SearchState {
   const current = cloneCells(cells);
-  const schedule = simulateCapabilitySchedule({ ...input, cells: current });
+  const schedule = simulateCapabilitySchedule({ ...input, cells: current, fidelity: "search" });
   return {
     input,
     cells: current,
+    originalCells: cloneCells(cells),
     schedule,
-    horizonBefore: horizonOf(schedule),
     moves: [],
     blocked: [],
     simulations: 1,
@@ -187,10 +200,23 @@ export function createSearch(
 }
 
 export function searchResult(state: SearchState): AutopilotResult {
+  // `horizonBefore` has to match what the timeline showed before the drawer
+  // opened, and the timeline simulates at "exact" — so when any move was
+  // accepted the before is re-simulated exactly rather than read off the
+  // search-fidelity evaluator. With no moves the exact final schedule *is*
+  // the unchanged plan, so before and after are the same number by
+  // construction. Cached on the state: assembling a result twice should not
+  // cost a second simulation.
+  if (state.moves.length > 0 && state.exactHorizonBefore == null) {
+    state.simulations += 1;
+    state.exactHorizonBefore = horizonOf(
+      simulateCapabilitySchedule({ ...state.input, cells: state.originalCells }),
+    );
+  }
   return {
     moves: state.moves,
     blocked: state.blocked,
-    horizonBefore: state.horizonBefore,
+    horizonBefore: state.moves.length > 0 ? state.exactHorizonBefore! : horizonOf(state.schedule),
     horizonAfter: horizonOf(state.schedule),
     simulations: state.simulations,
     truncated: state.truncated,
@@ -202,9 +228,21 @@ export function stepSearch(state: SearchState): boolean {
   if (state.done) return true;
 
   const { input } = state;
+  // Candidates are ranked under "search" fidelity — cheap, and both sides of
+  // every comparison carry the same pessimism. The one exception is the
+  // finalization below, which re-simulates the finished plan at "exact".
   const simulate = (c: Cells) => {
     state.simulations++;
-    return simulateCapabilitySchedule({ ...input, cells: c });
+    return simulateCapabilitySchedule({ ...input, cells: c, fidelity: "search" });
+  };
+  // Once the search is over, the schedule a caller reads scores off must be
+  // display-grade: rung scores in Symulacje and the proposal's horizon in
+  // Wyceny both come from here, and both sit next to numbers the timeline
+  // computed at "exact".
+  const finalize = () => {
+    state.simulations++;
+    state.schedule = simulateCapabilitySchedule({ ...input, cells: state.cells });
+    state.done = true;
   };
   let current = state.cells;
   let schedule = state.schedule;
@@ -220,7 +258,12 @@ export function stepSearch(state: SearchState): boolean {
     // earlier and takes something off the board. Without that second tier the
     // search would stall the moment two projects are tied for last, which on
     // a real backlog is most of the time.
-    let best: { move: CeilingMove; cells: Cells; score: PlanScore } | null = null;
+    let best: {
+      move: CeilingMove;
+      cells: Cells;
+      score: PlanScore;
+      schedule: ReturnType<typeof simulateCapabilitySchedule>;
+    } | null = null;
 
     for (const candidate of paceSetters(schedule)) {
       const cell = current[candidate.projectId]?.[candidate.capability];
@@ -269,19 +312,21 @@ export function stepSearch(state: SearchState): boolean {
       };
 
       if (!best || compareScores(trialScore, best.score) < 0) {
-        best = { move, cells: trial, score: trialScore };
+        best = { move, cells: trial, score: trialScore, schedule: trialSchedule };
       }
     }
 
     const chosen = best;
     if (!chosen) {
       state.blocked = rejected;
-      state.done = true;
+      finalize();
       return true;
     }
     moves.push(chosen.move);
+    // The chosen candidate's trial schedule is the schedule of the new
+    // current cells — simulating them again would only recompute it.
     current = chosen.cells;
-    schedule = simulate(current);
+    schedule = chosen.schedule;
     state.cells = current;
     state.schedule = schedule;
 
@@ -293,7 +338,7 @@ export function stepSearch(state: SearchState): boolean {
       state.blocked = rejected.filter(
         (r) => r.reason === "pool" || r.reason === "forbidden" || r.reason === "max-ceiling",
       );
-      state.done = true;
+      finalize();
       return true;
     }
   }
