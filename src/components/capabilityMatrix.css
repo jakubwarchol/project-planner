@@ -147,6 +147,8 @@
    reset; the old `.cm2 input` form was (0,1,1) and beat them. */
 :where(.cm2) :where(button, input, select, textarea) {
   font: inherit;
+  /* Type comes along, leading doesn't — see the .atl/.bv reset. */
+  line-height: normal;
 }
 
 .cm2 input[type="text"] {
