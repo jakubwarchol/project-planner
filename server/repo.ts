@@ -112,10 +112,22 @@ function readVariants(db: Db, people: Person[]): TeamVariant[] {
         label: String(row.label),
         fte: emptyCapabilityVector(),
         isRosterDerived: Number(row.is_roster_derived) === 1,
+        ceilings: {},
       };
       byId.set(id, variant);
     }
     if (row.capability != null) variant.fte[row.capability as Capability] = Number(row.fte);
+  }
+
+  for (const row of all(
+    db,
+    "SELECT variant_id, project_id, capability, max_fte FROM variant_project_ceiling",
+  )) {
+    const variant = byId.get(String(row.variant_id));
+    // A roster-derived variant never carries overrides; stray rows are noise.
+    if (!variant || variant.isRosterDerived) continue;
+    const projectId = String(row.project_id);
+    (variant.ceilings[projectId] ??= {})[row.capability as Capability] = Number(row.max_fte);
   }
 
   const derived = derivePoolsFromPeople(people);
@@ -229,6 +241,34 @@ export function insertVariant(db: Db, variant: TeamVariant, position: number): v
   for (const capability of CAPABILITY_ORDER) {
     stmt.run(variant.id, capability, Math.max(variant.fte[capability] ?? 0, 0));
   }
+  writeCeilings(db, variant.id, variant.ceilings ?? {});
+}
+
+function writeCeilings(db: Db, variantId: string, ceilings: TeamVariant["ceilings"]): void {
+  run(db, "DELETE FROM variant_project_ceiling WHERE variant_id = ?", [variantId]);
+  const stmt = db.prepare(
+    "INSERT INTO variant_project_ceiling (variant_id, project_id, capability, max_fte) VALUES (?, ?, ?, ?)",
+  );
+  for (const [projectId, row] of Object.entries(ceilings)) {
+    for (const [capability, maxFte] of Object.entries(row)) {
+      if (typeof maxFte === "number" && maxFte > 0) stmt.run(variantId, projectId, capability, maxFte);
+    }
+  }
+}
+
+/** Replaces the variant's whole override set — the ladder applies a rung's
+ *  complete set, never a diff. Ignored for roster-derived variants, which by
+ *  design never carry overrides. */
+export function setVariantCeilings(
+  db: Db,
+  id: string,
+  ceilings: TeamVariant["ceilings"],
+): void {
+  db.transaction(() => {
+    const [row] = all(db, "SELECT is_roster_derived FROM variants WHERE id = ?", [id]);
+    if (!row || Number(row.is_roster_derived) === 1) return;
+    writeCeilings(db, id, ceilings);
+  })();
 }
 
 function upsertCell(db: Db, projectId: string, capability: Capability, cell: CapabilityCell): void {

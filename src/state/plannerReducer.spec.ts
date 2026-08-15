@@ -61,6 +61,7 @@ function snapshot(): PlannerSnapshot {
         label: "Wariant 1 — obecny zespół",
         fte: { ...emptyCapabilityVector(), BE: 1.5 },
         isRosterDerived: true,
+        ceilings: {},
       },
     ],
     settings: DEFAULT_ESTIMATION_SETTINGS,

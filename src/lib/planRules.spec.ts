@@ -3,10 +3,12 @@ import {
   CEILING_STEP,
   MAX_PROJECT_CEILING,
   NEVER_RAISE_CEILING,
+  applyCeilingOverrides,
   ceilingRaiseBlock,
   compareScores,
   type PlanScore,
 } from "./planRules";
+import { emptyCapabilityCells } from "./estimation";
 
 function score(over: Partial<PlanScore> = {}): PlanScore {
   return { impossible: 0, missedDeadlines: 0, horizonMonths: 10, sumEndMonths: 30, ...over };
@@ -54,5 +56,35 @@ describe("ceilingRaiseBlock", () => {
 
   it("allows an ordinary raise", () => {
     expect(ceilingRaiseBlock("BE", 1, 4)).toBeNull();
+  });
+});
+
+describe("applyCeilingOverrides", () => {
+  function cells(maxFte: number) {
+    const row = emptyCapabilityCells();
+    row.BE = { days: 100, maxFte };
+    return { p1: row };
+  }
+
+  it("lays an override on top of the matrix without touching the input", () => {
+    const base = cells(1);
+    const out = applyCeilingOverrides(base, { p1: { BE: 2 } });
+    expect(out.p1.BE.maxFte).toBe(2);
+    expect(base.p1.BE.maxFte).toBe(1);
+    // Untouched rows keep identity — memo-keyed callers rely on it.
+    expect(out.p1.QA).toBe(base.p1.QA);
+  });
+
+  it("acts only upward: a stale override loses to a raised matrix", () => {
+    // The cell was 1 when the override (2) was accepted; the matrix has since
+    // been deliberately raised to 2.5 — the later estimate wins.
+    const base = cells(2.5);
+    expect(applyCeilingOverrides(base, { p1: { BE: 2 } })).toBe(base);
+  });
+
+  it("returns the input object when nothing applies", () => {
+    const base = cells(1);
+    expect(applyCeilingOverrides(base, {})).toBe(base);
+    expect(applyCeilingOverrides(base, { gone: { BE: 3 } })).toBe(base);
   });
 });

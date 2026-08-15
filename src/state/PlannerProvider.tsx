@@ -11,6 +11,7 @@ import type {
   Person,
   Project,
   StaffingAssignment,
+  VariantCeilings,
 } from "../types";
 import { PlannerContext, type PlannerContextValue } from "./plannerContext";
 import { plannerReducer } from "./plannerReducer";
@@ -127,6 +128,14 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
     (id: string, capability: Capability, fte: number) => {
       dispatch({ type: "setVariantFte", id, capability, fte });
       repo.setVariantFte(id, capability, fte).catch(report("set variant fte"));
+    },
+    [repo, report],
+  );
+
+  const setVariantCeilings = useCallback(
+    (id: string, ceilings: VariantCeilings) => {
+      dispatch({ type: "setVariantCeilings", id, ceilings });
+      repo.setVariantCeilings(id, ceilings).catch(report("set variant ceilings"));
     },
     [repo, report],
   );
@@ -265,6 +274,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       addVariant,
       renameVariant,
       setVariantFte,
+      setVariantCeilings,
       resetVariantFromRoster,
       deleteVariant,
       addPerson,
@@ -295,6 +305,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
     addVariant,
     renameVariant,
     setVariantFte,
+    setVariantCeilings,
     resetVariantFromRoster,
     deleteVariant,
     addPerson,

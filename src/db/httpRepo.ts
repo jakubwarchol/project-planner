@@ -40,6 +40,8 @@ export function createHttpRepository(baseUrl: string): PlannerRepository {
     renameVariant: (id, label) => send("PATCH", `/api/variants/${encodeURIComponent(id)}`, { label }),
     setVariantFte: (id, capability, fte) =>
       send("PUT", `/api/variants/${encodeURIComponent(id)}/fte/${encodeURIComponent(capability)}`, { fte }),
+    setVariantCeilings: (id, ceilings) =>
+      send("PUT", `/api/variants/${encodeURIComponent(id)}/ceilings`, { ceilings }),
     resetVariantFromRoster: (id) =>
       send("POST", `/api/variants/${encodeURIComponent(id)}/reset-from-roster`),
     deleteVariant: (id) => send("DELETE", `/api/variants/${encodeURIComponent(id)}`),

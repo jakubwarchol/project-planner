@@ -1,4 +1,4 @@
-import type { Capability, CapabilityVector, CapabilityCell, Estimate, EstimationSettings, Person, Project } from "../types";
+import type { Capability, CapabilityVector, CapabilityCell, Estimate, EstimationSettings, Person, Project, VariantCeilings } from "../types";
 
 // Fixed display/rank order — independent of the weight under each size, so
 // re-weighting the scale never reorders it.
@@ -108,6 +108,10 @@ export interface TeamVariant {
   /** When true, `fte` is recomputed from the live roster on read and the
    *  editor's inputs for it are read-only. */
   isRosterDerived: boolean;
+  /** Ceiling overrides the variant plans with — the hire-plus-ceilings
+   *  ladder's second lever. Empty on most variants; always empty on a
+   *  roster-derived one. */
+  ceilings: VariantCeilings;
 }
 
 export function emptyCapabilityVector(): CapabilityVector {

@@ -130,18 +130,26 @@ export function seedIfEmpty(db: Db): void {
   if (count("variants") === 0) {
     const derived = derivePoolsFromPeople(readPeople(db));
     const seedVariants: TeamVariant[] = [
-      { id: "variant-1", label: "Wariant 1 — obecny zespół", fte: derived, isRosterDerived: true },
+      {
+        id: "variant-1",
+        label: "Wariant 1 — obecny zespół",
+        fte: derived,
+        isRosterDerived: true,
+        ceilings: {},
+      },
       {
         id: "variant-2",
         label: "Wariant 2 — +1 TL +1 UX",
         fte: { ...derived, TL: derived.TL + 1, UX: derived.UX + 1 },
         isRosterDerived: false,
+        ceilings: {},
       },
       {
         id: "variant-3",
         label: "Wariant 3 — +2 TL +2 UX +2 BE",
         fte: { ...derived, TL: derived.TL + 2, UX: derived.UX + 2, BE: derived.BE + 2 },
         isRosterDerived: false,
+        ceilings: {},
       },
     ];
     seedVariants.forEach((variant, index) => insertVariant(db, variant, index));

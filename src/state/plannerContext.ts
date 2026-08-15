@@ -10,6 +10,7 @@ import type {
   Person,
   Project,
   StaffingAssignment,
+  VariantCeilings,
 } from "../types";
 
 export interface PlannerContextValue extends PlannerSnapshot {
@@ -24,6 +25,7 @@ export interface PlannerContextValue extends PlannerSnapshot {
   addVariant: (variant: TeamVariant) => void;
   renameVariant: (id: string, label: string) => void;
   setVariantFte: (id: string, capability: Capability, fte: number) => void;
+  setVariantCeilings: (id: string, ceilings: VariantCeilings) => void;
   resetVariantFromRoster: (id: string) => void;
   deleteVariant: (id: string) => void;
 

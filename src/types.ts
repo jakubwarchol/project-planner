@@ -91,6 +91,14 @@ export interface CapabilityCell {
   maxFte: number;
 }
 
+/** Ceiling overrides per project × capability — the `maxFte` a team variant
+ *  plans with instead of the matrix value. The matrix in Wyceny stays the
+ *  real estimate; these live on the variant and only Symulacje plans with
+ *  the overlay. Applied only upward (`applyCeilingOverrides` in
+ *  `lib/planRules.ts`): an override at or below the matrix cell is stale —
+ *  the matrix has since been raised past it — and is ignored. */
+export type VariantCeilings = Record<string, Partial<Record<Capability, number>>>;
+
 /** A real, named person actually working a project's capability need for a
  *  date range — layered on top of the capability-pool scheduler, never fed
  *  back into it. Dates are `YYYY-MM-DD`; `endDate` is exclusive. */

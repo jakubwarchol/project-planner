@@ -51,6 +51,9 @@ export function useTeamVariants(): TeamVariantsApi {
         label: nextVariantLabel(variants),
         fte,
         isRosterDerived: false,
+        // Copying a variant copies its ceiling overrides too — they are part
+        // of the plan the copy is meant to preserve.
+        ceilings: structuredClone(seed?.ceilings ?? {}),
       };
       addVariant(variant);
       return variant.id;

@@ -13,6 +13,7 @@ import {
 import { newId } from "../lib/id";
 import { leaveFteByMonth } from "../lib/leaves";
 import type { CapabilityCaps, HiringPlanInput, HiringScenario } from "../lib/hiringPlanner";
+import { applyCeilingOverrides } from "../lib/planRules";
 import { simulateCapabilitySchedule } from "../lib/scheduling";
 import { usePlanner } from "../state/plannerContext";
 import type { CapabilityVector, Project } from "../types";
@@ -151,7 +152,9 @@ export function TimelineView({
     for (const v of variants) {
       const schedule = simulateCapabilitySchedule({
         projects: plannedProjects,
-        cells,
+        // A variant plans on its own ceilings: the matrix with the variant's
+        // overrides laid on top (upward only; identity when it has none).
+        cells: applyCeilingOverrides(cells, v.ceilings),
         pools: v.fte,
         effectiveDaysPerMonth: edpm,
         minStaffingFraction: settings.minStaffingFraction,
@@ -227,7 +230,7 @@ export function TimelineView({
       );
       // Straight through addVariant, not createVariant — clampFte would
       // re-round the vector and store a different plan than the drawer showed.
-      addVariant({ id, label, fte: vector, isRosterDerived: false });
+      addVariant({ id, label, fte: vector, isRosterDerived: false, ceilings: {} });
       setVariantId(id);
       proposal.reset();
       setOptimizerOpen(false);

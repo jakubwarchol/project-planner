@@ -28,7 +28,7 @@
  * project is judged `min-above-pool`, and it drops out of the plan entirely —
  * a cliff, not a trade-off.
  */
-import type { Capability } from "../types";
+import type { Capability, CapabilityCell, VariantCeilings } from "../types";
 import type { CapabilitySchedule } from "./scheduling";
 
 const EPS = 1e-6;
@@ -63,6 +63,30 @@ export function ceilingRaiseBlock(
   if (to > MAX_PROJECT_CEILING + EPS) return "max-ceiling";
   if (to > Math.max(1, pool) + EPS) return "pool";
   return null;
+}
+
+/** The matrix with a variant's ceiling overrides laid on top. Overrides act
+ *  only upward — one at or below the matrix value is stale (the matrix has
+ *  since been raised past it) and is ignored, so a deliberate later estimate
+ *  always wins. Returns the input object untouched when nothing applies, so
+ *  memo-keyed callers see identity. */
+export function applyCeilingOverrides(
+  cells: Record<string, Record<Capability, CapabilityCell>>,
+  ceilings: VariantCeilings,
+): Record<string, Record<Capability, CapabilityCell>> {
+  let out: Record<string, Record<Capability, CapabilityCell>> | null = null;
+  for (const [projectId, row] of Object.entries(ceilings)) {
+    const baseRow = cells[projectId];
+    if (!baseRow) continue;
+    for (const [capability, maxFte] of Object.entries(row) as [Capability, number][]) {
+      const cell = baseRow[capability];
+      if (!cell || !(maxFte > cell.maxFte + EPS)) continue;
+      if (!out) out = { ...cells };
+      if (out[projectId] === cells[projectId]) out[projectId] = { ...baseRow };
+      out[projectId][capability] = { ...cell, maxFte };
+    }
+  }
+  return out ?? cells;
 }
 
 export interface PlanScore {

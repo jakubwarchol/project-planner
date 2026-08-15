@@ -9,6 +9,7 @@ import type {
   Project,
   StaffingAssignment,
   Team,
+  VariantCeilings,
 } from "../types";
 
 export interface PlannerSnapshot {
@@ -47,6 +48,9 @@ export interface PlannerRepository {
   createVariant(variant: TeamVariant): Promise<void>;
   renameVariant(id: string, label: string): Promise<void>;
   setVariantFte(id: string, capability: Capability, fte: number): Promise<void>;
+  /** Replace the variant's whole ceiling-override set — the ladder applies a
+   *  rung's complete set, never a diff. No-op on roster-derived variants. */
+  setVariantCeilings(id: string, ceilings: VariantCeilings): Promise<void>;
   /** Overwrite every capability of a variant from the live roster. */
   resetVariantFromRoster(id: string): Promise<void>;
   deleteVariant(id: string): Promise<void>;

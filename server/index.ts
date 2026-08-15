@@ -96,6 +96,9 @@ route("PATCH", "/api/variants/:id", (p, body: { label: string }) =>
 route("PUT", "/api/variants/:id/fte/:capability", (p, body: { fte: number }) =>
   repo.setVariantFte(db, p.id, p.capability as Capability, body.fte),
 );
+route("PUT", "/api/variants/:id/ceilings", (p, body: { ceilings: TeamVariant["ceilings"] }) =>
+  repo.setVariantCeilings(db, p.id, body.ceilings),
+);
 route("POST", "/api/variants/:id/reset-from-roster", (p) => repo.resetVariantFromRoster(db, p.id));
 route("DELETE", "/api/variants/:id", (p) => repo.deleteVariant(db, p.id));
 

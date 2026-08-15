@@ -25,6 +25,7 @@ const MIGRATION_FILES = [
   "schema_v14.sql",
   "schema_v15.sql",
   "schema_v16.sql",
+  "schema_v17.sql",
 ];
 
 export const MIGRATIONS: string[] = MIGRATION_FILES.map((file) =>

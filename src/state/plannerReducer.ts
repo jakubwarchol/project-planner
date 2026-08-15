@@ -10,6 +10,7 @@ import type {
   Person,
   Project,
   StaffingAssignment,
+  VariantCeilings,
 } from "../types";
 
 export type PlannerAction =
@@ -23,6 +24,7 @@ export type PlannerAction =
   | { type: "addVariant"; variant: TeamVariant }
   | { type: "renameVariant"; id: string; label: string }
   | { type: "setVariantFte"; id: string; capability: Capability; fte: number }
+  | { type: "setVariantCeilings"; id: string; ceilings: VariantCeilings }
   | { type: "resetVariantFromRoster"; id: string }
   | { type: "deleteVariant"; id: string }
   | { type: "addPerson"; person: Person }
@@ -136,6 +138,16 @@ function applyAction(state: PlannerSnapshot, action: PlannerAction): PlannerSnap
           v.id === action.id
             ? { ...v, isRosterDerived: false, fte: { ...v.fte, [action.capability]: action.fte } }
             : v,
+        ),
+      };
+
+    case "setVariantCeilings":
+      return {
+        ...state,
+        variants: state.variants.map((v) =>
+          // Roster-derived variants never carry overrides — same guard the
+          // server applies, so an errant dispatch cannot desync the two.
+          v.id === action.id && !v.isRosterDerived ? { ...v, ceilings: action.ceilings } : v,
         ),
       };
 
