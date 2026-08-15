@@ -158,11 +158,18 @@ export interface SearchState {
   moves: CeilingMove[];
   blocked: BlockedCandidate[];
   simulations: number;
+  maxMoves: number;
   truncated: boolean;
   done: boolean;
 }
 
-export function createSearch(cells: Cells, input: AutopilotInput): SearchState {
+/** `maxMoves` defaults to the Wyceny budget; the hire-plus-ceilings ladder
+ *  passes a smaller one because it pays this cost once per rung. */
+export function createSearch(
+  cells: Cells,
+  input: AutopilotInput,
+  maxMoves: number = MAX_MOVES,
+): SearchState {
   const current = cloneCells(cells);
   const schedule = simulateCapabilitySchedule({ ...input, cells: current });
   return {
@@ -173,6 +180,7 @@ export function createSearch(cells: Cells, input: AutopilotInput): SearchState {
     moves: [],
     blocked: [],
     simulations: 1,
+    maxMoves,
     truncated: false,
     done: false,
   };
@@ -277,7 +285,7 @@ export function stepSearch(state: SearchState): boolean {
     state.cells = current;
     state.schedule = schedule;
 
-    if (moves.length >= MAX_MOVES) {
+    if (moves.length >= state.maxMoves) {
       // Out of budget, not out of ideas. Only the blocks that stay true
       // however long you search are carried through — the rulebook's, and
       // the pool's.
