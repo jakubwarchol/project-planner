@@ -234,5 +234,8 @@ eksperyment potrzebował drobniej.
    jednorazowego planowania.
 4. **Optymalizator składu zespołu** — najlepiej dopasowany do realnego użycia
    (kolejność przyjmuje jako daną); tryb zatrudnieniowy dopiero po punkcie 1.
+   Tryb pierwszy (same etaty) stoi w `src/lib/hiringPlanner.ts`; drugi —
+   etaty razem z sufitami — jest rozpisany w
+   [hiring-and-ceilings.md](./hiring-and-ceilings.md).
 5. Dalej według potrzeb: praca stała, niepewność, optymalizator kolejności,
    reszta.
