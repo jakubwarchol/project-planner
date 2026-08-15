@@ -64,6 +64,11 @@ Te 2,6 miesiąca różnicy między 8,9 a 6,3 to cała racja bytu tego trybu.
 - **UX: najwyżej 1 osoba na projekt.** Z doświadczenia zespołu — dwóch designerów
   na jednym projekcie nie pracuje szybciej. Sufit UX nigdy nie jest podnoszony.
 - **TL: najwyżej 1 osoba na projekt.** Ta sama zasada.
+- **SEC: najwyżej 1 osoba na projekt.** Ta sama zasada.
+- **PM i QA wolno podnosić.** Ich 1,0 w macierzy to domyślna wartość, której
+  nikt nie ruszał, nie realne ograniczenie projektowe.
+- **Górna granica podniesień: 3,0 na projekt** — górny stop paska sufitów w
+  Wycenach. Planer nie proponuje sufitu powyżej tej wartości.
 - Stan macierzy to potwierdza: wszystkie 13 komórek UX i 26 komórek TL stoi dziś
   dokładnie na 1,0. Powyżej jedynki wychodzą tylko BE (do 2,5) i FE (do 1,5).
 - **Podniesione sufity zapisują się w wariancie** i są widoczne na ekranie —
@@ -98,10 +103,10 @@ WTR·BE 2→2,5 → 6,3 mies."*.
 
 Kandydaci na podniesienie:
 
-- tylko kompetencje spoza listy zakazanych (dziś: nie UX, nie TL),
+- tylko kompetencje spoza listy zakazanych (dziś: nie UX, nie TL, nie SEC),
 - tylko komórki, które faktycznie wyznaczają tempo fazy — podniesienie sufitu z
   zapasem nie zmienia niczego i autopilot już to wie,
-- do granicy „ile osób ma sens na jednym projekcie" (patrz otwarte pytania),
+- do granicy 3,0 na projekt × kompetencję,
 - podniesienie, które czyni projekt niewykonalnym, odpada samo — poziom
   `impossible` w `PlanScore` jest nadrzędny.
 
@@ -131,15 +136,7 @@ Skutki uboczne do przemyślenia przy wdrożeniu:
 
 ## Otwarte pytania
 
-1. **PM, QA, SEC — czy też najwyżej 1 na projekt?** Wszystkie ich komórki stoją
-   dziś na 1,0 (25, 25 i 16 komórek), ale nie wiadomo, czy to realne
-   ograniczenie jak przy UX, czy domyślna wartość, której nikt nie ruszał. Od
-   odpowiedzi zależy, czy planer ma je w ogóle podnosić.
-2. **Górna granica dla tych, które mogą rosnąć.** BE sięga dziś 2,5, FE 1,5.
-   Jeśli czterech backendowców na jednym projekcie to absurd, ta granica jest
-   tym, co powstrzyma optymalizator przed zaproponowaniem takiego składu.
-   Naturalny kandydat: 3,0 — górny stop paska sufitów w Wycenach.
-3. **Czy podniesienie sufitu to zmiana estymaty?** Jeśli „max 1 UX" opisuje
+1. **Czy podniesienie sufitu to zmiana estymaty?** Jeśli „max 1 UX" opisuje
    projekt, a nie zespół, to propozycja podniesienia jest twierdzeniem o tym, że
    pracę da się pokroić inaczej. Ekran powinien to mówić wprost, zamiast po
    cichu przepisywać liczby, które ktoś świadomie wpisał.
