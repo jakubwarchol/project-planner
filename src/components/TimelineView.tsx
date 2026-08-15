@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTeamVariants } from "../hooks/useTeamVariants";
-import { useHiringPlan } from "../hooks/useHiringPlan";
 import { useHiringLadder } from "../hooks/useHiringLadder";
 import type { LadderRung } from "../lib/hirePlusCeilings";
 import { earliestStartOffsets } from "../hooks/useCapabilitySchedule";
@@ -14,11 +13,11 @@ import {
 } from "../lib/estimation";
 import { newId } from "../lib/id";
 import { leaveFteByMonth } from "../lib/leaves";
-import type { CapabilityCaps, HiringPlanInput, HiringScenario } from "../lib/hiringPlanner";
+import type { CapabilityCaps, HiringPlanInput } from "../lib/hiringPlanner";
 import { applyCeilingOverrides } from "../lib/planRules";
 import { simulateCapabilitySchedule } from "../lib/scheduling";
 import { usePlanner } from "../state/plannerContext";
-import type { CapabilityVector, Project } from "../types";
+import type { Project } from "../types";
 import { useZoomGesture } from "../hooks/useZoomGesture";
 import { HiringPlanDrawer } from "./HiringPlanDrawer";
 import { VariantEditor } from "./VariantEditor";
@@ -225,7 +224,6 @@ export function TimelineView({
 
   // Calls the simulation through the lib directly — the shared schedule hook's
   // tiny identity-keyed cache would thrash under hundreds of trial vectors.
-  const proposal = useHiringPlan(roster.fte, optimizerInput);
   const ladder = useHiringLadder(roster.fte, optimizerInput);
   const projectNameOf = useCallback(
     (id: string) => projects.find((p) => p.id === id)?.name ?? id,
@@ -257,44 +255,6 @@ export function TimelineView({
     });
     return s.scheduled.some((p) => p.isImpossible) ? null : s.horizonMonths;
   }, [optimizerOpen, plannedProjects, rosterCells, roster.fte, edpm, settings.minStaffingFraction, settings.minCrewFte, earliestStart, leaveDips]);
-
-  const applyProposal = useCallback(
-    (vector: CapabilityVector, scenario: HiringScenario) => {
-      const id = newId("variant");
-      // The label carries the hire, because that is what distinguishes this
-      // variant from its siblings: "+3: BE×2 · UX" beats "Optymalizacja (4)".
-      // The absolute team size rides along because "+N" is relative to the
-      // baseline selected at creation — baselines change and get deleted, and
-      // a "+4" built on a big baseline once read as smaller than a "+7" built
-      // on the roster, which cost a real afternoon of confusion.
-      const who = CAPABILITY_ORDER.filter((c) => (scenario.byCapability[c] ?? 0) > 0)
-        .map((c) => {
-          const n = scenario.byCapability[c] ?? 0;
-          return n > 1 ? `${c}×${n}` : c;
-        })
-        .join(" · ");
-      const total = CAPABILITY_ORDER.reduce((sum, c) => sum + (vector[c] ?? 0), 0);
-      const label = optimizedLabel(
-        variants.map((v) => v.label),
-        `+${scenario.hires} → ${fmt(total)} FTE: ${who}`,
-      );
-      // Straight through addVariant, not createVariant — clampFte would
-      // re-round the vector and store a different plan than the drawer showed.
-      // The roster variant never carries overrides, so a mode-1 scenario
-      // starts from the bare matrix — no inherited ceilings.
-      addVariant({
-        id,
-        label,
-        fte: vector,
-        isRosterDerived: false,
-        ceilings: structuredClone(roster.ceilings),
-      });
-      setVariantId(id);
-      proposal.reset();
-      setOptimizerOpen(false);
-    },
-    [variants, addVariant, proposal, roster.ceilings],
-  );
 
   const applyRung = useCallback(
     (rung: LadderRung) => {
@@ -760,7 +720,6 @@ export function TimelineView({
 
       {optimizerOpen && (
         <HiringPlanDrawer
-          api={proposal}
           ladder={ladder}
           baselineLabel={roster.label}
           baselineFte={roster.fte}
@@ -768,7 +727,6 @@ export function TimelineView({
           insets={{ top: D.hdr, bottom: D.foot }}
           caps={caps}
           onCapsChange={setCaps}
-          onApply={applyProposal}
           onApplyRung={applyRung}
           projectNameOf={projectNameOf}
           onClose={() => setOptimizerOpen(false)}
