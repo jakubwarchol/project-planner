@@ -306,8 +306,12 @@
 .atl-seg button {
   border: 0;
   height: var(--ctl-h);
+  padding: 0 12px;
   background: transparent;
   color: var(--ink-2);
+  /* Stated here, not inherited: an unstyled <button> falls back to the
+     browser's 13.3px, which is how segments drifted apart between screens. */
+  font-size: 11.5px;
   cursor: pointer;
 }
 
@@ -338,6 +342,7 @@
 
 .atl-seg .atl-seg-icon {
   width: 30px;
+  padding: 0;
   font-family: var(--atl-mono);
   font-size: 10.5px;
 }
@@ -1962,7 +1967,7 @@
 .bv-add-project {
   margin: 8px 16px 12px;
   font: inherit;
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--ink-2);
   background: transparent;
   border: 1px dashed var(--line);
@@ -2203,7 +2208,7 @@
 .ve-add {
   margin-top: 4px;
   font: inherit;
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--ink-2);
   background: transparent;
   border: 1px dashed var(--line);
@@ -2312,7 +2317,7 @@
 .ve-delete,
 .ve-done {
   font: inherit;
-  font-size: 13px;
+  font-size: 11.5px;
   height: var(--ctl-h);
   border-radius: var(--ctl-r);
   padding: 0 var(--ctl-px);
@@ -2768,7 +2773,7 @@
   align-items: center;
   gap: 5px;
   font: inherit;
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--ink-2);
   background: transparent;
   border: 1px dashed var(--line);
@@ -2964,7 +2969,6 @@
   padding: 0 var(--ctl-px);
   border-radius: var(--ctl-r);
   font-size: 11.5px;
-  font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
 }
@@ -3031,7 +3035,6 @@
   padding: 0 var(--ctl-px);
   border-radius: var(--ctl-r);
   font-size: 11.5px;
-  font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
 }
@@ -3549,7 +3552,6 @@
   padding: 0 var(--ctl-px);
   border-radius: var(--ctl-r);
   font-size: 11.5px;
-  font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
 }
