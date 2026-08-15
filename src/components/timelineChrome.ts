@@ -1,7 +1,21 @@
 // Shared vocabulary for the two timeline views: the same density and zoom
 // steps, the same colour helpers, the same month formatting.
 
+import { CAPABILITY_LABELS, CAPABILITY_ORDER } from "../lib/estimation";
+import type { LadderRung } from "../lib/hirePlusCeilings";
+
 export type Screen = "backlog" | "team" | "matrix" | "advanced" | "obsada" | "compare";
+
+/** "TL, FE×2, SEC" — a ladder rung's hires as the option cards and variant
+ *  labels spell them. */
+export function rungRoles(rung: LadderRung): string {
+  return CAPABILITY_ORDER.filter((c) => (rung.byCapability[c] ?? 0) > 0)
+    .map((c) => {
+      const n = rung.byCapability[c] ?? 0;
+      return n > 1 ? `${CAPABILITY_LABELS[c]}×${n}` : CAPABILITY_LABELS[c];
+    })
+    .join(", ");
+}
 
 /** Ordered from data to results — dane wejściowe | wyniki | hipotezy. The
  *  hairlines in the nav rail sit on the group boundaries, and ⌘1…⌘6 follow
@@ -104,10 +118,9 @@ export const soft = (h: number) => `oklch(var(--bar-soft-l) var(--bar-soft-c) ${
 export const envc = (h: number) => `oklch(var(--bar-env-l) var(--bar-env-c) ${h})`;
 export const wash = (h: number, a: number) => `oklch(var(--bar-l) var(--bar-c) ${h} / ${a})`;
 
-/** Labels are often already called "Variant N" / "Wariant N" — don't say it twice. */
-export function variantCaption(label: string): string {
-  const lower = label.toLowerCase();
-  return /variant|wariant/i.test(label) ? lower : `wariant ${lower}`;
+/** "+3" / "−2" / "±0" — deltas the Symulacje sidebar and option cards speak. */
+export function signed(n: number): string {
+  return n === 0 ? "±0" : `${n > 0 ? "+" : "−"}${Math.abs(n)}`;
 }
 
 /** Polish plural rule: 1 → one, 2-4 (not 12-14) → few, else → many. */

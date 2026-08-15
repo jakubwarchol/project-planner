@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTeamVariants } from "../hooks/useTeamVariants";
 import { useHiringLadder } from "../hooks/useHiringLadder";
 import type { LadderRung } from "../lib/hirePlusCeilings";
@@ -8,41 +8,31 @@ import {
   CAPABILITY_ORDER,
   effectiveDaysByCapability,
   isIncludedInPlan,
-  totalCapabilityEffortDays,
   type TeamVariant,
 } from "../lib/estimation";
 import { newId } from "../lib/id";
 import { leaveFteByMonth } from "../lib/leaves";
 import type { CapabilityCaps, HiringPlanInput } from "../lib/hiringPlanner";
 import { applyCeilingOverrides } from "../lib/planRules";
-import { simulateCapabilitySchedule } from "../lib/scheduling";
+import {
+  simulateCapabilitySchedule,
+  type CapabilitySchedule,
+} from "../lib/scheduling";
 import { usePlanner } from "../state/plannerContext";
-import type { Project } from "../types";
-import { useZoomGesture } from "../hooks/useZoomGesture";
+import type { Project, VariantCeilings } from "../types";
 import { HiringPlanDrawer } from "./HiringPlanDrawer";
 import { VariantEditor } from "./VariantEditor";
-import {
-  DENSITIES,
-  HUES,
-  ZOOMS,
-  buildAxis,
-  fmt,
-  monthLabel,
-  optimizedLabel,
-  plCount,
-  variantCaption,
-  soft,
-  solid,
-  wash,
-} from "./timelineChrome";
+import { MON, fmt, monthLabel, optimizedLabel, plCount, rungRoles, signed, weeksOf } from "./timelineChrome";
 import "./timeline.css";
 
 const CAPS_KEY = "planner-capability-caps";
 
-/** How many project × capability cells this variant plans differently. */
-function ceilingOverrideCount(variant: TeamVariant): number {
-  return Object.values(variant.ceilings).reduce((sum, row) => sum + Object.keys(row).length, 0);
-}
+/** The budget-year line: projects that land inside it are this year's wins,
+ *  and the headline metric counts them. */
+const YEAR_LINE = 12;
+
+const ROW_H = 31;
+const AXIS_H = 52;
 
 /** Caps live in localStorage rather than the database: they are a constraint on
  *  a question ("we only ever want one TL"), not a fact about the roster, and
@@ -74,105 +64,144 @@ interface TimelineViewProps {
   initialOptimizerOpen?: boolean;
 }
 
-const WHOLE_PLAN = "Cała praca";
+export type FillMode = "serify" | "kreska";
 
-interface VariantRow {
-  variant: TeamVariant;
-  hue: number;
-  fte: number;
-  /** Infinity when nobody is on it. */
-  months: number;
-  isBaseline: boolean;
+interface VariantSummary {
+  horizon: number;
+  within: number;
+  impossible: number;
+  totalFte: number;
 }
 
-interface CompareBand {
-  label: string;
-  fteMonths: number;
-  rows: VariantRow[];
-  isWholePlan: boolean;
+function summarize(schedule: CapabilitySchedule, totalFte: number): VariantSummary {
+  let within = 0;
+  let impossible = 0;
+  for (const sp of schedule.scheduled) {
+    if (sp.isImpossible) impossible += 1;
+    else if (
+      !sp.hasNoDemand &&
+      Number.isFinite(sp.endMonths) &&
+      sp.endMonths <= YEAR_LINE + 1e-9
+    ) {
+      within += 1;
+    }
+  }
+  return { horizon: schedule.horizonMonths, within, impossible, totalFte };
 }
 
-export function TimelineView({
-  projects,
-  theme,
-  initialOptimizerOpen,
-}: TimelineViewProps) {
+function gainColor(better: number): string {
+  return better > 0 ? "var(--win)" : better < 0 ? "var(--warn)" : "var(--ink-4)";
+}
+
+const totalFteOf = (v: TeamVariant) =>
+  CAPABILITY_ORDER.reduce((sum, c) => sum + (v.fte[c] ?? 0), 0);
+
+export function TimelineView({ projects, theme, initialOptimizerOpen }: TimelineViewProps) {
   // The one screen where variants apply — every other view plans on the live
-  // roster, so the comparison owns its selection instead of the app shell.
+  // roster, so the comparison owns them instead of the app shell.
   const variantsApi = useTeamVariants();
   const { variants } = variantsApi;
-  const [variantId, setVariantId] = useState(() => variants[0].id);
   const { cells, people, leaves, settings, addVariant } = usePlanner();
   // Every FTE figure in this view is headcount; productivity is in the rate,
   // and each capability's rate is its own people's.
   const edpm = useMemo(() => effectiveDaysByCapability(people, settings), [people, settings]);
-  const baseline: TeamVariant = variants.find((v) => v.id === variantId) ?? variants[0];
 
-  // The baseline can be deleted from the editor below — fall back to the first.
+  // Obecny zespół is the fixed reference every comparison is measured against;
+  // the *selected* variant is what the timeline draws.
+  const reference = variants.find((v) => v.isRosterDerived) ?? variants[0];
+  const [variantId, setVariantId] = useState(reference.id);
+  const selected = variants.find((v) => v.id === variantId) ?? reference;
+
+  // The selected variant can be deleted from the editor — fall back to the
+  // reference.
   useEffect(() => {
-    if (!variants.some((v) => v.id === variantId)) setVariantId(variants[0].id);
-  }, [variants, variantId]);
+    if (!variants.some((v) => v.id === variantId)) setVariantId(reference.id);
+  }, [variants, variantId, reference.id]);
 
-  const { ppm, setPpm, scrollRef } = useZoomGesture(ZOOMS[1].ppm);
-  const [densityId, setDensityId] = useState("m");
-  const [keyOpen, setKeyOpen] = useState(true);
-  const [hover, setHover] = useState<string | null>(null);
+  const [fillMode, setFillMode] = useState<FillMode>("serify");
+  const [drawerOpen, setDrawerOpen] = useState(initialOptimizerOpen ?? false);
   const [editorOpen, setEditorOpen] = useState(false);
-  const [optimizerOpen, setOptimizerOpen] = useState(initialOptimizerOpen ?? false);
+  const [viewW, setViewW] = useState(0);
+  const [winW, setWinW] = useState(() => window.innerWidth);
+
+  const scrollRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
       // Innermost layer first: the editor is a modal above the drawer.
       if (editorOpen) setEditorOpen(false);
-      else if (optimizerOpen) setOptimizerOpen(false);
+      else if (drawerOpen) setDrawerOpen(false);
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [editorOpen, optimizerOpen]);
+  }, [editorOpen, drawerOpen]);
 
-  const hueByVariant = useMemo(() => {
-    const map: Record<string, number> = {};
-    variants.forEach((v, i) => {
-      map[v.id] = HUES[i % HUES.length];
-    });
-    return map;
-  }, [variants]);
+  // The chart always fits the whole horizon to the visible track, so it has to
+  // know how wide the track is; the sidebar and drawer widths follow the
+  // window's overall width.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const measure = () => {
+      setViewW(el.clientWidth);
+      setWinW(window.innerWidth);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    window.addEventListener("resize", measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, []);
 
   const plannedProjects = useMemo(() => projects.filter(isIncludedInPlan), [projects]);
-  const totalsByCapability = useMemo(
-    () => totalCapabilityEffortDays(plannedProjects, cells),
-    [plannedProjects, cells],
-  );
 
   // Same inputs as the harmonogram's simulation — dropping `earliestStart`
   // here made the same variant finish earlier on this screen than on that one.
   const earliestStart = useMemo(() => earliestStartOffsets(plannedProjects), [plannedProjects]);
   const leaveDips = useMemo(() => leaveFteByMonth(people, leaves), [people, leaves]);
 
-  // A whole-plan month count run through the real phase-gated simulation for
-  // each variant — cheap (three sims of ~47 projects) and the only honest way
-  // to account for phase gating and pool contention across capabilities.
-  const wholePlanMonthsByVariant = useMemo(() => {
-    const map: Record<string, number> = {};
-    for (const v of variants) {
-      const schedule = simulateCapabilitySchedule({
+  const simulate = useCallback(
+    (variantCells: typeof cells, pools: TeamVariant["fte"]) =>
+      simulateCapabilitySchedule({
         projects: plannedProjects,
-        // A variant plans on its own ceilings: the matrix with the variant's
-        // overrides laid on top (upward only; identity when it has none).
-        cells: applyCeilingOverrides(cells, v.ceilings),
-        pools: v.fte,
+        cells: variantCells,
+        pools,
         effectiveDaysPerMonth: edpm,
         minStaffingFraction: settings.minStaffingFraction,
         minCrewFte: settings.minCrewFte,
         earliestStart,
         leaveFteByMonth: leaveDips,
-      });
-      const anyImpossible = schedule.scheduled.some((s) => s.isImpossible);
-      map[v.id] = anyImpossible ? Infinity : schedule.horizonMonths;
+      }),
+    [plannedProjects, edpm, settings.minStaffingFraction, settings.minCrewFte, earliestStart, leaveDips],
+  );
+
+  // One real phase-gated simulation per variant. The sidebar reads the
+  // summaries; the chart reads the full per-project schedules of the selected
+  // and the reference variant.
+  const schedByVariant = useMemo(() => {
+    const map: Record<string, CapabilitySchedule> = {};
+    for (const v of variants) {
+      // A variant plans on its own ceilings: the matrix with the variant's
+      // overrides laid on top (upward only; identity when it has none).
+      map[v.id] = simulate(applyCeilingOverrides(cells, v.ceilings), v.fte);
     }
     return map;
-  }, [variants, plannedProjects, cells, edpm, earliestStart, leaveDips, settings.minStaffingFraction, settings.minCrewFte]);
+  }, [variants, cells, simulate]);
+
+  const summaryByVariant = useMemo(() => {
+    const map: Record<string, VariantSummary> = {};
+    for (const v of variants) map[v.id] = summarize(schedByVariant[v.id], totalFteOf(v));
+    return map;
+  }, [variants, schedByVariant]);
+
+  const refSummary = summaryByVariant[reference.id];
+  const selSummary = summaryByVariant[selected.id];
+  const refSched = schedByVariant[reference.id];
+  const selSched = schedByVariant[selected.id];
 
   // The optimizer's input — everything but the pools it searches over. The
   // deadline map follows the Plan screen's comparison to the letter, past
@@ -189,28 +218,23 @@ export function TimelineView({
 
   // Per-capability ceilings on team size. The planner would otherwise happily
   // staff four tech leads: nothing in the model knows that a team wants one.
-  // Kept on the client — this is a knob you turn while asking a question, not
-  // roster data, and it should not migrate the database to be tried out.
   const [caps, setCaps] = useState<CapabilityCaps>(savedCaps);
   useEffect(() => {
     localStorage.setItem(CAPS_KEY, JSON.stringify(caps));
   }, [caps]);
 
-  // The optimizer always plans from today's real team — the roster-derived
-  // variant — no matter which variant the timeline currently compares
-  // against. Planning from a selected variant compounded hypothetical worlds:
-  // a "+4" built on one baseline carried that baseline's people and overrides
-  // into its label and its numbers, and two rows became incomparable.
-  const roster = variants.find((v) => v.isRosterDerived) ?? variants[0];
-  const rosterCells = useMemo(
-    () => applyCeilingOverrides(cells, roster.ceilings),
-    [cells, roster.ceilings],
+  // The optimizer always plans from today's real team — the reference — no
+  // matter which variant the timeline currently draws. Planning from a
+  // selected variant compounded hypothetical worlds.
+  const referenceCells = useMemo(
+    () => applyCeilingOverrides(cells, reference.ceilings),
+    [cells, reference.ceilings],
   );
 
   const optimizerInput = useMemo<HiringPlanInput>(
     () => ({
       projects: plannedProjects,
-      cells: rosterCells,
+      cells: referenceCells,
       effectiveDaysPerMonth: edpm,
       minStaffingFraction: settings.minStaffingFraction,
       minCrewFte: settings.minCrewFte,
@@ -219,524 +243,453 @@ export function TimelineView({
       deadlineMonths,
       caps,
     }),
-    [plannedProjects, rosterCells, edpm, earliestStart, leaveDips, settings.minStaffingFraction, settings.minCrewFte, deadlineMonths, caps],
+    [plannedProjects, referenceCells, edpm, earliestStart, leaveDips, settings.minStaffingFraction, settings.minCrewFte, deadlineMonths, caps],
   );
 
   // Calls the simulation through the lib directly — the shared schedule hook's
   // tiny identity-keyed cache would thrash under hundreds of trial vectors.
-  const ladder = useHiringLadder(roster.fte, optimizerInput);
+  const ladder = useHiringLadder(reference.fte, optimizerInput);
   const projectNameOf = useCallback(
     (id: string) => projects.find((p) => p.id === id)?.name ?? id,
     [projects],
   );
-  const rosterTotalFte = useMemo(
-    () => CAPABILITY_ORDER.reduce((sum, c) => sum + (roster.fte[c] ?? 0), 0),
-    [roster.fte],
-  );
 
   // Hiring's hard floor: the horizon with unlimited people. Whatever it is,
   // no headcount goes below it — past that point only ceilings and ordering
-  // move the plan. One simulation, computed only while the drawer is open;
-  // it is what makes "+4 buys 3.8 months" readable as "half of everything
-  // hiring can ever buy" instead of "barely a quarter of the plan".
+  // move the plan. One simulation, computed only while the drawer is open.
   const hiringFloorMonths = useMemo(() => {
-    if (!optimizerOpen || plannedProjects.length === 0) return null;
-    const unlimited = { ...roster.fte };
+    if (!drawerOpen || plannedProjects.length === 0) return null;
+    const unlimited = { ...reference.fte };
     for (const c of CAPABILITY_ORDER) unlimited[c] = 100;
-    const s = simulateCapabilitySchedule({
-      projects: plannedProjects,
-      cells: rosterCells,
-      pools: unlimited,
-      effectiveDaysPerMonth: edpm,
-      minStaffingFraction: settings.minStaffingFraction,
-      minCrewFte: settings.minCrewFte,
-      earliestStart,
-      leaveFteByMonth: leaveDips,
-    });
+    const s = simulate(referenceCells, unlimited);
     return s.scheduled.some((p) => p.isImpossible) ? null : s.horizonMonths;
-  }, [optimizerOpen, plannedProjects, rosterCells, roster.fte, edpm, settings.minStaffingFraction, settings.minCrewFte, earliestStart, leaveDips]);
+  }, [drawerOpen, plannedProjects.length, referenceCells, reference.fte, simulate]);
+
+  // The option cards headline "N projektów w 12 mies." — one extra simulation
+  // per rung, only once a search has finished (the search itself ran hundreds).
+  const rungWithin = useMemo(() => {
+    const out: Record<number, number> = {};
+    if (!ladder.result) return out;
+    for (const rung of ladder.result.rungs) {
+      const overrides: VariantCeilings = structuredClone(reference.ceilings);
+      for (const move of rung.ceilingMoves) {
+        (overrides[move.projectId] ??= {})[move.capability] = move.to;
+      }
+      const s = simulate(applyCeilingOverrides(cells, overrides), rung.pools);
+      out[rung.hires] = summarize(s, 0).within;
+    }
+    return out;
+  }, [ladder.result, reference.ceilings, cells, simulate]);
+
+  // A rung the user already turned into a variant flips its card button to
+  // "Dodany — pokaż". The map lives per search: a rerun resets it.
+  const [appliedByHires, setAppliedByHires] = useState<Record<number, string>>({});
+  useEffect(() => {
+    setAppliedByHires({});
+  }, [ladder.result]);
+
+  const appliedVariantIdOf = useCallback(
+    (rung: LadderRung) => {
+      const id = appliedByHires[rung.hires];
+      return id && variants.some((v) => v.id === id) ? id : null;
+    },
+    [appliedByHires, variants],
+  );
 
   const applyRung = useCallback(
     (rung: LadderRung) => {
       const id = newId("variant");
       // Moves chain per cell (1→1.5, 1.5→2); applied in order, the last write
-      // per cell is the rung's final ceiling. The roster variant they were
+      // per cell is the rung's final ceiling. The reference variant they were
       // computed against never carries overrides of its own.
-      const ceilings = structuredClone(roster.ceilings);
+      const ceilings = structuredClone(reference.ceilings);
       for (const move of rung.ceilingMoves) {
         (ceilings[move.projectId] ??= {})[move.capability] = move.to;
       }
       const raisedCells = new Set(
         rung.ceilingMoves.map((m) => `${m.projectId}:${m.capability}`),
       ).size;
-      const who = CAPABILITY_ORDER.filter((c) => (rung.byCapability[c] ?? 0) > 0)
-        .map((c) => {
-          const n = rung.byCapability[c] ?? 0;
-          return n > 1 ? `${c}×${n}` : c;
-        })
-        .join(" · ");
-      const total = CAPABILITY_ORDER.reduce((sum, c) => sum + (rung.pools[c] ?? 0), 0);
       const core =
-        rung.hires === 0
-          ? `sufity ×${raisedCells} (${fmt(total)} FTE)`
-          : `+${rung.hires} → ${fmt(total)} FTE: ${who}${raisedCells > 0 ? ` · sufity ×${raisedCells}` : ""}`;
+        rung.hires === 0 ? `sufity ×${raisedCells}` : `+${rung.hires}: ${rungRoles(rung)}`;
       const label = optimizedLabel(
         variants.map((v) => v.label),
         core,
       );
       addVariant({ id, label, fte: rung.pools, isRosterDerived: false, ceilings });
+      // The drawer stays open — the card flips to "Dodany — pokaż" and the
+      // timeline behind it already follows the new variant.
+      setAppliedByHires((m) => ({ ...m, [rung.hires]: id }));
       setVariantId(id);
-      ladder.reset();
-      setOptimizerOpen(false);
     },
-    [variants, addVariant, ladder, roster.ceilings],
+    [variants, addVariant, reference.ceilings],
   );
 
-  // One band, not eight. The per-capability bands answered "how long would BE's
-  // work take if BE were the only thing in the world" — a number no plan ever
-  // realises, since capabilities gate each other inside every phase. It read as
-  // seven competing forecasts next to the one real one.
-  const bands: CompareBand[] = useMemo(() => {
-    const fteMonths = CAPABILITY_ORDER.reduce((sum, capability) => {
-      const days = totalsByCapability[capability] ?? 0;
-      return sum + (edpm[capability] > 0 ? days / edpm[capability] : 0);
-    }, 0);
+  // ── Chart geometry ──────────────────────────────────────────────────────
+  const wide = (winW || 1280) >= 1180;
+  const nameW = wide ? 300 : 280;
+  const drawerW = wide ? 460 : 380;
+  const variantsW = wide ? 224 : 196;
 
-    return [
-      {
-        label: WHOLE_PLAN,
-        fteMonths,
-        rows: variants.map((v) => ({
-          variant: v,
-          hue: hueByVariant[v.id] ?? HUES[0],
-          fte: CAPABILITY_ORDER.reduce((sum, c) => sum + (v.fte[c] ?? 0), 0),
-          months: wholePlanMonthsByVariant[v.id] ?? Infinity,
-          isBaseline: v.id === baseline.id,
-        })),
-        isWholePlan: true,
-      },
-    ];
-  }, [variants, totalsByCapability, hueByVariant, baseline.id, wholePlanMonthsByVariant, edpm]);
-
-  const D = DENSITIES.find((d) => d.id === densityId) ?? DENSITIES[1];
-  const nameW = D.name;
-  const barTop = Math.round((D.row - D.bar) / 2);
-
-  const longest = useMemo(() => {
-    let max = 0;
-    for (const band of bands) {
-      for (const row of band.rows) {
-        if (Number.isFinite(row.months)) max = Math.max(max, row.months);
+  const maxEnd = useMemo(() => {
+    let max = YEAR_LINE;
+    for (const s of [selSched, refSched]) {
+      for (const sp of s.scheduled) {
+        if (Number.isFinite(sp.endMonths)) max = Math.max(max, sp.endMonths);
       }
     }
     return max;
-  }, [bands]);
+  }, [selSched, refSched]);
 
-  const months = Math.max(12, Math.ceil(longest / 6) * 6 + 6);
-  const totalW = months * ppm;
+  const months = Math.ceil((maxEnd * 1.06) / 3) * 3 + 3;
+  // The drawer slides over the canvas, so the chart keeps the full width.
+  const trackW = (viewW || 1100) - nameW - 6;
+  const ppm = Math.max(3, trackW / months);
+  const totalW = Math.round(months * ppm);
+  const yearX = Math.round(YEAR_LINE * ppm);
+  const labelStep = ppm >= 34 ? 3 : ppm >= 17 ? 6 : 12;
 
   const now = useMemo(() => new Date(), []);
   const startYear = now.getFullYear();
   const startMonth = now.getMonth();
 
-  const { ticks, tickLabels, gridlines } = useMemo(
-    () => buildAxis(months, ppm, startYear, startMonth),
-    [months, ppm, startYear, startMonth],
-  );
+  const { ticks, tickLabels, gridlines } = useMemo(() => {
+    const t: { x: number; h: number; color: string }[] = [];
+    const l: { x: number; label: string }[] = [];
+    const g: number[] = [];
+    for (let i = 0; i <= months; i++) {
+      const abs = startMonth + i;
+      const m = abs % 12;
+      const y = startYear + Math.floor(abs / 12);
+      const quarter = m % 3 === 0;
+      const x = Math.round(i * ppm);
+      t.push({ x, h: quarter ? 11 : 5, color: quarter ? "var(--line-strong)" : "var(--line-soft)" });
+      if (i % labelStep === 0 && i < months) l.push({ x, label: `${MON[m]} ${String(y).slice(2)}` });
+      if (quarter && i > 0) g.push(x);
+    }
+    return { ticks: t, tickLabels: l, gridlines: g };
+  }, [months, ppm, startYear, startMonth, labelStep]);
 
-  const planRows = bands[0].rows;
-  const baselinePlan = planRows.find((r) => r.isBaseline) ?? planRows[0];
-  const fastestPlan = planRows.reduce((best, r) => (r.months < best.months ? r : best), planRows[0]);
+  const compare = selected.id !== reference.id;
+  const refByProject = useMemo(() => {
+    const map: Record<string, CapabilitySchedule["scheduled"][number]> = {};
+    for (const sp of refSched.scheduled) map[sp.project.id] = sp;
+    return map;
+  }, [refSched]);
 
-  function deltaAgainstBaseline(row: VariantRow, band: CompareBand) {
-    const base = band.rows.find((r) => r.isBaseline);
-    if (!base || row.isBaseline) return null;
-    if (!Number.isFinite(row.months) || !Number.isFinite(base.months)) return null;
-    const diff = base.months - row.months;
-    if (Math.abs(diff) < 0.05) return { text: "tak samo", color: "var(--ink-3)" };
-    const pct = base.months > 0 ? Math.abs(diff) / base.months : 0;
-    const faster = diff > 0;
-    return {
-      text: `${faster ? "−" : "+"}${fmt(Math.abs(diff))} mies. · ${Math.round(pct * 100)}% ${faster ? "szybciej" : "wolniej"}`,
-      color: faster ? "var(--accent)" : "var(--warn)",
-    };
-  }
+  function renderRow(sp: CapabilitySchedule["scheduled"][number]) {
+    const p = sp.project;
+    const ref = refByProject[p.id];
+    const finite = !sp.isImpossible && Number.isFinite(sp.endMonths) && !sp.hasNoDemand;
+    const refFinite = ref && !ref.isImpossible && Number.isFinite(ref.endMonths) && !ref.hasNoDemand;
 
-  function renderRow(band: CompareBand, row: VariantRow) {
-    const hovered = hover === row.variant.id;
-    const base = band.rows.find((r) => r.isBaseline);
-    const delta = deltaAgainstBaseline(row, band);
-    const noPeople = row.fte <= 0 && band.fteMonths > 0;
-    const noWork = band.fteMonths === 0;
+    const endLabel = sp.hasNoDemand ? "—" : finite ? monthLabel(startYear, startMonth, sp.endMonths) : "nigdy";
+    const endColor = sp.hasNoDemand ? "var(--ink-4)" : finite ? "var(--ink-3)" : "var(--warn)";
 
-    const width = noPeople || noWork ? 0 : Math.max(4, Math.round(row.months * ppm));
-    const height = D.bar;
-    const baselineX =
-      base && !row.isBaseline && Number.isFinite(base.months) ? Math.round(base.months * ppm) : null;
+    const barX = finite ? Math.round(sp.startMonths * ppm) : 0;
+    const barW = finite ? Math.max(3, Math.round((sp.endMonths - sp.startMonths) * ppm)) : 0;
+    const refStartX = refFinite ? Math.round(ref.startMonths * ppm) : 0;
+    const refEndX = refFinite ? Math.round(ref.endMonths * ppm) : 0;
 
-    const outParts: { text: string; color: string }[] = [];
-    if (noWork) outParts.push({ text: "brak zaplanowanej pracy", color: "var(--ink-4)" });
-    else if (noPeople) outParts.push({ text: "nikt nie przypisany — nigdy się nie skończy", color: "var(--warn)" });
-    else outParts.push({ text: `${fmt(row.months)} mies.`, color: "var(--ink-2)" });
-    if (delta) outParts.push({ text: delta.text, color: delta.color });
+    const compareRow = compare && finite && refFinite;
+    // Start shifts are fractions of a month, so pixel rounding wipes them out
+    // — measure in months and give the marker a legible floor.
+    const startDelta = compareRow ? ref.startMonths - sp.startMonths : 0;
+    const hasStartShift = startDelta > 0.05;
+    const leadW = hasStartShift ? Math.max(5, Math.round(startDelta * ppm)) : 0;
+    // The reference band hugs the bar's start when the shift is small — except
+    // for a variant that starts *later* than the reference, where the honest
+    // position is the reference's own.
+    const bandX = compareRow
+      ? sp.startMonths <= ref.startMonths + 1e-9
+        ? barX + leadW
+        : refStartX
+      : 0;
+    const bandW = compareRow ? Math.max(1, refEndX - bandX) : 0;
+
+    // kreska startu: the ghost is the reference plan. When the two spans
+    // overlap, its left edge merges with the bar's start so the pair reads as
+    // one nested shape; when they don't, that anchor would stretch the ghost
+    // across the gap (or collapse it to a sliver on a slower variant) — so a
+    // disjoint ghost sits on the reference's true span, hair included.
+    const spansOverlap =
+      compareRow && sp.startMonths < ref.endMonths && ref.startMonths < sp.endMonths;
+    const outlineX = spansOverlap ? Math.min(barX, refStartX) : refStartX;
+    const outlineW = Math.max(3, refEndX - outlineX);
+    const hairX = spansOverlap ? barX + leadW : refStartX;
+
+    const endDiff = compareRow ? ref.endMonths - sp.endMonths : 0;
+    const endTitle =
+      endDiff > 0.05
+        ? `koniec wcześniej o ${fmt(endDiff)} mies.`
+        : endDiff < -0.05
+          ? `koniec później o ${fmt(-endDiff)} mies.`
+          : "koniec bez zmian";
+    const startTitle = hasStartShift
+      ? `start wcześniej o ${fmt(startDelta)} mies.`
+      : "start bez zmian";
+    const refTitle = refFinite
+      ? `${reference.label} · ${fmt(ref.startMonths)}–${fmt(ref.endMonths)} mies.`
+      : reference.label;
+
+    const serify = compareRow && fillMode === "serify";
+    const kreska = compareRow && fillMode === "kreska";
 
     return (
-      <div
-        key={row.variant.id}
-        className="atl-row"
-        style={{ height: D.row, background: hovered ? "var(--row-hover)" : "transparent" }}
-        onMouseEnter={() => setHover(row.variant.id)}
-        onMouseLeave={() => setHover((h) => (h === row.variant.id ? null : h))}
-        onClick={() => setVariantId(row.variant.id)}
-      >
-        <div
-          className="atl-row-name"
-          style={{
-            width: nameW,
-            background: hovered ? "var(--name-hover)" : "var(--band)",
-            cursor: "pointer",
-          }}
-          title={`Porównaj z ${row.variant.label}`}
-        >
-          <span
-            className="atl-hue"
-            style={{ height: D.bar, background: solid(row.hue), opacity: row.isBaseline ? 1 : 0.55 }}
-          />
-          <span
-            className="atl-row-title"
-            style={{ fontSize: D.fsName, fontWeight: row.isBaseline ? 600 : 400 }}
-          >
-            {row.variant.label}
-          </span>
-          {row.isBaseline && <span className="atl-band-badge">bazowy</span>}
-          <span className="atl-row-id" style={{ fontSize: D.fsMono }}>
-            {fmt(row.fte)}
+      <div key={p.id} className="sv-row" style={{ height: ROW_H }}>
+        <div className="sv-row-name" title={`${p.name} · ${selected.label}`} style={{ width: nameW }}>
+          <span className="sv-row-title">{p.name}</span>
+          <span className="sv-row-end" style={{ color: endColor }}>
+            {endLabel}
           </span>
         </div>
-
-        <div className="atl-row-track" style={{ width: totalW, height: D.row }}>
+        <div className="sv-row-track" style={{ width: totalW, height: ROW_H }}>
           {gridlines.map((x) => (
-            <div key={x} className="atl-grid" style={{ left: x, height: D.row, background: "var(--line)" }} />
+            <div key={x} className="atl-grid" style={{ left: x, height: ROW_H, background: "var(--line-soft)" }} />
           ))}
+          <div className="sv-year-line" style={{ left: yearX, height: ROW_H, opacity: 0.55 }} />
 
-          {width > 0 && height > 0 && (
-            <div
-              className="atl-bar"
-              style={{
-                left: 0,
-                top: barTop,
-                width,
-                height,
-                border: `1px solid ${row.isBaseline ? solid(row.hue) : "transparent"}`,
-                background: row.isBaseline ? solid(row.hue) : soft(row.hue),
-                cursor: "pointer",
-              }}
-            >
-              {width >= 34 && height >= 12 && (
-                <span
-                  className="atl-seg-people"
-                  style={{
-                    bottom: Math.max(2, Math.round((height - 10) / 2)),
-                    color: row.isBaseline ? "var(--on-bar)" : "var(--ink)",
-                  }}
-                >
-                  {fmt(row.fte)}
-                </span>
-              )}
-            </div>
+          {kreska && (
+            <div className="sv-outline" title={refTitle} style={{ left: outlineX, width: outlineW }} />
           )}
 
-          {/* where the baseline lands, so the gap is visible and not just stated */}
-          {baselineX != null && width > 0 && (
+          {serify && (
+            <>
+              <div className="sv-refband" title={refTitle} style={{ left: bandX, width: bandW }} />
+              <div className="sv-refband-hatch" style={{ left: bandX, width: bandW }} />
+              <div className="sv-serif" title={startTitle} style={{ left: bandX }} />
+              <div className="sv-serif" title={endTitle} style={{ left: refEndX }} />
+            </>
+          )}
+
+          {finite && (
             <div
+              className="sv-bar"
+              title={`${p.name} · ${fmt(sp.startMonths)}–${fmt(sp.endMonths)} mies. · kończy ${monthLabel(startYear, startMonth, sp.endMonths)}`}
               style={{
-                position: "absolute",
-                left: baselineX,
-                top: barTop - 3,
-                width: 1,
-                height: D.bar + 6,
-                background: "transparent",
-                borderLeft: `1px dashed ${wash(base!.hue, 0.75)}`,
+                left: barX,
+                width: barW,
+                background: serify ? "var(--win)" : "var(--accent)",
+                borderColor: serify ? "var(--win-edge)" : "transparent",
               }}
             />
           )}
 
-          <div
-            className="atl-out-label"
-            style={{ left: width, top: barTop, height: D.bar, gap: 10 }}
-          >
-            {outParts.map((p, i) => (
-              <span key={i} style={{ color: p.color }}>
-                {p.text}
-              </span>
-            ))}
-          </div>
+          {kreska && hasStartShift && (
+            <div className="sv-hair" title={startTitle} style={{ left: hairX }} />
+          )}
         </div>
       </div>
     );
   }
 
-  function renderBand(band: CompareBand) {
-    const finite = band.rows.filter((r) => Number.isFinite(r.months) && r.months > 0);
-    const best = finite.reduce<VariantRow | null>(
-      (b, r) => (b == null || r.months < b.months ? r : b),
-      null,
-    );
-    const worst = finite.reduce<VariantRow | null>(
-      (b, r) => (b == null || r.months > b.months ? r : b),
-      null,
-    );
-    const spread =
-      best && worst && worst.months > 0 && best.variant.id !== worst.variant.id
-        ? Math.round(((worst.months - best.months) / worst.months) * 100)
-        : 0;
+  // ── Sidebar cards ───────────────────────────────────────────────────────
+  function variantCard(v: TeamVariant) {
+    const s = summaryByVariant[v.id];
+    const active = v.id === selected.id;
+    const isRef = v.id === reference.id;
+    const broken = s.impossible > 0;
+    const refBroken = refSummary.impossible > 0;
+
+    let metaPlan: string;
+    let planColor: string;
+    if (broken) {
+      metaPlan = `nie domyka się (${s.impossible})`;
+      planColor = "var(--warn)";
+    } else if (isRef || refBroken) {
+      metaPlan = `plan ${fmt(s.horizon)} mies.`;
+      planColor = active ? "var(--ink-2)" : "var(--ink-4)";
+    } else {
+      const weeks = Math.round(weeksOf(s.horizon - refSummary.horizon));
+      metaPlan = `${signed(weeks)} tyg.`;
+      planColor = gainColor(-weeks);
+    }
+
+    const projDiff = s.within - refSummary.within;
+    const metaProj = isRef
+      ? `${s.within} proj. w ${YEAR_LINE} mies.`
+      : `${signed(projDiff)} proj. w ${YEAR_LINE} mies.`;
+    const projColor = isRef ? (active ? "var(--ink-2)" : "var(--ink-4)") : gainColor(projDiff);
 
     return (
-      <section className={`atl-band ${band.isWholePlan ? "atl-band-total" : ""}`} key={band.label}>
-        <div className="atl-band-head" style={{ height: D.band }}>
-          <div className="atl-band-name" style={{ width: nameW }}>
-            <div
-              style={{
-                flex: "none",
-                width: 3,
-                height: D.bar,
-                background: band.isWholePlan ? "var(--accent)" : "var(--ink-3)",
-                opacity: 0.6,
-              }}
-            />
-            <b>{band.label}</b>
-            <span className="atl-band-people">{fmt(band.fteMonths)} FTE-mies.</span>
-          </div>
-          <div className="atl-band-track" style={{ width: totalW }}>
-            <div className="atl-band-chips" style={{ left: 0, height: D.band }}>
-              {best && (
-                <span style={{ color: "var(--ink-2)" }}>
-                  najszybszy {best.variant.label.toLowerCase()} · {fmt(best.months)} mies.
-                </span>
-              )}
-              {spread > 0 && (
-                <span style={{ color: "var(--accent)" }}>{spread}% różnicy między najlepszym i najgorszym</span>
-              )}
-              {!best && <span style={{ color: "var(--ink-4)" }}>brak zaplanowanych prac</span>}
-              {band.isWholePlan && (
-                <span style={{ color: "var(--ink-4)" }} title="uwzględnia fazowanie i kolejkowanie zdolności">
-                  z symulacji fazowej
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="atl-rows">{band.rows.map((row) => renderRow(band, row))}</div>
-      </section>
+      <button
+        key={v.id}
+        type="button"
+        className={`sv-card ${active ? "is-active" : ""}`}
+        onClick={() => setVariantId(v.id)}
+        title={v.label}
+      >
+        <span className="sv-card-top">
+          <span className="sv-card-label" style={{ fontWeight: active ? 600 : 450 }}>
+            {v.label}
+          </span>
+          <span className="sv-card-fte">{fmt(s.totalFte)} etatów</span>
+        </span>
+        <span className="sv-card-meta" style={{ color: planColor }}>
+          {metaPlan}
+        </span>
+        <span className="sv-card-meta" style={{ color: projColor }}>
+          {metaProj}
+        </span>
+      </button>
     );
   }
 
-  const planDelta = deltaAgainstBaseline(fastestPlan, bands[0]);
+  const stripHeadline = `${selSummary.within} projektów w ${YEAR_LINE} mies. · ${selected.label}`;
+  const stripSecondary =
+    selSummary.impossible > 0
+      ? `plan nie domyka się — ${plCount(selSummary.impossible, "projekt bez końca", "projekty bez końca", "projektów bez końca")} · ${fmt(selSummary.totalFte)} etatów · ${plannedProjects.length} projektów w portfelu`
+      : `koniec planu ${fmt(selSummary.horizon)} mies. · ${fmt(selSummary.totalFte)} etatów · ${plannedProjects.length} projektów w portfelu`;
 
   return (
     <div className="atl" data-theme={theme === "auto" ? undefined : theme}>
-      <header className="atl-header" style={{ height: D.hdr }}>
-        <div className="atl-title">
-          <b>Symulacje</b>
-          <span className="atl-chip">
-            {plCount(variants.length, "wariant", "warianty", "wariantów")}
-          </span>
+      <header className="sv-header">
+        <b className="sv-title">Symulacje</b>
+        <span className="atl-chip">
+          {plCount(variants.length, "wariant", "warianty", "wariantów")}
+        </span>
+        <span className="sv-vr" />
+        <span className="sv-hdr-note" title={selected.label}>
+          wybrany wariant · {selected.label}
+        </span>
+        <span className="sv-vr" />
+        <span className="atl-eyebrow">porównanie</span>
+        <div className="atl-seg">
+          {(
+            [
+              { id: "serify", label: "serify" },
+              { id: "kreska", label: "kreska startu" },
+            ] as { id: FillMode; label: string }[]
+          ).map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              className={`atl-seg-text ${fillMode === m.id ? "is-active" : ""}`}
+              onClick={() => setFillMode(m.id)}
+            >
+              {m.label}
+            </button>
+          ))}
         </div>
-
-        <div className="atl-group is-divided">
-          <span className="atl-eyebrow" style={{ paddingLeft: 10 }}>
-            bazowy
-          </span>
-          <div className="atl-seg">
-            {variants.map((v) => {
-              const overrides = ceilingOverrideCount(v);
-              return (
-                <button
-                  key={v.id}
-                  type="button"
-                  className={`atl-seg-text ${v.id === variantId ? "is-active" : ""}`}
-                  onClick={() => setVariantId(v.id)}
-                  title={
-                    overrides > 0
-                      ? `${v.label} — ${plCount(overrides, "nadpisany sufit", "nadpisane sufity", "nadpisanych sufitów")}, szczegóły w Edytuj…`
-                      : v.label
-                  }
-                >
-                  {v.label}
-                  {overrides > 0 ? ` ▲${overrides}` : ""}
-                </button>
-              );
-            })}
-          </div>
-          <button type="button" className="atl-btn" onClick={() => setEditorOpen(true)}>
-            Edytuj…
-          </button>
-          <button
-            type="button"
-            className={`atl-btn ${optimizerOpen ? "is-on" : ""}`}
-            onClick={() => setOptimizerOpen(true)}
-            disabled={rosterTotalFte <= 0 || plannedProjects.length === 0}
-            title={
-              rosterTotalFte <= 0
-                ? "Wariant bez ludzi — nie ma czego przesuwać"
-                : plannedProjects.length === 0
-                  ? "Brak projektów w planie"
-                  : undefined
-            }
-          >
-            <span className="atl-spark">✦</span> Optymalizuj…
-          </button>
-        </div>
-
-        <div className="atl-spacer" />
-
-        <div className="atl-group">
-          <span className="atl-eyebrow" title="gęstość wierszy">
-            gęstość
-          </span>
-          <div className="atl-seg">
-            {DENSITIES.map((d) => (
-              <button
-                key={d.id}
-                type="button"
-                className={`atl-seg-icon ${d.id === D.id ? "is-active" : ""}`}
-                onClick={() => setDensityId(d.id)}
-              >
-                {d.label}
-              </button>
-            ))}
-          </div>
-          <span className="atl-eyebrow" title="miesięcy na ekran" style={{ paddingLeft: 3 }}>
-            zoom
-          </span>
-          <div className="atl-seg">
-            {ZOOMS.map((z) => (
-              <button
-                key={z.id}
-                type="button"
-                className={`atl-seg-icon ${Math.abs(z.ppm - ppm) < 0.5 ? "is-active" : ""}`}
-                onClick={() => setPpm(z.ppm)}
-              >
-                {z.label}
-              </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            className={`atl-btn ${keyOpen ? "is-on" : ""}`}
-            onClick={() => setKeyOpen((v) => !v)}
-          >
-            Legenda
-          </button>
-        </div>
+        <span className="atl-spacer" />
+        <button
+          type="button"
+          className={`sv-opt-toggle ${drawerOpen ? "is-on" : ""}`}
+          onClick={() => setDrawerOpen((v) => !v)}
+          disabled={plannedProjects.length === 0}
+          title={plannedProjects.length === 0 ? "Brak projektów w planie" : undefined}
+        >
+          <span className="atl-spark">✦</span> Optymalizuj…
+        </button>
       </header>
 
-      {keyOpen && (
-        <div className="atl-key">
-          <div className="atl-key-item">
-            <div className="atl-key-bar" style={{ borderStyle: "solid", borderColor: "var(--line-strong)" }}>
-              <i style={{ left: 0, width: 20, height: 13, background: "var(--accent)", borderRadius: 1 }} />
-            </div>
-            <span>jeden wiersz na wariant · długość = kiedy kończy się cała praca · liczba = etaty w zespole</span>
+      <div className="sv-content">
+        <aside className="sv-side" aria-label="Warianty zespołu" style={{ width: variantsW }}>
+          <div className="sv-side-head">
+            <b>Warianty zespołu</b>
+            <span>{plCount(variants.length, "wariant", "warianty", "wariantów")}</span>
           </div>
-          <div className="atl-key-item">
-            <div
-              className="atl-key-bar"
-              style={{ border: "none", background: "none", width: 34, display: "flex", alignItems: "center" }}
+          <div className="sv-side-list">{variants.map((v) => variantCard(v))}</div>
+          <div className="sv-side-foot">
+            <button type="button" className="sim-btn" onClick={() => setEditorOpen(true)}>
+              Edytuj warianty…
+            </button>
+            <button
+              type="button"
+              className="sv-btn-dashed"
+              onClick={() => {
+                setVariantId(variantsApi.createVariant(selected));
+                setEditorOpen(true);
+              }}
             >
-              <span style={{ borderLeft: "1px dashed var(--accent)", height: 15, marginLeft: 16 }} />
+              + Nowy wariant
+            </button>
+          </div>
+        </aside>
+
+        <div className="sv-main">
+          <div className="sv-strip">
+            <div className="sv-strip-text">
+              <b>{stripHeadline}</b>
+              <span>{stripSecondary}</span>
             </div>
-            <span>gdzie kończy wariant bazowy</span>
           </div>
-          <div className="atl-key-item">
-            <span className="atl-key-num" style={{ color: "var(--accent)" }}>
-              −2 mies. · 30% szybciej
-            </span>
-            <span>względem wariantu bazowego</span>
-          </div>
-          <div className="atl-key-item">
-            <span className="atl-key-num">kliknij</span>
-            <span>wiersz, aby ustawić ten wariant jako bazowy</span>
-          </div>
-        </div>
-      )}
 
-      <div className="atl-scroll" ref={scrollRef}>
-        <div className="atl-axis" style={{ height: D.axis }}>
-          <div className="atl-axis-corner" style={{ width: nameW }}>
-            <span className="atl-eyebrow">wariant</span>
-          </div>
-          <div className="atl-track" style={{ width: totalW, height: D.axis }}>
-            {ticks.map((t, i) => (
-              <div key={i} className="atl-tick" style={{ left: t.x, height: t.h, background: t.color }} />
-            ))}
-            {tickLabels.map((t, i) => (
-              <div key={i} className="atl-tick-label" style={{ left: t.x, color: t.color }}>
-                {t.label}
+          <div className="sv-scroll" ref={scrollRef}>
+            <div className="sv-axis" style={{ height: AXIS_H }}>
+              <div className="sv-axis-corner" style={{ width: nameW }}>
+                <span className="atl-eyebrow">projekt</span>
+                <span className="atl-eyebrow">koniec</span>
               </div>
-            ))}
+              <div className="atl-track" style={{ width: totalW, height: AXIS_H }}>
+                <div
+                  className="sv-year-label"
+                  title="koniec roku budżetowego"
+                  style={{ width: yearX }}
+                >
+                  {YEAR_LINE} mies.
+                </div>
+                {ticks.map((t, i) => (
+                  <div key={i} className="atl-tick" style={{ left: t.x, height: t.h, background: t.color }} />
+                ))}
+                {tickLabels.map((t, i) => (
+                  <div key={i} className="sv-tick-label" style={{ left: t.x }}>
+                    {t.label}
+                  </div>
+                ))}
+                <div className="sv-year-line" style={{ left: yearX, top: 20, bottom: 0 }} />
+              </div>
+            </div>
+
+            {selSched.scheduled.map((sp) => renderRow(sp))}
+
+            <div className="sv-legend" style={{ width: viewW > 0 ? viewW : undefined }}>
+              <span className="sv-legend-item">
+                <span style={{ width: 22, height: 9, borderRadius: 2, background: "var(--accent)" }} />
+                plan wybranego wariantu
+              </span>
+              <span className="sv-legend-item">
+                <span
+                  style={{
+                    width: 22,
+                    height: 9,
+                    borderRadius: 2,
+                    background: "var(--ghost-soft)",
+                    border: "1px solid var(--ghost)",
+                  }}
+                />
+                {fillMode === "serify"
+                  ? `${reference.label} · pas i kreski = bazowy start i koniec`
+                  : `${reference.label} · obrys = plan bazowy, kreska = bazowy start`}
+              </span>
+            </div>
           </div>
         </div>
 
-        {bands.map((band) => renderBand(band))}
-
-        <div style={{ display: "flex", height: D.axis }}>
-          <div
-            style={{
-              position: "sticky",
-              left: 0,
-              zIndex: 4,
-              flex: "none",
-              width: nameW,
-              background: "var(--surface)",
-              borderRight: "1px solid var(--line-strong)",
-            }}
-          />
-          <div style={{ flex: "none", width: totalW }} />
-        </div>
-      </div>
-
-      <footer className="atl-footer" style={{ height: D.foot }}>
-        <span>bazowy · {variantCaption(baseline.label)}</span>
-        <span>
-          {fmt(bands[0].fteMonths)} FTE-mies. pracy ·{" "}
-          {plCount(CAPABILITY_ORDER.length, "kompetencja", "kompetencje", "kompetencji")}
-        </span>
-        <span>
-          kończy się{" "}
-          {Number.isFinite(baselinePlan.months) ? monthLabel(startYear, startMonth, baselinePlan.months) : "nigdy"}
-        </span>
-        {planDelta ? (
-          <span style={{ color: planDelta.color }}>
-            najlepszy {fastestPlan.variant.label.toLowerCase()} · {planDelta.text}
-          </span>
-        ) : (
-          <span style={{ color: "var(--accent)" }}>wariant bazowy jest najszybszy</span>
-        )}
-        <span style={{ flex: 1 }} />
-        <span>kliknij wiersz, aby zmienić punkt odniesienia · esc zamyka panele</span>
-      </footer>
-
-      {optimizerOpen && (
         <HiringPlanDrawer
           ladder={ladder}
-          baselineLabel={roster.label}
-          baselineFte={roster.fte}
+          open={drawerOpen}
+          width={drawerW}
+          referenceLabel={reference.label}
+          referenceFte={reference.fte}
+          referenceWithin={refSummary.within}
+          referenceHorizon={refSummary.horizon}
+          rungWithin={rungWithin}
+          yearLine={YEAR_LINE}
           hiringFloorMonths={hiringFloorMonths}
-          insets={{ top: D.hdr, bottom: D.foot }}
           caps={caps}
           onCapsChange={setCaps}
+          appliedVariantIdOf={appliedVariantIdOf}
           onApplyRung={applyRung}
+          onShowVariant={setVariantId}
           projectNameOf={projectNameOf}
-          onClose={() => setOptimizerOpen(false)}
+          onClose={() => setDrawerOpen(false)}
         />
-      )}
+      </div>
 
       {editorOpen && (
         <VariantEditor
           api={variantsApi}
-          activeId={baseline.id}
+          activeId={selected.id}
           projectNameOf={projectNameOf}
           onActivate={setVariantId}
           onClose={() => setEditorOpen(false)}

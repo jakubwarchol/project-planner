@@ -1,25 +1,48 @@
 import { X } from "lucide-react";
 import type { HiringLadderApi } from "../hooks/useHiringLadder";
+import { CAPABILITY_HUES, fmt, fmt2, plCount, rungRoles, signed, solid, weeksOf } from "./timelineChrome";
 import { CAPABILITY_LABELS, CAPABILITY_ORDER } from "../lib/estimation";
 import type { CeilingMove } from "../lib/autopilot";
 import type { LadderRung } from "../lib/hirePlusCeilings";
 import type { BlockedHire, CapabilityCaps, PlanScore } from "../lib/hiringPlanner";
 import type { Capability, CapabilityVector } from "../types";
-import { fmt, fmt2, plCount, weeksOf } from "./timelineChrome";
+
+/** Full names for the caps rows — everywhere else the app speaks in the short
+ *  codes, but a headcount limit reads better against the job title. */
+const CAPABILITY_FULL: Record<Capability, string> = {
+  PM: "Kierownik projektu",
+  UX: "Projektant UX",
+  TL: "Lider techniczny",
+  BE: "Backend",
+  FE: "Frontend",
+  QA: "Testy",
+  SEC: "Bezpieczeństwo",
+};
 
 interface HiringPlanDrawerProps {
   ladder: HiringLadderApi;
-  baselineLabel: string;
-  baselineFte: CapabilityVector;
+  /** The drawer stays mounted and slides in and out, so the transition can
+   *  actually play. */
+  open: boolean;
+  width: number;
+  referenceLabel: string;
+  referenceFte: CapabilityVector;
+  /** Projects the reference lands inside the budget year — the number every
+   *  option card's headline is measured against. */
+  referenceWithin: number;
+  referenceHorizon: number;
+  /** Within-year counts per rung (keyed by hires), simulated by the screen. */
+  rungWithin: Record<number, number>;
+  yearLine: number;
   /** Horizon with unlimited people — hiring's hard floor. Null when it
    *  cannot be computed (empty plan, or something stays impossible). */
   hiringFloorMonths: number | null;
-  /** Header/footer heights vary with the density control, unlike cm2's fixed
-   *  chrome — so the drawer takes its vertical bounds from the screen. */
-  insets: { top: number; bottom: number };
   caps: CapabilityCaps;
   onCapsChange: (caps: CapabilityCaps) => void;
+  /** Id of the variant a rung was already turned into, or null. */
+  appliedVariantIdOf: (rung: LadderRung) => string | null;
   onApplyRung: (rung: LadderRung) => void;
+  onShowVariant: (variantId: string) => void;
   projectNameOf: (id: string) => string;
   onClose: () => void;
 }
@@ -27,36 +50,41 @@ interface HiringPlanDrawerProps {
 /**
  * "If we hired N people, what would it buy?"
  *
- * One list, one story: each row is a hire count with the work already re-cut
- * for that team (rung 0 is today's team, work re-cut, nobody hired). There
- * used to be a second, hires-only mode; it answered a question nobody asks —
- * when you hire, you let the new people onto the work — and having two tabs
- * of overlapping numbers cost more confusion than the conservative floor it
- * showed was worth. The details a PM does not need up front (which exact
- * ceilings move, team-size limits) live in tooltips and a collapsed section.
+ * One list, one story: each card is a hire count with the work already re-cut
+ * for that team (rung 0 is today's team, work re-cut, nobody hired). The
+ * headline is what a budget conversation actually weighs — projects landed
+ * inside the budget year — with the plan length as the small print.
  */
 export function HiringPlanDrawer({
   ladder,
-  baselineLabel,
-  baselineFte,
+  open,
+  width,
+  referenceLabel,
+  referenceFte,
+  referenceWithin,
+  referenceHorizon,
+  rungWithin,
+  yearLine,
   hiringFloorMonths,
-  insets,
   caps,
   onCapsChange,
+  appliedVariantIdOf,
   onApplyRung,
+  onShowVariant,
   projectNameOf,
   onClose,
 }: HiringPlanDrawerProps) {
   return (
     <aside
       className="atl-drawer"
-      style={{ top: insets.top, bottom: insets.bottom }}
+      style={{ width, transform: open ? "translateX(0)" : "translateX(101%)" }}
       aria-label="Plan zatrudnienia"
+      inert={!open}
     >
       <header className="atl-drawer-head">
         <div className="atl-drawer-title">
           <b>Plan zatrudnienia</b>
-          <span className="atl-drawer-sub">co kupi każdy kolejny etat · {baselineLabel}</span>
+          <span className="atl-drawer-sub">co kupi każdy kolejny etat · {referenceLabel}</span>
         </div>
         <button
           type="button"
@@ -68,125 +96,105 @@ export function HiringPlanDrawer({
         </button>
       </header>
 
-      {ladder.status === "idle" && (
-        <div className="atl-drawer-body atl-opt-intro">
-          <p>
-            Policzę, co kupi każdy kolejny etat — od zera do siedmiu — razem z najlepszym
-            pokrojeniem pracy dla każdego z tych zespołów. Każdy wiersz wyniku to prawdziwy,
-            policzony harmonogram całego portfela.
-          </p>
-          <FloorNote floor={hiringFloorMonths} />
-          <div>
-            <button type="button" className="atl-primary" onClick={ladder.run}>
-              Policz
-            </button>
-          </div>
-          <p className="is-muted">
-            Nic się nie zapisze — wybrany wiersz trafia do nowego wariantu, obok obecnych.
-          </p>
-          <AdvancedCaps caps={caps} baselineFte={baselineFte} onCapsChange={onCapsChange} />
-        </div>
-      )}
+      <div className="sv-opt-body">
+        {ladder.status === "idle" && (
+          <>
+            <p className="sv-opt-p">
+              Policzę, co kupi każdy kolejny etat — od zera do siedmiu — razem z najlepszym
+              pokrojeniem pracy dla każdego z tych zespołów. Każdy wiersz wyniku to policzony
+              harmonogram całego portfela, nie przedłużenie trendu.
+            </p>
+            <FloorNote floor={hiringFloorMonths} />
+            <p className="sv-opt-p is-dim">
+              Nic się nie zapisze — wybrany wiersz trafia do nowego wariantu, obok obecnych.
+            </p>
+            <div>
+              <button type="button" className="sim-btn-accent" onClick={ladder.run}>
+                Policz
+              </button>
+            </div>
+          </>
+        )}
 
-      {ladder.status === "running" && (
-        <div className="atl-drawer-body atl-opt-intro">
-          <p>
-            Liczę… {plCount(ladder.solved, "wiersz gotowy", "wiersze gotowe", "wierszy gotowych")} ·{" "}
-            {ladder.simulations} symulacji
-          </p>
-          <div>
-            <button type="button" className="atl-btn" onClick={ladder.cancel}>
-              Przerwij
-            </button>
-          </div>
-        </div>
-      )}
+        {ladder.status === "running" && (
+          <>
+            <p className="sv-opt-p">
+              Liczę… {plCount(ladder.solved, "wiersz gotowy", "wiersze gotowe", "wierszy gotowych")}{" "}
+              · {ladder.simulations} symulacji
+            </p>
+            <div>
+              <button type="button" className="sim-btn" onClick={ladder.cancel}>
+                Przerwij
+              </button>
+            </div>
+          </>
+        )}
 
-      {ladder.status === "ready" && ladder.result && (
-        <>
-          <div className="atl-drawer-body">
+        {ladder.status === "ready" && ladder.result && (
+          <>
             {ladder.stale && (
-              <p className="atl-opt-stale">
+              <p className="sv-opt-stale">
                 Dane zmieniły się od ostatniego liczenia — policz jeszcze raz.
               </p>
             )}
 
-            <div className="atl-opt-summary">
-              <div className="atl-opt-sum-row">
-                <span>dziś, bez żadnych zmian</span>
-                <b>{fmt(ladder.result.base.horizonMonths)} mies.</b>
-              </div>
-              {ladder.result.base.score.impossible > 0 && (
-                <div className="atl-opt-sum-row is-warn">
-                  <span>projekty bez końca</span>
-                  <b>{ladder.result.base.score.impossible}</b>
-                </div>
-              )}
-              <FloorRow floor={hiringFloorMonths} />
-            </div>
+            <p className="sv-opt-p">
+              Dziś, bez zmian: <b>{referenceWithin} projektów w {yearLine} mies.</b>, koniec planu{" "}
+              {fmt(referenceHorizon)} mies. Każda karta to policzony harmonogram całego portfela,
+              nie przedłużenie trendu.
+            </p>
+            <FloorNote floor={hiringFloorMonths} />
 
-            <div className="atl-opt-section">
-              <span className="atl-eyebrow">ile etatów, tyle planu</span>
+            <div className="sv-opt-cards">
               {worthwhileRungs(ladder.result.rungs, ladder.result.base.score).map((rung) => (
-                <RungRow
+                <OptionCard
                   key={rung.hires}
                   rung={rung}
-                  baseHorizon={ladder.result!.base.horizonMonths}
+                  referenceWithin={referenceWithin}
+                  referenceHorizon={referenceHorizon}
+                  within={rungWithin[rung.hires]}
+                  yearLine={yearLine}
+                  appliedVariantId={appliedVariantIdOf(rung)}
                   disabled={ladder.stale}
                   projectNameOf={projectNameOf}
                   onApply={() => onApplyRung(rung)}
+                  onShow={onShowVariant}
                 />
               ))}
             </div>
 
             <BlockedReport blocked={ladder.result.blocked} caps={caps} />
-            <AdvancedCaps caps={caps} baselineFte={baselineFte} onCapsChange={onCapsChange} />
-          </div>
 
-          <footer className="atl-opt-foot">
-            <span className="is-muted">{ladder.simulations} symulacji</span>
-            <span style={{ flex: 1 }} />
-            <button type="button" className="atl-btn" onClick={ladder.reset}>
-              Zamknij
-            </button>
-            <button type="button" className="atl-btn" onClick={ladder.run}>
-              Policz ponownie
-            </button>
-          </footer>
-        </>
-      )}
+            <div className="sv-opt-again">
+              <button type="button" className="sim-btn" onClick={ladder.run}>
+                Policz ponownie
+              </button>
+              <span>{plCount(ladder.simulations, "symulacja", "symulacje", "symulacji")}</span>
+            </div>
+          </>
+        )}
+
+        <CapsSection caps={caps} referenceFte={referenceFte} onCapsChange={onCapsChange} />
+      </div>
     </aside>
   );
 }
 
-/** Hiring's hard floor, spelled out before the search runs: the horizon with
- *  unlimited people. It reframes every row — a gain is a share of what
+/** Hiring's hard floor, spelled out next to the ladder: the horizon with
+ *  unlimited people. It reframes every card — a gain is a share of what
  *  hiring can ever buy, not of the whole plan. */
 function FloorNote({ floor }: { floor: number | null }) {
   if (floor == null) return null;
   return (
-    <p className="is-muted">
-      Szybciej niż <b>{fmt(floor)} mies.</b> nie będzie przy żadnej liczbie ludzi — tyle trwa
-      najdłuższy projekt. Niżej schodzi tylko inne pokrojenie pracy, a to liczę razem z etatami.
+    <p className="sv-opt-p is-dim">
+      Szybciej niż <b>{fmt(floor)} mies.</b> nie będzie przy żadnej liczbie ludzi — wąskim gardłem
+      przestają być etaty. Niżej schodzi tylko inne pokrojenie pracy, a to liczę razem z etatami.
     </p>
   );
 }
 
-function FloorRow({ floor }: { floor: number | null }) {
-  if (floor == null) return null;
-  return (
-    <div
-      className="atl-opt-sum-row is-muted"
-      title="Horyzont przy nieograniczonej liczbie ludzi — poniżej schodzi tylko inne pokrojenie pracy, nie etaty"
-    >
-      <span>szybciej się nie da żadną liczbą ludzi</span>
-      <b>{fmt(floor)} mies.</b>
-    </div>
-  );
-}
-
 /** The ladder cut where it stops paying — with one twist: rung 0 earns its
- *  row only by actually moving something. */
+ *  card only by actually moving something. */
 function worthwhileRungs(rungs: LadderRung[], baseScore: PlanScore): LadderRung[] {
   let lastGain = -1;
   rungs.forEach((rung, index) => {
@@ -222,117 +230,100 @@ function compressMoves(moves: CeilingMove[]) {
   return [...byCell.values()];
 }
 
-/** One row: who joins, what it buys, and the button that makes it a variant.
- *  The gain is stated against today's plan, because that is the number a
- *  budget conversation uses; which exact ceilings move lives in the tooltip. */
-function RungRow({
+/** One card: who joins, what it buys in budget-year projects, and the button
+ *  that makes it a variant (or jumps to the one it already made). */
+function OptionCard({
   rung,
-  baseHorizon,
+  referenceWithin,
+  referenceHorizon,
+  within,
+  yearLine,
+  appliedVariantId,
   disabled,
   projectNameOf,
   onApply,
+  onShow,
 }: {
   rung: LadderRung;
-  baseHorizon: number;
+  referenceWithin: number;
+  referenceHorizon: number;
+  within: number | undefined;
+  yearLine: number;
+  appliedVariantId: string | null;
   disabled: boolean;
   projectNameOf: (id: string) => string;
   onApply: () => void;
+  onShow: (variantId: string) => void;
 }) {
-  const hires = CAPABILITY_ORDER.filter((c) => (rung.byCapability[c] ?? 0) > 0).map((c) => {
-    const n = rung.byCapability[c] ?? 0;
-    return n > 1 ? `${CAPABILITY_LABELS[c]}×${n}` : CAPABILITY_LABELS[c];
-  });
+  const roles = rungRoles(rung);
   const raises = compressMoves(rung.ceilingMoves);
-  const raiseTooltip = raises
-    .map(
-      (r) =>
-        `${projectNameOf(r.projectId)} — ${CAPABILITY_LABELS[r.capability]}: ${fmt2(r.from)} → ${fmt2(r.to)}`,
-    )
-    .join("\n");
-  const gain = Number.isFinite(rung.deltaHorizon) ? -rung.deltaHorizon : 0;
-  const pct = baseHorizon > 0 ? Math.round((gain / baseHorizon) * 100) : 0;
+  const recutTitle =
+    raises.length > 0
+      ? `Inne pokrojenie pracy: ${plCount(new Set(raises.map((r) => r.projectId)).size, "projekt zmienia", "projekty zmieniają", "projektów zmienia")} obsadę faz, żeby nowi ludzie mieli co robić od pierwszego miesiąca.\n\n${raises
+          .map(
+            (r) =>
+              `${projectNameOf(r.projectId)} — ${CAPABILITY_LABELS[r.capability]}: ${fmt2(r.from)} → ${fmt2(r.to)}`,
+          )
+          .join("\n")}`
+      : undefined;
+
+  const weeks = Math.round(weeksOf(rung.horizonMonths - referenceHorizon));
   const heals = rung.deltaImpossible < 0;
+  const withinKnown = within !== undefined;
+  const better = withinKnown && within > referenceWithin;
 
   return (
-    <div className="atl-opt-scenario">
-      <span className="atl-opt-hires">{rung.hires}</span>
-      <div className="atl-opt-scenario-main">
-        <div className="atl-opt-scenario-who">
-          {hires.length > 0 ? (
-            hires.map((label) => (
-              <span className="atl-opt-tag" key={label}>
-                {label}
-              </span>
-            ))
-          ) : (
-            <span className="atl-opt-added">nikt nowy — tylko pokrojenie pracy</span>
-          )}
-        </div>
-        <div className="atl-opt-scenario-gain">
-          <span className={gain > 0.05 ? "is-good" : "is-muted"}>
-            {gain > 0.05
-              ? `plan ${fmt(rung.horizonMonths)} mies. — krócej o ${plCount(
-                  Math.round(weeksOf(gain)),
-                  "tydzień",
-                  "tygodnie",
-                  "tygodni",
-                )} (${pct}%)`
-              : `plan ${fmt(rung.horizonMonths)} mies. — bez skrócenia`}
-          </span>
-          {heals && (
-            <span className="atl-opt-badge is-good">
-              ratuje {plCount(-rung.deltaImpossible, "projekt", "projekty", "projektów")}
-            </span>
-          )}
-        </div>
-        <div className="atl-opt-scenario-sub is-muted">
-          zespół {fmt2(sumOf(rung.pools))} FTE
-          {raises.length > 0 && (
-            <span title={raiseTooltip} style={{ cursor: "help" }}>
-              {" "}
-              · praca pokrojona inaczej w{" "}
-              {plCount(raises.length, "miejscu", "miejscach", "miejscach")} ⓘ
-            </span>
-          )}
-        </div>
+    <div className="sv-opt-card">
+      <div className="sv-opt-card-top">
+        <span className="sv-opt-hires">+{rung.hires}</span>
+        <span className="sv-opt-roles">{roles || "nikt nowy — tylko pokrojenie pracy"}</span>
       </div>
-      <button type="button" className="atl-btn" onClick={onApply} disabled={disabled}>
-        Wariant
-      </button>
+      <div className="sv-opt-headline-row">
+        <b className="sv-opt-headline" style={{ color: better ? "var(--win)" : "var(--ink-2)" }}>
+          {withinKnown ? `${within} projektów w ${yearLine} mies.` : `plan ${fmt(rung.horizonMonths)} mies.`}
+        </b>
+        {withinKnown && <span className="sv-opt-base">{signed(within - referenceWithin)}</span>}
+      </div>
+      <span className="sv-opt-secondary" title={recutTitle}>
+        plan {fmt(rung.horizonMonths)} mies. · {signed(weeks)} tyg.
+        {heals && ` · ratuje ${plCount(-rung.deltaImpossible, "projekt", "projekty", "projektów")}`}
+      </span>
+      <div className="sv-opt-actions">
+        {appliedVariantId ? (
+          <>
+            <button
+              type="button"
+              className="sv-opt-apply is-added"
+              onClick={() => onShow(appliedVariantId)}
+            >
+              Dodany — pokaż
+            </button>
+            <span>jest na liście wariantów</span>
+          </>
+        ) : (
+          <button type="button" className="sv-opt-apply" onClick={onApply} disabled={disabled}>
+            Dodaj jako wariant
+          </button>
+        )}
+      </div>
     </div>
   );
 }
 
-/** Per-capability ceilings on team size — advanced, collapsed by default.
- *  Without them the search will happily staff four tech leads, because
- *  nothing in the model knows a team wants one. */
-function AdvancedCaps({
+/** Per-capability ceilings on team size — collapsed by default. Without them
+ *  the search will happily staff four tech leads, because nothing in the
+ *  model knows a team wants one. */
+function CapsSection({
   caps,
-  baselineFte,
+  referenceFte,
   onCapsChange,
 }: {
   caps: CapabilityCaps;
-  baselineFte: CapabilityVector;
+  referenceFte: CapabilityVector;
   onCapsChange: (caps: CapabilityCaps) => void;
 }) {
-  return (
-    <details className="atl-opt-advanced">
-      <summary>Limity zespołu — ilu ludzi danej kompetencji najwyżej zatrudniamy</summary>
-      <p className="atl-opt-caption">zmiana limitu wymaga ponownego policzenia</p>
-      <CapsEditor caps={caps} baselineFte={baselineFte} onCapsChange={onCapsChange} />
-    </details>
-  );
-}
+  const anySet = CAPABILITY_ORDER.some((c) => caps[c] !== undefined);
 
-function CapsEditor({
-  caps,
-  baselineFte,
-  onCapsChange,
-}: {
-  caps: CapabilityCaps;
-  baselineFte: CapabilityVector;
-  onCapsChange: (caps: CapabilityCaps) => void;
-}) {
   const setCap = (capability: Capability, value: number | undefined) => {
     const next = { ...caps };
     if (value === undefined) delete next[capability];
@@ -341,44 +332,48 @@ function CapsEditor({
   };
 
   return (
-    <div className="atl-caps">
-      <div className="atl-caps-head">
-        <span>kompetencja</span>
-        <span>dziś</span>
-        <span>maks. w zespole</span>
+    <details className="sv-caps">
+      <summary>limity kompetencji</summary>
+      <div className="sv-caps-body">
+        <span className="sv-opt-p is-dim">
+          Ilu ludzi danej kompetencji najwyżej zatrudniamy — klik zmienia limit, zmiana wymaga
+          ponownego policzenia.
+        </span>
+        <div className="sv-caps-rows">
+          {CAPABILITY_ORDER.map((capability) => {
+            const limit = caps[capability];
+            return (
+              <div className="sv-caps-row" key={capability}>
+                <span
+                  className="sv-caps-dot"
+                  style={{ background: solid(CAPABILITY_HUES[capability]) }}
+                />
+                <span className="sv-caps-name">{CAPABILITY_FULL[capability]}</span>
+                <span className="sv-caps-now" title="w wariancie bazowym">
+                  teraz {fmt(referenceFte[capability] ?? 0)}
+                </span>
+                <div className="sv-steps">
+                  {[undefined, 1, 2, 3, 4, 5, 6, 7].map((v, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      className={(v === undefined ? limit === undefined : limit === v) ? "is-active" : ""}
+                      title={v === undefined ? "bez limitu" : `najwyżej ${v}`}
+                      onClick={() => setCap(capability, v)}
+                    >
+                      {v === undefined ? "∞" : v}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <span className="sv-caps-note">
+          {anySet ? "limity zmienione — policz scenariusze ponownie" : "bez limitu = ile trzeba"}
+        </span>
       </div>
-      {CAPABILITY_ORDER.map((capability) => {
-        const pool = baselineFte[capability] ?? 0;
-        const cap = caps[capability];
-        return (
-          <div className="atl-caps-row" key={capability}>
-            <span className="atl-caps-name">{CAPABILITY_LABELS[capability]}</span>
-            <span className="atl-caps-pool">{fmt2(pool)}</span>
-            <span className="atl-caps-input">
-              <button
-                type="button"
-                className={`atl-caps-opt ${cap === undefined ? "is-on" : ""}`}
-                onClick={() => setCap(capability, undefined)}
-                title="bez limitu"
-              >
-                ∞
-              </button>
-              {[1, 2, 3, 4, 5].map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  className={`atl-caps-opt ${cap === n ? "is-on" : ""}`}
-                  onClick={() => setCap(capability, n)}
-                  title={`najwyżej ${n} FTE ${CAPABILITY_LABELS[capability]} w zespole`}
-                >
-                  {n}
-                </button>
-              ))}
-            </span>
-          </div>
-        );
-      })}
-    </div>
+    </details>
   );
 }
 
@@ -387,23 +382,18 @@ function BlockedReport({ blocked, caps }: { blocked: BlockedHire[]; caps: Capabi
   const idle = blocked.filter((b) => b.reason === "no-demand");
   if (capped.length === 0 && idle.length === 0) return null;
   return (
-    <div className="atl-opt-section">
-      <span className="atl-eyebrow">pominięte kompetencje</span>
-      {capped.map((b) => (
-        <div className="atl-opt-blocked" key={b.capability}>
-          <b>{CAPABILITY_LABELS[b.capability]}</b>
-          <span>
-            limit {fmt(caps[b.capability] ?? b.cap ?? 0)} FTE osiągnięty (dziś {fmt2(b.pool ?? 0)})
-          </span>
-        </div>
-      ))}
-      {idle.length > 0 && (
-        <div className="atl-opt-blocked">
-          <b>{idle.map((b) => CAPABILITY_LABELS[b.capability]).join(" · ")}</b>
-          <span>portfel nie ma dla nich pracy</span>
-        </div>
-      )}
-    </div>
+    <p className="sv-opt-p is-dim">
+      Pominięte:{" "}
+      {[
+        ...capped.map(
+          (b) =>
+            `${CAPABILITY_FULL[b.capability]} (limit ${fmt(caps[b.capability] ?? b.cap ?? 0)} osiągnięty, dziś ${fmt2(b.pool ?? 0)})`,
+        ),
+        ...(idle.length > 0
+          ? [`${idle.map((b) => CAPABILITY_FULL[b.capability]).join(", ")} — portfel nie ma dla nich pracy`]
+          : []),
+      ].join(" · ")}
+    </p>
   );
 }
 
@@ -418,8 +408,4 @@ function worthTaking(previous: PlanScore, next: PlanScore): boolean {
   const horizon = previous.horizonMonths - next.horizonMonths;
   if (horizon >= MIN_GAIN_MONTHS) return true;
   return previous.sumEndMonths - next.sumEndMonths >= MIN_GAIN_MONTHS;
-}
-
-function sumOf(vector: CapabilityVector): number {
-  return CAPABILITY_ORDER.reduce((sum, capability) => sum + (vector[capability] ?? 0), 0);
 }
