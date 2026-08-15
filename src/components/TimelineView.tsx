@@ -236,6 +236,28 @@ export function TimelineView({
     [roster.fte],
   );
 
+  // Hiring's hard floor: the horizon with unlimited people. Whatever it is,
+  // no headcount goes below it — past that point only ceilings and ordering
+  // move the plan. One simulation, computed only while the drawer is open;
+  // it is what makes "+4 buys 3.8 months" readable as "half of everything
+  // hiring can ever buy" instead of "barely a quarter of the plan".
+  const hiringFloorMonths = useMemo(() => {
+    if (!optimizerOpen || plannedProjects.length === 0) return null;
+    const unlimited = { ...roster.fte };
+    for (const c of CAPABILITY_ORDER) unlimited[c] = 100;
+    const s = simulateCapabilitySchedule({
+      projects: plannedProjects,
+      cells: rosterCells,
+      pools: unlimited,
+      effectiveDaysPerMonth: edpm,
+      minStaffingFraction: settings.minStaffingFraction,
+      minCrewFte: settings.minCrewFte,
+      earliestStart,
+      leaveFteByMonth: leaveDips,
+    });
+    return s.scheduled.some((p) => p.isImpossible) ? null : s.horizonMonths;
+  }, [optimizerOpen, plannedProjects, rosterCells, roster.fte, edpm, settings.minStaffingFraction, settings.minCrewFte, earliestStart, leaveDips]);
+
   const applyProposal = useCallback(
     (vector: CapabilityVector, scenario: HiringScenario) => {
       const id = newId("variant");
@@ -742,6 +764,7 @@ export function TimelineView({
           ladder={ladder}
           baselineLabel={roster.label}
           baselineFte={roster.fte}
+          hiringFloorMonths={hiringFloorMonths}
           insets={{ top: D.hdr, bottom: D.foot }}
           caps={caps}
           onCapsChange={setCaps}

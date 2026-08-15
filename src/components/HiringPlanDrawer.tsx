@@ -20,6 +20,9 @@ interface HiringPlanDrawerProps {
   ladder: HiringLadderApi;
   baselineLabel: string;
   baselineFte: CapabilityVector;
+  /** Horizon with unlimited people — hiring's hard floor. Null when it
+   *  cannot be computed (empty plan, or something stays impossible). */
+  hiringFloorMonths: number | null;
   /** Header/footer heights vary with the density control, unlike cm2's fixed
    *  chrome — so the drawer takes its vertical bounds from the screen. */
   insets: { top: number; bottom: number };
@@ -45,6 +48,7 @@ export function HiringPlanDrawer({
   ladder,
   baselineLabel,
   baselineFte,
+  hiringFloorMonths,
   insets,
   caps,
   onCapsChange,
@@ -127,6 +131,8 @@ export function HiringPlanDrawer({
             wyniku to policzony harmonogram, więc widać, na której osobie zysk przestaje rosnąć.
           </p>
 
+          <FloorNote floor={hiringFloorMonths} />
+
           <CapsEditor caps={caps} baselineFte={baselineFte} onCapsChange={onCapsChange} />
 
           <p className="is-muted">
@@ -178,6 +184,7 @@ export function HiringPlanDrawer({
                   <b>{result.base.score.impossible}</b>
                 </div>
               )}
+              <FloorRow floor={hiringFloorMonths} />
             </div>
 
             {result.scenarios.length === 0 ? (
@@ -247,6 +254,8 @@ export function HiringPlanDrawer({
             wariancie — macierz w Wycenach zostaje nietknięta.
           </p>
 
+          <FloorNote floor={hiringFloorMonths} />
+
           <CapsEditor caps={caps} baselineFte={baselineFte} onCapsChange={onCapsChange} />
 
           <p className="is-muted">
@@ -294,6 +303,7 @@ export function HiringPlanDrawer({
                   <b>{ladder.result.base.score.impossible}</b>
                 </div>
               )}
+              <FloorRow floor={hiringFloorMonths} />
             </div>
 
             <div className="atl-opt-section">
@@ -336,6 +346,33 @@ export function HiringPlanDrawer({
         </>
       )}
     </aside>
+  );
+}
+
+/** Hiring's hard floor, spelled out before the search runs: the horizon with
+ *  unlimited people. It reframes every row — a gain is a share of what
+ *  hiring can ever buy, not of the whole plan. */
+function FloorNote({ floor }: { floor: number | null }) {
+  if (floor == null) return null;
+  return (
+    <p className="is-muted">
+      Granica samego zatrudniania: <b>{fmt(floor)} mies.</b> — tyle trwałby plan przy
+      nieograniczonej liczbie ludzi. Tej granicy nie przebije żaden budżet — wyznaczają ją sufity
+      obłożenia i kolejność pracy, nie etaty.
+    </p>
+  );
+}
+
+function FloorRow({ floor }: { floor: number | null }) {
+  if (floor == null) return null;
+  return (
+    <div
+      className="atl-opt-sum-row is-muted"
+      title="Horyzont przy nieograniczonej liczbie ludzi — poniżej schodzi tylko inne pokrojenie pracy, nie etaty"
+    >
+      <span>granica samego zatrudniania</span>
+      <b>{fmt(floor)} mies.</b>
+    </div>
   );
 }
 
