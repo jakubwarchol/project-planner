@@ -29,8 +29,15 @@
  * a real simulated plan, never an extrapolation.
  */
 import { CAPABILITY_ORDER, totalCapabilityEffortDays } from "./estimation";
-import { simulateCapabilitySchedule, type CapabilitySchedule, type SimulateInput } from "./scheduling";
+import { compareScores, scoreOf, type PlanScore } from "./planRules";
+import { simulateCapabilitySchedule, type SimulateInput } from "./scheduling";
 import type { Capability, CapabilityVector } from "../types";
+
+// The score and comparator live in the shared rulebook so this planner, the
+// ceiling autopilot and the hire-plus-ceilings mode can never disagree about
+// what "a better plan" means. Re-exported because this module is where the
+// UI historically imports them from.
+export { compareScores, scoreOf, type PlanScore } from "./planRules";
 
 const EPS = 1e-6;
 
@@ -58,32 +65,12 @@ export type CapabilityCaps = Partial<Record<Capability, number>>;
 
 export type HiringPlanInput = Omit<SimulateInput, "pools"> & {
   /** Per project, `monthsFrom(nowMonth, deadlineDate)` — the lib stays
-   *  date-free, exactly as `earliestStart` already does. */
+   *  date-free, exactly as `earliestStart` already does. Deadlines are soft:
+   *  the planner counts misses for display and never ranks on them. */
   deadlineMonths: Record<string, number>;
   caps?: CapabilityCaps;
   maxHires?: number;
 };
-
-/** Lexicographic, compared field by field in declaration order.
- *
- *  `impossible` leads because a project that never finishes has
- *  `endMonths = Infinity`: summing it would poison `sumEndMonths`, and calling
- *  it "missed" is wrong for a project that has no deadline to miss. Healing one
- *  is the biggest win a hire can produce, so it outranks any number of months.
- *
- *  `horizonMonths` sits above `sumEndMonths` because the question this screen
- *  answers is "when is all of this done". Ranking on the sum alone rewards
- *  finishing many projects a little sooner even when that pushes the *last*
- *  one later — which showed up as hiring two people and watching the plan get
- *  longer than with one. The sum stays as the tie-break, so among teams that
- *  finish together the one that delivers earlier on average still wins. */
-export interface PlanScore {
-  impossible: number;
-  missedDeadlines: number;
-  /** When the last project finishes; 0 when nothing is schedulable. */
-  horizonMonths: number;
-  sumEndMonths: number;
-}
 
 export interface HiringScenario {
   /** How many people this scenario hires — 1…maxHires. */
@@ -122,41 +109,6 @@ export interface HiringPlanResult {
   scenarios: HiringScenario[];
   blocked: BlockedHire[];
   simulations: number;
-}
-
-export function scoreOf(
-  schedule: CapabilitySchedule,
-  deadlineMonths: Record<string, number>,
-): PlanScore {
-  let impossible = 0;
-  let missedDeadlines = 0;
-  let sumEndMonths = 0;
-  let horizonMonths = 0;
-  for (const sp of schedule.scheduled) {
-    if (sp.isImpossible || !Number.isFinite(sp.endMonths)) {
-      impossible += 1;
-      continue;
-    }
-    sumEndMonths += sp.endMonths;
-    // Over the finite ends only: an impossible project is already counted in
-    // its own tier, and letting Infinity in here would flatten every horizon
-    // comparison into a tie.
-    if (sp.endMonths > horizonMonths) horizonMonths = sp.endMonths;
-    const deadline = deadlineMonths[sp.project.id];
-    if (deadline !== undefined && sp.endMonths > deadline + EPS) missedDeadlines += 1;
-  }
-  return { impossible, missedDeadlines, horizonMonths, sumEndMonths };
-}
-
-/** < 0 when `a` is the better plan. Integer tiers compare exactly; months
- *  differences inside EPS are a tie. */
-export function compareScores(a: PlanScore, b: PlanScore): number {
-  if (a.impossible !== b.impossible) return a.impossible - b.impossible;
-  if (a.missedDeadlines !== b.missedDeadlines) return a.missedDeadlines - b.missedDeadlines;
-  const h = a.horizonMonths - b.horizonMonths;
-  if (Math.abs(h) > EPS) return h;
-  const d = a.sumEndMonths - b.sumEndMonths;
-  return Math.abs(d) <= EPS ? 0 : d;
 }
 
 /** Base pools plus a scenario's hires. Never rounds — the caller owns the

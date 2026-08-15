@@ -209,12 +209,12 @@ describe("hiringPlanner", () => {
     expect(result.scenarios[0].deltaImpossible).toBe(-1);
   });
 
-  it("puts a missed deadline above the sum of end dates", () => {
+  it("counts missed deadlines but never lets them steer a hire", () => {
     const projects = [project("a"), project("b")];
     const cells = cellsFor({
-      // b is small and due soon; a is big and unconstrained. Both stay
-      // *possible* on the current team — a is 47.6 months and b is 4.8 — so
-      // the choice is decided by the deadline tier and not by healing.
+      // b is small and due soon; a is big and unconstrained. A second tester
+      // would rescue b's deadline, but deadlines are soft markers — the plan's
+      // length decides, so the hire goes where the months are.
       a: { BE: { days: 600, maxFte: 2 } },
       b: { QA: { days: 60, maxFte: 2 } },
     });
@@ -222,17 +222,16 @@ describe("hiringPlanner", () => {
       pools({ BE: 1, QA: 1 }),
       input(projects, cells, { maxHires: 1 }),
     );
-    // Three months is reachable for b with a second tester (60 days over two
-    // people is ~2.4 months) and out of reach with one (~4.8) — so the deadline
-    // tier, not the month count, is what decides this hire.
     const withDeadline = runPlan(
       pools({ BE: 1, QA: 1 }),
       input(projects, cells, { maxHires: 1, deadlineMonths: { b: 3 } }),
     );
 
-    expect(hiresIn(withoutDeadline, 1)).toEqual({ BE: 1 });
-    expect(hiresIn(withDeadline, 1)).toEqual({ QA: 1 });
-    expect(withDeadline.scenarios[0].deltaMissed).toBe(-1);
+    // The marker changes what is reported, never what is chosen.
+    expect(hiresIn(withDeadline, 1)).toEqual(hiresIn(withoutDeadline, 1));
+    expect(hiresIn(withDeadline, 1)).toEqual({ BE: 1 });
+    expect(withDeadline.base.score.missedDeadlines).toBe(1);
+    expect(withoutDeadline.base.score.missedDeadlines).toBe(0);
   });
 
   it("does not mutate the pools it was given", () => {

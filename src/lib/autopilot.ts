@@ -18,14 +18,18 @@
  * question is worth asking. The human answers it.
  */
 import { CAPABILITY_ORDER } from "./estimation";
+import {
+  CEILING_STEP,
+  ceilingRaiseBlock,
+  compareScores,
+  scoreOf,
+  type CeilingRaiseBlock,
+  type PlanScore,
+} from "./planRules";
 import { simulateCapabilitySchedule, type SimulateInput } from "./scheduling";
 import type { Capability, CapabilityCell } from "../types";
 
 const EPS = 1e-6;
-
-/** Half a person. Smaller steps just find the same cells more slowly, and a
- *  ceiling is a judgement about headcount — tenths would be false precision. */
-const CEILING_STEP = 0.5;
 
 /** A runaway search is worse than a short one: every extra move is another
  *  claim a human has to check, and the interesting ones are always first. */
@@ -47,7 +51,7 @@ export interface CeilingMove {
   pool: number;
 }
 
-export type BlockedReason = "pool" | "no-effect" | "worse" | "impossible";
+export type BlockedReason = CeilingRaiseBlock | "no-effect" | "worse" | "impossible";
 
 export interface BlockedCandidate {
   projectId: string;
@@ -199,17 +203,16 @@ export function stepSearch(state: SearchState): boolean {
   const moves = state.moves;
 
   {
-    const here = horizonOf(schedule);
+    const hereScore = scoreOf(schedule);
     const rejected: BlockedCandidate[] = [];
-    // Two tiers, taken in order. A move that shortens the whole plan always
-    // wins; failing that, one that finishes its own project sooner at no cost
-    // to the horizon is still worth having — it frees capacity earlier and
-    // takes something off the board. Without the second tier the search stalls
-    // the moment two projects are tied for last, which on a real backlog is
-    // most of the time: no *single* move shortens the plan, so a
-    // horizon-only rule declares victory with months still on the table.
-    let best: { move: CeilingMove; cells: Cells } | null = null;
-    let consolation: { move: CeilingMove; cells: Cells } | null = null;
+    // "Better" is the shared rulebook's compareScores, and its tiers carry the
+    // whole selection: a move that shortens the horizon wins outright, and one
+    // that only finishes some project sooner (a lower sum of ends at the same
+    // horizon) is still an improvement worth taking — it frees capacity
+    // earlier and takes something off the board. Without that second tier the
+    // search would stall the moment two projects are tied for last, which on
+    // a real backlog is most of the time.
+    let best: { move: CeilingMove; cells: Cells; score: PlanScore } | null = null;
 
     for (const candidate of paceSetters(schedule)) {
       const cell = current[candidate.projectId]?.[candidate.capability];
@@ -219,26 +222,29 @@ export function stepSearch(state: SearchState): boolean {
       const from = cell.maxFte;
       const to = from + CEILING_STEP;
 
-      // Never past the pool. Beyond it the phase's own minimum crew exceeds
-      // what exists, the project is judged `min-above-pool`, and it drops out
-      // of the plan entirely — a cliff, not a trade-off.
-      if (to > Math.max(1, pool) + EPS) {
-        rejected.push({ ...candidate, from, to, reason: "pool", pool });
+      const block = ceilingRaiseBlock(candidate.capability, from, pool);
+      if (block) {
+        rejected.push({ ...candidate, from, to, reason: block, pool });
         continue;
       }
 
       const trial = cloneCells(current);
       trial[candidate.projectId][candidate.capability].maxFte = to;
       const trialSchedule = simulate(trial);
-      const horizonAfter = horizonOf(trialSchedule);
-      const deltaHorizon = horizonAfter - here;
+      const trialScore = scoreOf(trialSchedule);
+      const deltaHorizon = trialScore.horizonMonths - hereScore.horizonMonths;
 
-      if (!Number.isFinite(horizonAfter)) {
+      if (trialScore.impossible > hereScore.impossible) {
         rejected.push({ ...candidate, from, to, reason: "impossible", pool });
         continue;
       }
-      if (deltaHorizon > EPS) {
+      const cmp = compareScores(trialScore, hereScore);
+      if (cmp > 0) {
         rejected.push({ ...candidate, from, to, reason: "worse", deltaHorizon, pool });
+        continue;
+      }
+      if (cmp === 0) {
+        rejected.push({ ...candidate, from, to, reason: "no-effect", deltaHorizon, pool });
         continue;
       }
 
@@ -248,24 +254,18 @@ export function stepSearch(state: SearchState): boolean {
         ...candidate,
         from,
         to,
-        horizonAfter,
+        horizonAfter: trialScore.horizonMonths,
         deltaHorizon,
         deltaProject,
         pool,
       };
 
-      if (deltaHorizon < -EPS) {
-        if (!best || horizonAfter < best.move.horizonAfter) best = { move, cells: trial };
-      } else if (deltaProject < -EPS) {
-        if (!consolation || deltaProject < consolation.move.deltaProject) {
-          consolation = { move, cells: trial };
-        }
-      } else {
-        rejected.push({ ...candidate, from, to, reason: "no-effect", deltaHorizon, pool });
+      if (!best || compareScores(trialScore, best.score) < 0) {
+        best = { move, cells: trial, score: trialScore };
       }
     }
 
-    const chosen = best ?? consolation;
+    const chosen = best;
     if (!chosen) {
       state.blocked = rejected;
       state.done = true;
@@ -278,10 +278,13 @@ export function stepSearch(state: SearchState): boolean {
     state.schedule = schedule;
 
     if (moves.length >= MAX_MOVES) {
-      // Out of budget, not out of ideas. Only the pool blocks are carried
-      // through — they are the ones that stay true however long you search.
+      // Out of budget, not out of ideas. Only the blocks that stay true
+      // however long you search are carried through — the rulebook's, and
+      // the pool's.
       state.truncated = true;
-      state.blocked = rejected.filter((r) => r.reason === "pool");
+      state.blocked = rejected.filter(
+        (r) => r.reason === "pool" || r.reason === "forbidden" || r.reason === "max-ceiling",
+      );
       state.done = true;
       return true;
     }

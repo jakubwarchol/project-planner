@@ -76,6 +76,16 @@ Te 2,6 miesiąca różnicy między 8,9 a 6,3 to cała racja bytu tego trybu.
   zmian przy wariancie, bez osobnego oznaczania „zmiana estymaty". Wyjątkiem są
   UX, TL i SEC — tam jedynka opisuje projekt, dlatego stoją na liście
   zakazanych.
+- **Terminy są miękkie.** To znaczniki na osi czasu do ręcznej korekty, nie cel
+  optymalizacji. Liczbę przekroczonych terminów pokazujemy, ale żadne narzędzie
+  na niej nie rankuje.
+- **Wspólny zbiór reguł: `src/lib/planRules.ts`.** Definicja „lepszego planu"
+  (`PlanScore`, `compareScores`: niewykonalne → horyzont → suma końców) i
+  reguły podnoszenia sufitów (lista zakazana UX/TL/SEC, granica 3,0, krok 0,5,
+  strażnik puli) żyją w jednym module. Planer zatrudnienia i autopilot w
+  Wycenach już z niego korzystają — autopilot przez to sam odmawia podnoszenia
+  UX/TL/SEC i nie wychodzi ponad 3,0 — a tryb 2 dostaje te same reguły za
+  darmo. To zamyka rozjazd celów między narzędziami z krytyki projektu.
 - Stan macierzy to potwierdza: wszystkie 13 komórek UX i 26 komórek TL stoi dziś
   dokładnie na 1,0. Powyżej jedynki wychodzą tylko BE (do 2,5) i FE (do 1,5).
 - **Podniesione sufity zapisują się w wariancie** i są widoczne na ekranie —
@@ -110,10 +120,10 @@ WTR·BE 2→2,5 → 6,3 mies."*.
 
 Kandydaci na podniesienie:
 
-- tylko kompetencje spoza listy zakazanych (dziś: nie UX, nie TL, nie SEC),
+- tylko to, co przepuści `ceilingRaiseBlock` z `planRules.ts` (lista zakazana,
+  granica 3,0, strażnik puli),
 - tylko komórki, które faktycznie wyznaczają tempo fazy — podniesienie sufitu z
   zapasem nie zmienia niczego i autopilot już to wie,
-- do granicy 3,0 na projekt × kompetencję,
 - podniesienie, które czyni projekt niewykonalnym, odpada samo — poziom
   `impossible` w `PlanScore` jest nadrzędny.
 

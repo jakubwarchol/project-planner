@@ -7,6 +7,7 @@ import { useCeilingProposal, type CeilingProposalApi } from "../hooks/useCeiling
 import { useProjectCrud } from "../hooks/useProjectCrud";
 import { useRoster } from "../hooks/useRoster";
 import type { AutopilotInput, BlockedCandidate, CeilingMove } from "../lib/autopilot";
+import { MAX_PROJECT_CEILING } from "../lib/planRules";
 import { leaveFteByMonth } from "../lib/leaves";
 import {
   CAPABILITY_LABELS,
@@ -1332,6 +1333,32 @@ function BlockedRows({
       cap: capability,
       reason: `pula ${fmt2(items[0].pool)} FTE — ${plCount(items.length, "projekt czeka", "projekty czekają", "projektów czeka")}, nie ma kogo dołożyć`,
       title: items.map((i) => nameOf(i.projectId)).join("\n"),
+    });
+  }
+
+  const forbidden = blocked.filter((b) => b.reason === "forbidden");
+  const forbiddenByCapability = new Map<string, BlockedCandidate[]>();
+  for (const b of forbidden) {
+    const list = forbiddenByCapability.get(b.capability);
+    if (list) list.push(b);
+    else forbiddenByCapability.set(b.capability, [b]);
+  }
+  for (const [capability, items] of forbiddenByCapability) {
+    rows.push({
+      key: `forbidden-${capability}`,
+      cap: capability,
+      reason: "najwyżej 1 osoba na projekt — zasada zespołu, sufitu nie podnosimy",
+      title: items.map((i) => nameOf(i.projectId)).join("\n"),
+    });
+  }
+
+  const atLimit = blocked.filter((b) => b.reason === "max-ceiling");
+  if (atLimit.length > 0) {
+    rows.push({
+      key: "max-ceiling",
+      cap: [...new Set(atLimit.map((b) => b.capability))].join(", "),
+      reason: `sufit już na granicy ${fmt2(MAX_PROJECT_CEILING)} os. na projekt — więcej naraz nie ma sensu`,
+      title: [...new Set(atLimit.map((b) => nameOf(b.projectId)))].join("\n"),
     });
   }
 

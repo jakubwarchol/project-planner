@@ -117,16 +117,45 @@ describe("the ceiling search", () => {
     expect(result.moves.every((m) => m.capability !== "QA")).toBe(true);
   });
 
-  it("stops once the pace has moved to a capability with no room left", () => {
-    // BE can grow; UX cannot. Raising BE eventually hands the pace to UX, and
-    // there the search has to stop rather than keep spending moves.
+  it("stops once the pace has moved to a capability that may not grow", () => {
+    // BE can grow; UX may never — one designer per project is a fact about
+    // the work. Raising BE eventually hands the pace to UX, and there the
+    // search has to stop rather than keep spending moves.
     const cells = cellsFor({
       p1: { BE: { days: 120, maxFte: 1 }, UX: { days: 60, maxFte: 1 } },
     });
     const result = runSearch(cells, input([project("p1")], { BE: 4, UX: 1 }));
 
     expect(result.moves.every((m) => m.capability === "BE")).toBe(true);
-    expect(result.blocked.some((b) => b.capability === "UX" && b.reason === "pool")).toBe(true);
+    expect(result.blocked.some((b) => b.capability === "UX" && b.reason === "forbidden")).toBe(true);
+  });
+
+  it("never raises UX, TL or SEC, however much pool stands behind them", () => {
+    const cells = cellsFor({
+      p1: { UX: { days: 120, maxFte: 1 } },
+      p2: { TL: { days: 120, maxFte: 1 } },
+      p3: { SEC: { days: 120, maxFte: 1 } },
+    });
+    const result = runSearch(
+      cells,
+      input([project("p1"), project("p2"), project("p3")], { UX: 4, TL: 4, SEC: 4 }),
+    );
+
+    expect(result.moves).toEqual([]);
+    for (const capability of ["UX", "TL", "SEC"] as const) {
+      expect(result.blocked.some((b) => b.capability === capability && b.reason === "forbidden")).toBe(
+        true,
+      );
+    }
+  });
+
+  it("stops at the per-project ceiling of 3, even with pool to spare", () => {
+    const cells = cellsFor({ p1: { BE: { days: 600, maxFte: 1 } } });
+    const result = runSearch(cells, input([project("p1")], { BE: 9 }));
+
+    expect(result.moves.length).toBeGreaterThan(0);
+    expect(Math.max(...result.moves.map((m) => m.to))).toBe(3);
+    expect(result.blocked.some((b) => b.capability === "BE" && b.reason === "max-ceiling")).toBe(true);
   });
 
   it("reports a move that would make the plan worse instead of hiding it", () => {
