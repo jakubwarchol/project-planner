@@ -12,7 +12,7 @@ import { useMemo, useState } from "react";
 import { CATEGORY_ORDER } from "../../lib/estimation";
 import { buildProjectStaffingRows, type ProjectStaffingRow } from "../../lib/staffing";
 import type { Project } from "../../types";
-import { CAPABILITY_HUES, fmt2, plCount, solid } from "../timelineChrome";
+import { CAPABILITY_HUES, fmt2, groupArrowNav, plCount, solid } from "../timelineChrome";
 import { AxisBackdrop, AxisHeader, ObsadaToolbar } from "./ObsadaGrid";
 import { AXIS_H, useTimelineScroll } from "./timelineScroll";
 import { buildObsadaAxis, focusLabel, shortDay, stepTo } from "./axis";
@@ -101,11 +101,25 @@ export function ProjectStaffingView({ ctx, projects }: ProjectStaffingViewProps)
           </span>
         }
       >
-        <div className="atl-seg">
-          <button type="button" className={gapsOnly ? undefined : "is-active"} onClick={() => setGapsOnly(false)}>
+        <div className="atl-seg" role="tablist" aria-label="Filtr projektów" onKeyDown={groupArrowNav}>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={!gapsOnly}
+            tabIndex={gapsOnly ? -1 : 0}
+            className={gapsOnly ? undefined : "is-active"}
+            onClick={() => setGapsOnly(false)}
+          >
             Wszystkie
           </button>
-          <button type="button" className={gapsOnly ? "is-active" : undefined} onClick={() => setGapsOnly(true)}>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={gapsOnly}
+            tabIndex={gapsOnly ? 0 : -1}
+            className={gapsOnly ? "is-active" : undefined}
+            onClick={() => setGapsOnly(true)}
+          >
             Z lukami
           </button>
         </div>
@@ -144,6 +158,11 @@ export function ProjectStaffingView({ ctx, projects }: ProjectStaffingViewProps)
                             row.anyGap
                               ? `brakuje ${fmt2(row.gapRuns.reduce((m, r) => Math.max(m, r.gap), 0))} FTE — otwórz obsadzanie`
                               : "obsadzone"
+                          }
+                          aria-label={
+                            row.anyGap
+                              ? `Otwórz obsadzanie — ${project.name} ma lukę`
+                              : `${project.name} — obsadzone`
                           }
                           onClick={() => openWorstGap(project.id)}
                         >

@@ -51,6 +51,78 @@
   --shadow: rgba(13, 18, 22, 0.14) 0 10px 24px -6px, rgba(13, 18, 22, 0.1) 0 4px 8px -4px;
   --atl-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
   --atl-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  /* Control tokens — the one geometry every control draws from. Same values
+     in both themes, so no dark override. */
+  --ctl-h: 26px;
+  --ctl-r: 3px;
+  --ctl-px: 11px;
+  --field-r: 3px;
+  --focus-ring: 2px solid var(--accent-line);
+  /* The scrim behind a label riding a coloured bar. */
+  --bar-scrim: rgba(12, 16, 20, 0.5);
+}
+
+/* One focus ring for everything keyboard-reachable; never removed without a
+   replacement. Controls sitting flush in tight rows or clipped containers pull
+   the ring inward with a negative offset instead of opting out. */
+.atl :focus-visible,
+.bv :focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.atl-seg button:focus-visible,
+.obs-tabs button:focus-visible,
+.rail-tab:focus-visible,
+.rail-icon:focus-visible {
+  outline-offset: -2px;
+}
+
+/* NumberField variants — numbers are mono and right-aligned in both. The grid
+   cell stays borderless until hover; the form field carries its border. Call
+   sites add their own class only for width and font-size. */
+.nf-grid,
+.nf-form {
+  color: var(--ink);
+  /* .cm2 spells its mono stack --mono; the shells spell it --atl-mono. */
+  font-family: var(--atl-mono, var(--mono));
+  text-align: right;
+}
+
+.nf-grid {
+  border: 1px solid transparent;
+  border-radius: var(--field-r);
+  background: transparent;
+}
+
+.nf-grid:hover {
+  border-color: var(--line);
+}
+
+.nf-grid:focus {
+  border-color: var(--accent-line);
+  background: var(--surface-2);
+}
+
+.nf-grid:focus-visible {
+  outline-offset: -1px;
+}
+
+.nf-form {
+  border: 1px solid var(--line);
+  border-radius: var(--field-r);
+  background: var(--surface-2);
+}
+
+.nf-form:focus {
+  border-color: var(--accent-line);
+  background: var(--surface);
+}
+
+.nf-grid[aria-invalid="true"],
+.nf-form[aria-invalid="true"] {
+  border-color: var(--warn);
+  background: var(--warn-wash);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -90,6 +162,11 @@
     --idle-wash: rgba(154, 168, 181, 0.1);
     --row-hover: #222b33;
     --name-hover: #27313a;
+    --win: #7fc79b;
+    --win-line: #3f6b53;
+    --win-edge: oklch(62% 0.09 158);
+    --ghost: #3a444d;
+    --ghost-soft: #232b32;
     --shadow: rgba(0, 0, 0, 0.55) 0 10px 24px -6px, rgba(0, 0, 0, 0.4) 0 4px 8px -4px;
   }
 }
@@ -228,7 +305,7 @@
 
 .atl-seg button {
   border: 0;
-  height: 26px;
+  height: var(--ctl-h);
   background: transparent;
   color: var(--ink-2);
   cursor: pointer;
@@ -240,7 +317,7 @@
 
 .atl-seg button.is-active {
   background: var(--accent);
-  color: var(--surface);
+  color: var(--on-bar);
 }
 
 .atl-seg .atl-seg-text {
@@ -269,9 +346,9 @@
   border: 1px solid var(--line-strong);
   background: transparent;
   color: var(--ink-2);
-  height: 26px;
-  padding: 0 11px;
-  border-radius: 3px;
+  height: var(--ctl-h);
+  padding: 0 var(--ctl-px);
+  border-radius: var(--ctl-r);
   font-size: 11.5px;
   cursor: pointer;
   white-space: nowrap;
@@ -907,7 +984,7 @@
 }
 
 .atl-fte-slot:focus-visible {
-  outline: 2px solid var(--accent-line);
+  outline: var(--focus-ring);
   outline-offset: -2px;
 }
 
@@ -1839,13 +1916,12 @@
   color: var(--ink);
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: var(--field-r);
   padding: 5px 7px;
 }
 
 .bv-input:focus,
 .bv-select:focus {
-  outline: none;
   border-color: var(--accent);
 }
 
@@ -1853,20 +1929,23 @@
 .bv-cancel {
   font: inherit;
   font-size: 11.5px;
-  border-radius: 4px;
-  padding: 5px 10px;
+  height: var(--ctl-h);
+  border-radius: var(--ctl-r);
+  padding: 0 var(--ctl-px);
   cursor: pointer;
 }
 
 .bv-save {
-  color: #fff;
+  color: var(--on-bar);
   background: var(--accent);
   border: 1px solid var(--accent);
 }
 
 .bv-save:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
+  border-color: var(--line);
+  background: transparent;
+  color: var(--ink-4);
+  cursor: default;
 }
 
 .bv-cancel {
@@ -1887,7 +1966,7 @@
   color: var(--ink-2);
   background: transparent;
   border: 1px dashed var(--line);
-  border-radius: 6px;
+  border-radius: var(--ctl-r);
   padding: 7px 10px;
   cursor: pointer;
   text-align: left;
@@ -2096,7 +2175,7 @@
   color: var(--ink);
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: var(--ctl-r);
   padding: 6px 8px;
   cursor: pointer;
 }
@@ -2128,7 +2207,7 @@
   color: var(--ink-2);
   background: transparent;
   border: 1px dashed var(--line);
-  border-radius: 6px;
+  border-radius: var(--ctl-r);
   padding: 6px 8px;
   cursor: pointer;
 }
@@ -2164,13 +2243,12 @@
   color: var(--ink);
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--field-r);
   padding: 6px 8px;
 }
 
 .ve-text:focus,
 .ve-number:focus {
-  outline: none;
   border-color: var(--accent);
 }
 
@@ -2194,7 +2272,7 @@
   color: var(--ink-2);
   background: transparent;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--ctl-r);
   padding: 3px 8px;
   cursor: pointer;
 }
@@ -2235,8 +2313,9 @@
 .ve-done {
   font: inherit;
   font-size: 13px;
-  border-radius: 6px;
-  padding: 6px 12px;
+  height: var(--ctl-h);
+  border-radius: var(--ctl-r);
+  padding: 0 var(--ctl-px);
   cursor: pointer;
 }
 
@@ -2252,18 +2331,19 @@
 }
 
 .ve-delete.is-confirming {
-  color: #fff;
+  color: var(--on-bar);
   background: var(--warn);
   border-color: var(--warn);
 }
 
 .ve-delete:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
+  border-color: var(--line);
+  color: var(--ink-4);
+  cursor: default;
 }
 
 .ve-done {
-  color: #fff;
+  color: var(--on-bar);
   background: var(--accent);
   border: 1px solid var(--accent);
 }
@@ -2329,6 +2409,13 @@
 
 .sync-banner-close:hover {
   background: light-dark(rgba(0, 0, 0, 0.07), rgba(255, 255, 255, 0.09));
+}
+
+/* The banner renders outside every token root, so the ring colour is spelled
+   out rather than drawn from --focus-ring. */
+.sync-banner-close:focus-visible {
+  outline: 2px solid light-dark(#8a76d4, #6f5ec0);
+  outline-offset: 1px;
 }
 
 /* Team / roster view */
@@ -2578,7 +2665,6 @@
   color: var(--ink-2);
 }
 
-.tw-alloc .ve-num,
 .tw-alloc input {
   width: 52px;
 }
@@ -2616,9 +2702,14 @@
   justify-content: flex-end;
   height: 24px;
   border: 1px solid var(--line);
-  border-radius: 3px;
+  border-radius: var(--field-r);
   background: var(--surface);
   overflow: hidden;
+}
+
+/* The frame is the field; the ring hugs the inner input's box. */
+.tw-prod:focus-within {
+  border-color: var(--accent-line);
 }
 
 .tw-prod input {
@@ -2634,8 +2725,8 @@
   color: var(--ink);
 }
 
-.tw-prod input:focus {
-  outline: none;
+.tw-prod input:focus-visible {
+  outline-offset: -2px;
 }
 
 /* Anything under full is what the plan actually runs on, so it gets the
@@ -2681,7 +2772,7 @@
   color: var(--ink-2);
   background: transparent;
   border: 1px dashed var(--line);
-  border-radius: 6px;
+  border-radius: var(--ctl-r);
   padding: 6px 10px;
   cursor: pointer;
 }
@@ -2697,7 +2788,8 @@
    density-sized header and footer. */
 
 .atl-btn:disabled {
-  opacity: 0.45;
+  border-color: var(--line);
+  color: var(--ink-4);
   cursor: default;
 }
 
@@ -2785,7 +2877,7 @@
   color: var(--ink);
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: var(--ctl-r);
   cursor: pointer;
 }
 
@@ -2839,12 +2931,12 @@
 /* Shared buttons */
 
 .sim-btn {
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
   background: transparent;
   color: var(--ink-2);
-  height: 26px;
-  padding: 0 11px;
-  border-radius: 3px;
+  height: var(--ctl-h);
+  padding: 0 var(--ctl-px);
+  border-radius: var(--ctl-r);
   font-size: 11.5px;
   cursor: pointer;
   white-space: nowrap;
@@ -2856,7 +2948,8 @@
 }
 
 .sim-btn:disabled {
-  opacity: 0.45;
+  border-color: var(--line);
+  color: var(--ink-4);
   cursor: default;
 }
 
@@ -2867,9 +2960,9 @@
   border: 1px solid var(--accent-line);
   background: var(--accent-wash);
   color: var(--accent);
-  height: 26px;
-  padding: 0 12px;
-  border-radius: 3px;
+  height: var(--ctl-h);
+  padding: 0 var(--ctl-px);
+  border-radius: var(--ctl-r);
   font-size: 11.5px;
   font-weight: 500;
   cursor: pointer;
@@ -2881,7 +2974,9 @@
 }
 
 .sim-btn-accent:disabled {
-  opacity: 0.45;
+  border-color: var(--line);
+  background: transparent;
+  color: var(--ink-4);
   cursor: default;
 }
 
@@ -2932,9 +3027,9 @@
   border: 1px solid var(--line-strong);
   background: transparent;
   color: var(--ink-2);
-  height: 26px;
-  padding: 0 12px;
-  border-radius: 3px;
+  height: var(--ctl-h);
+  padding: 0 var(--ctl-px);
+  border-radius: var(--ctl-r);
   font-size: 11.5px;
   font-weight: 500;
   white-space: nowrap;
@@ -2953,7 +3048,8 @@
 }
 
 .sv-opt-toggle:disabled {
-  opacity: 0.45;
+  border-color: var(--line);
+  color: var(--ink-4);
   cursor: default;
 }
 
@@ -3078,8 +3174,9 @@
   border: 1px dashed var(--line-strong);
   background: transparent;
   color: var(--ink-3);
-  height: 26px;
-  border-radius: 3px;
+  height: var(--ctl-h);
+  padding: 0 var(--ctl-px);
+  border-radius: var(--ctl-r);
   font-size: 11.5px;
   cursor: pointer;
 }
@@ -3447,10 +3544,10 @@
 .sv-opt-apply {
   border: 1px solid var(--accent);
   background: var(--accent);
-  color: #fff;
-  height: 26px;
-  padding: 0 12px;
-  border-radius: 3px;
+  color: var(--on-bar);
+  height: var(--ctl-h);
+  padding: 0 var(--ctl-px);
+  border-radius: var(--ctl-r);
   font-size: 11.5px;
   font-weight: 500;
   white-space: nowrap;
@@ -3458,7 +3555,9 @@
 }
 
 .sv-opt-apply:disabled {
-  opacity: 0.45;
+  border-color: var(--line);
+  background: transparent;
+  color: var(--ink-4);
   cursor: default;
 }
 
@@ -3567,8 +3666,12 @@
   flex: none;
   display: flex;
   border: 1px solid var(--line-strong);
-  border-radius: 3px;
+  border-radius: var(--ctl-r);
   overflow: hidden;
+}
+
+.sv-steps button:focus-visible {
+  outline-offset: -2px;
 }
 
 .sv-steps button {
@@ -3593,7 +3696,7 @@
 
 .sv-steps button.is-active {
   background: var(--accent);
-  color: var(--surface);
+  color: var(--on-bar);
 }
 
 .sv-caps-note {

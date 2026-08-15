@@ -375,8 +375,10 @@
   background: var(--leave-hatch);
   cursor: pointer;
 }
+/* Hover affordances on the bar controls are box-shadows, not outlines — the
+   outline channel belongs to the focus ring. */
 .obs-leave:hover {
-  outline: 1px solid var(--accent-line);
+  box-shadow: 0 0 0 1px var(--accent-line);
 }
 .obs-mark {
   position: absolute;
@@ -407,7 +409,7 @@
   cursor: pointer;
 }
 .obs-chip {
-  background: rgba(12, 16, 20, 0.5);
+  background: var(--bar-scrim);
   color: #fff;
   height: 15px;
 }
@@ -431,7 +433,7 @@
 }
 .obs-chip:hover,
 .obs-tag:hover {
-  outline: 1px solid var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
 }
 
 /* ── Projekty: a lane per person, one hatched lane for the hole ──────── */
@@ -447,7 +449,7 @@
   cursor: pointer;
 }
 .obs-lane:hover {
-  outline: 1px solid var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
 }
 .obs-lane-chip {
   display: flex;
@@ -455,7 +457,7 @@
   gap: 6px;
   padding: 0 4px;
   border-radius: 2px;
-  background: rgba(12, 16, 20, 0.42);
+  background: var(--bar-scrim);
   color: #fff;
   white-space: nowrap;
 }
@@ -488,7 +490,7 @@
   color: var(--warn);
 }
 .obs-gap:hover {
-  outline: 1px solid var(--warn);
+  box-shadow: 0 0 0 1px var(--warn);
 }
 
 /* ── footer ──────────────────────────────────────────────────────────── */
@@ -547,7 +549,7 @@
 }
 .obs-capfilter button {
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: var(--ctl-r);
   padding: 4px 9px;
   background: transparent;
   color: var(--ink-3);
@@ -1064,8 +1066,8 @@
   align-items: center;
 }
 .obs-stepper button {
-  width: 28px;
-  height: 28px;
+  width: var(--ctl-h);
+  height: var(--ctl-h);
   border: 1px solid var(--line);
   background: var(--surface-2);
   color: var(--ink-2);
@@ -1074,18 +1076,18 @@
 }
 .obs-stepper button:first-child {
   border-right: 0;
-  border-radius: 4px 0 0 4px;
+  border-radius: var(--ctl-r) 0 0 var(--ctl-r);
 }
 .obs-stepper button:last-child {
   border-left: 0;
-  border-radius: 0 4px 4px 0;
+  border-radius: 0 var(--ctl-r) var(--ctl-r) 0;
 }
 .obs-stepper button:hover {
   background: var(--row-hover);
 }
 .obs-stepper b {
   min-width: 44px;
-  height: 28px;
+  height: var(--ctl-h);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1096,23 +1098,33 @@
   font-weight: 400;
 }
 .obs-primary {
-  height: 28px;
-  padding: 0 13px;
+  height: var(--ctl-h);
+  padding: 0 var(--ctl-px);
   border: 1px solid var(--accent);
-  border-radius: 4px;
+  border-radius: var(--ctl-r);
   background: var(--accent);
-  color: #fff;
+  color: var(--on-bar);
   font-size: 13px;
   cursor: pointer;
 }
-.obs-primary:hover {
+.obs-primary:hover:not(:disabled) {
   filter: brightness(1.08);
 }
-.obs-ghost {
-  height: 28px;
-  padding: 0 11px;
+/* Disabled keeps its outline and dims the label — never opacity. */
+.obs-primary:disabled,
+.obs-wand:disabled,
+.obs-assign:disabled {
   border: 1px solid var(--line);
-  border-radius: 4px;
+  background: transparent;
+  color: var(--ink-4);
+  filter: none;
+  cursor: default;
+}
+.obs-ghost {
+  height: var(--ctl-h);
+  padding: 0 var(--ctl-px);
+  border: 1px solid var(--line);
+  border-radius: var(--ctl-r);
   background: transparent;
   color: var(--ink-3);
   font-size: 13px;
@@ -1123,10 +1135,10 @@
   color: var(--warn);
 }
 .obs-danger {
-  height: 28px;
-  padding: 0 12px;
+  height: var(--ctl-h);
+  padding: 0 var(--ctl-px);
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: var(--ctl-r);
   background: transparent;
   color: var(--warn);
   font-size: 13px;
@@ -1138,9 +1150,9 @@
 .obs-assign {
   flex: none;
   width: 140px;
-  height: 28px;
+  height: var(--ctl-h);
   padding: 0 10px;
-  border-radius: 4px;
+  border-radius: var(--ctl-r);
   font-size: 13px;
   cursor: pointer;
 }
@@ -1149,14 +1161,14 @@
   background: transparent;
   color: var(--warn);
 }
-.obs-assign.is-risky:hover {
+.obs-assign.is-risky:hover:not(:disabled) {
   filter: brightness(1.08);
 }
 .obs-wand {
-  height: 28px;
-  padding: 0 12px;
+  height: var(--ctl-h);
+  padding: 0 var(--ctl-px);
   border: 1px solid var(--accent-line);
-  border-radius: 4px;
+  border-radius: var(--ctl-r);
   background: var(--accent-wash);
   color: var(--accent);
   font-size: 13px;
@@ -1165,15 +1177,15 @@
   align-items: center;
   gap: 7px;
 }
-.obs-wand:hover {
+.obs-wand:hover:not(:disabled) {
   border-color: var(--accent);
 }
 .obs-search {
   width: 150px;
-  height: 28px;
+  height: var(--ctl-h);
   padding: 0 9px;
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: var(--field-r);
   background: var(--surface);
   color: var(--ink);
   font-size: 13px;
@@ -1186,19 +1198,19 @@
   color: var(--ink-4);
 }
 .obs-sort select {
-  height: 28px;
+  height: var(--ctl-h);
   padding: 0 6px;
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: var(--field-r);
   background: var(--surface);
   color: var(--ink);
   font-size: 13px;
 }
 .obs-toggle {
-  height: 28px;
-  padding: 0 11px;
+  height: var(--ctl-h);
+  padding: 0 var(--ctl-px);
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: var(--ctl-r);
   background: var(--surface-2);
   color: var(--ink-2);
   font-size: 13px;
@@ -1249,10 +1261,10 @@
   color: var(--ink-2);
 }
 .obs-x {
-  width: 28px;
-  height: 28px;
+  width: var(--ctl-h);
+  height: var(--ctl-h);
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: var(--ctl-r);
   background: transparent;
   color: var(--ink-3);
   font-size: 13px;
@@ -1301,10 +1313,10 @@
 .obs-modal input {
   flex: 1;
   min-width: 0;
-  height: 26px;
+  height: var(--ctl-h);
   padding: 0 6px;
   border: 1px solid var(--line);
-  border-radius: 3px;
+  border-radius: var(--field-r);
   background: var(--surface-2);
   color: var(--ink);
   font-size: 11.5px;

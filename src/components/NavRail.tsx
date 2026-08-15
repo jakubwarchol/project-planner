@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { HelpCircle, Moon } from "lucide-react";
-import { MOD, SCREENS, type Screen } from "./timelineChrome";
+import { MOD, SCREENS, groupArrowNav, type Screen } from "./timelineChrome";
 
 const THEME_LABELS = { auto: "auto", light: "jasny", dark: "ciemny" } as const;
 
@@ -34,12 +34,15 @@ export function NavRail({ screen, onSelect, theme, onCycleTheme }: NavRailProps)
   return (
     <nav className="rail" aria-label="Widoki">
       <span className="rail-logo" />
-      <div className="rail-tabs">
+      <div className="rail-tabs" role="tablist" aria-label="Ekrany" onKeyDown={groupArrowNav}>
         {SCREENS.map((s, i) => (
           <div className="rail-slot" key={s.id}>
             {i > 0 && s.group !== SCREENS[i - 1].group && <span className="rail-divider" />}
             <button
               type="button"
+              role="tab"
+              aria-selected={s.id === screen}
+              tabIndex={s.id === screen ? 0 : -1}
               className={`rail-tab ${s.id === screen ? "is-active" : ""}`}
               onClick={() => onSelect(s.id)}
               title={`${s.label} — ${s.hint} · ${MOD}${i + 1}`}

@@ -155,7 +155,7 @@ export function VariantEditor({ api, activeId, projectNameOf, onActivate, onClos
                 <div className="ve-row" key={capability}>
                   <span className="ve-row-label">{CAPABILITY_LABELS[capability]}</span>
                   <NumberField
-                    key={`${selected.id}-${capability}`}
+                    subject={`${selected.id}-${capability}`}
                     initial={selected.fte[capability] ?? 0}
                     label={`FTE dla ${capability}`}
                     decimals={2}
@@ -178,10 +178,14 @@ export function VariantEditor({ api, activeId, projectNameOf, onActivate, onClos
                 className={`ve-delete ${confirmingDelete ? "is-confirming" : ""}`}
                 onClick={handleDelete}
                 disabled={!canDelete}
-                title={canDelete ? undefined : "Nie można usunąć ostatniego wariantu"}
               >
                 {confirmingDelete ? "Potwierdź usunięcie" : "Usuń wariant"}
               </button>
+              {/* A title on a disabled button surfaces for nobody — the reason
+                  it is off gets said out loud instead. */}
+              {!canDelete && (
+                <span className="ve-field-label">Nie można usunąć ostatniego wariantu</span>
+              )}
               <button type="button" className="ve-done" onClick={onClose}>
                 Gotowe
               </button>

@@ -38,6 +38,27 @@
   --size-xxl: #bb2436;
   --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  /* Whatever sits on an --accent fill takes this colour. */
+  --on-bar: #ffffff;
+  /* Control tokens — shared with the .atl/.bv shells; same values in both
+     themes, so no dark override. */
+  --ctl-h: 26px;
+  --ctl-r: 3px;
+  --ctl-px: 11px;
+  --field-r: 3px;
+  --focus-ring: 2px solid var(--accent-line);
+  --bar-scrim: rgba(12, 16, 20, 0.5);
+}
+
+/* One focus ring for everything keyboard-reachable; tight in-row controls pull
+   it inward with a negative offset rather than opting out. */
+.cm2 :focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.cm2-seg button:focus-visible {
+  outline-offset: -2px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -70,6 +91,7 @@
     --size-l: #f0a453;
     --size-xl: #f47b52;
     --size-xxl: #f56576;
+    --on-bar: #0b0f12;
   }
 }
 
@@ -102,6 +124,7 @@
   --size-l: #f0a453;
   --size-xl: #f47b52;
   --size-xxl: #f56576;
+  --on-bar: #0b0f12;
 }
 
 .cm2 {
@@ -234,17 +257,17 @@
 
 .cm2-crew-toggle.is-on .cm2-switch-knob {
   left: 13px;
-  background: #fff;
+  background: var(--on-bar);
 }
 
 .cm2-btn {
   display: flex;
   align-items: center;
   gap: 6px;
-  height: 26px;
-  padding: 0 10px;
+  height: var(--ctl-h);
+  padding: 0 var(--ctl-px);
   border: 1px solid var(--line-strong);
-  border-radius: 3px;
+  border-radius: var(--ctl-r);
   background: transparent;
   color: var(--ink-2);
   font-size: 11.5px;
@@ -267,7 +290,7 @@
 .cm2-seg {
   display: flex;
   border: 1px solid var(--line-strong);
-  border-radius: 3px;
+  border-radius: var(--ctl-r);
   overflow: hidden;
 }
 
@@ -275,7 +298,7 @@
   border: 0;
   border-left: 1px solid var(--line-strong);
   padding: 0 12px;
-  height: 26px;
+  height: var(--ctl-h);
   font-size: 11.5px;
   background: transparent;
   color: var(--ink-2);
@@ -289,7 +312,7 @@
 
 .cm2-seg button.is-active {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-bar);
   font-weight: 600;
 }
 
@@ -297,10 +320,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: var(--ctl-h);
+  height: var(--ctl-h);
   border: 1px solid var(--line-strong);
-  border-radius: 3px;
+  border-radius: var(--ctl-r);
   background: transparent;
   color: var(--ink-2);
   cursor: pointer;
@@ -620,27 +643,13 @@
   pointer-events: none;
 }
 
+/* Look and states come from .nf-grid; this class only sizes the cell. */
 .cm2-input {
   flex: 1;
   min-width: 0;
   height: 100%;
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--ink);
-  font-family: var(--mono);
   font-size: 13px;
-  text-align: right;
   padding: 0 8px 0 6px;
-}
-
-.cm2-input:hover {
-  border-color: var(--line);
-}
-
-.cm2-input:focus {
-  outline: none;
-  border-color: var(--accent-line);
-  background: var(--surface);
 }
 
 .cm2-input::placeholder {
@@ -750,7 +759,7 @@
 }
 
 .cm2-slot:focus-visible {
-  outline: 2px solid var(--accent-line);
+  outline: var(--focus-ring);
   outline-offset: -2px;
 }
 
@@ -895,23 +904,12 @@
   color: var(--ink-2);
 }
 
+/* Look and states come from .nf-form; this class only sizes the field. */
 .cm2-field {
   width: 76px;
   height: 24px;
-  border: 1px solid var(--line);
-  border-radius: 3px;
-  background: var(--surface-2);
-  color: var(--ink);
-  font-family: var(--mono);
   font-size: 11.5px;
-  text-align: right;
   padding: 0 6px;
-}
-
-.cm2-field:focus {
-  outline: none;
-  border-color: var(--accent-line);
-  background: var(--surface);
 }
 
 .cm2-card-preview {
@@ -1289,9 +1287,9 @@
   height: 18px;
   margin-top: 1px;
   border: 1px solid var(--line-strong);
-  border-radius: 3px;
+  border-radius: var(--ctl-r);
   background: transparent;
-  color: #fff;
+  color: var(--on-bar);
   font-family: var(--mono);
   font-size: 10px;
   line-height: 1;
@@ -1417,10 +1415,10 @@
 }
 
 .cm2-ghost {
-  height: 26px;
-  padding: 0 11px;
+  height: var(--ctl-h);
+  padding: 0 var(--ctl-px);
   border: 1px solid var(--line-strong);
-  border-radius: 3px;
+  border-radius: var(--ctl-r);
   background: transparent;
   color: var(--ink-2);
   font-size: 11.5px;
@@ -1428,18 +1426,23 @@
 }
 
 .cm2-primary {
-  height: 26px;
-  padding: 0 12px;
+  height: var(--ctl-h);
+  padding: 0 var(--ctl-px);
   border: 1px solid var(--accent);
-  border-radius: 3px;
+  border-radius: var(--ctl-r);
   background: var(--accent);
-  color: #fff;
+  color: var(--on-bar);
   font-size: 11.5px;
   font-weight: 600;
   cursor: pointer;
 }
 
+/* Disabled keeps its outline and dims the label — never opacity. */
+.cm2-ghost:disabled,
 .cm2-primary:disabled {
-  opacity: 0.45;
+  border-color: var(--line);
+  background: transparent;
+  color: var(--ink-4);
+  font-weight: 400;
   cursor: default;
 }

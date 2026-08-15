@@ -5,6 +5,7 @@
  */
 import type { ReactNode } from "react";
 import { UNITS, UNIT_ORDER, type ObsadaAxis, type ObsadaUnit } from "./axis";
+import { groupArrowNav } from "../timelineChrome";
 import { AXIS_H, BAND_H } from "./timelineScroll";
 
 interface ToolbarProps {
@@ -43,11 +44,14 @@ export function ObsadaToolbar({
         </button>
       </div>
 
-      <div className="atl-seg">
+      <div className="atl-seg" role="tablist" aria-label="Skala czasu" onKeyDown={groupArrowNav}>
         {UNIT_ORDER.map((u) => (
           <button
             key={u}
             type="button"
+            role="tab"
+            aria-selected={u === unit}
+            tabIndex={u === unit ? 0 : -1}
             className={u === unit ? "is-active" : undefined}
             onClick={() => onUnit(u)}
           >

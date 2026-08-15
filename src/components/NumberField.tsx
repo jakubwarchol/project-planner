@@ -5,6 +5,15 @@ interface NumberFieldProps {
   initial: number;
   onCommit: (value: number) => void;
   label: string;
+  /** Grid cells sit borderless until hover; form fields carry their border.
+   *  Both take geometry from the control tokens (--field-r). */
+  variant?: "grid" | "form";
+  /** Identity of the thing being edited (a row id, a capability). When it
+   *  changes the field remounts itself, resetting the draft — callers no
+   *  longer pass a `key` for that. */
+  subject?: string;
+  /** Out-of-range or rejected value → aria-invalid plus the warn border. */
+  invalid?: boolean;
   /** Floor for the committed value — for knobs the database rejects at 0.
    *  Only the commit is clamped; the draft is left alone so a value can still
    *  be typed through "0" on its way to "0,5". */
@@ -36,14 +45,19 @@ interface NumberFieldProps {
 }
 
 // Draft kept locally so the field can be emptied or hold a trailing "," while
-// typing without the store snapping it back to "0" mid-edit. Callers that
-// edit a different subject (a different row, a different capability) must
-// pass a `key` that changes with it — remounting is how the draft resets,
-// the same convention used throughout this codebase's other numeric inputs.
-export function NumberField({
+// typing without the store snapping it back to "0" mid-edit. Remounting is how
+// the draft resets when the edited subject changes — `subject` carries that
+// key here, so callers don't each reinvent the convention.
+export function NumberField(props: NumberFieldProps) {
+  return <NumberFieldInner key={props.subject} {...props} />;
+}
+
+function NumberFieldInner({
   initial,
   onCommit,
   label,
+  variant,
+  invalid,
   min = 0,
   max = 99,
   decimals = 1,
@@ -140,12 +154,19 @@ export function NumberField({
     onDraft?.(null);
   }
 
+  // `variant` is the styling channel; `className` stays as the escape hatch
+  // for the call sites the shared field classes don't cover yet.
+  const classes = [variant && `nf-${variant}`, className ?? (variant ? undefined : "ve-number")]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <input
-      className={className ?? "ve-number"}
+      className={classes}
       type="text"
       inputMode="decimal"
       aria-label={label}
+      aria-invalid={invalid || undefined}
       value={draft}
       placeholder={placeholder}
       disabled={disabled}

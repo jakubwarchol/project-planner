@@ -1,6 +1,6 @@
 import { X } from "lucide-react";
 import type { HiringLadderApi } from "../hooks/useHiringLadder";
-import { CAPABILITY_HUES, fmt, fmt2, plCount, rungRoles, signed, solid, weeksOf } from "./timelineChrome";
+import { CAPABILITY_HUES, fmt, fmt2, groupArrowNav, plCount, rungRoles, signed, solid, weeksOf } from "./timelineChrome";
 import { CAPABILITY_LABELS, CAPABILITY_ORDER } from "../lib/estimation";
 import type { CeilingMove } from "../lib/autopilot";
 import type { LadderRung } from "../lib/hirePlusCeilings";
@@ -352,18 +352,29 @@ function CapsSection({
                 <span className="sv-caps-now" title="w wariancie bazowym">
                   teraz {fmt(referenceFte[capability] ?? 0)}
                 </span>
-                <div className="sv-steps">
-                  {[undefined, 1, 2, 3, 4, 5, 6, 7].map((v, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      className={(v === undefined ? limit === undefined : limit === v) ? "is-active" : ""}
-                      title={v === undefined ? "bez limitu" : `najwyżej ${v}`}
-                      onClick={() => setCap(capability, v)}
-                    >
-                      {v === undefined ? "∞" : v}
-                    </button>
-                  ))}
+                <div
+                  className="sv-steps"
+                  role="radiogroup"
+                  aria-label={`Limit etatów — ${CAPABILITY_FULL[capability]}`}
+                  onKeyDown={groupArrowNav}
+                >
+                  {[undefined, 1, 2, 3, 4, 5, 6, 7].map((v, i) => {
+                    const current = v === undefined ? limit === undefined : limit === v;
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        role="radio"
+                        aria-checked={current}
+                        tabIndex={current ? 0 : -1}
+                        className={current ? "is-active" : ""}
+                        title={v === undefined ? "bez limitu" : `najwyżej ${v}`}
+                        onClick={() => setCap(capability, v)}
+                      >
+                        {v === undefined ? "∞" : v}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             );

@@ -33,7 +33,7 @@ import {
 } from "../../lib/staffing";
 import type { Capability, Person, StaffingAssignment } from "../../types";
 import type { StaffingApi } from "../../hooks/useStaffing";
-import { plCount } from "../timelineChrome";
+import { groupArrowNav, plCount } from "../timelineChrome";
 import { longDay, shortDay } from "./axis";
 import type { ObsadaContext, ObsadaSelection } from "./ObsadaWorkspace";
 
@@ -407,18 +407,35 @@ export function StaffingPanelView({ ctx, people, staffing, selection, onSelect }
           </span>
         </div>
 
-        <div className="atl-seg">
-          <button type="button" className={openOnly ? "is-active" : undefined} onClick={() => setOpenOnly(true)}>
+        <div className="atl-seg" role="tablist" aria-label="Filtr pozycji" onKeyDown={groupArrowNav}>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={openOnly}
+            tabIndex={openOnly ? 0 : -1}
+            className={openOnly ? "is-active" : undefined}
+            onClick={() => setOpenOnly(true)}
+          >
             Do obsadzenia
           </button>
-          <button type="button" className={openOnly ? undefined : "is-active"} onClick={() => setOpenOnly(false)}>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={!openOnly}
+            tabIndex={openOnly ? -1 : 0}
+            className={openOnly ? undefined : "is-active"}
+            onClick={() => setOpenOnly(false)}
+          >
             Wszystkie
           </button>
         </div>
 
+        {/* Not a tablist: each capability toggles back off, so the group is a
+            set of pressed-state filters rather than pick-one tabs. */}
         <div className="obs-capfilter">
           <button
             type="button"
+            aria-pressed={capFilter === null}
             className={capFilter === null ? "is-active" : undefined}
             onClick={() => setCapFilter(null)}
           >
@@ -428,6 +445,7 @@ export function StaffingPanelView({ ctx, people, staffing, selection, onSelect }
             <button
               key={cap}
               type="button"
+              aria-pressed={capFilter === cap}
               className={capFilter === cap ? "is-active" : undefined}
               onClick={() => setCapFilter(capFilter === cap ? null : cap)}
             >
@@ -719,6 +737,7 @@ export function StaffingPanelView({ ctx, people, staffing, selection, onSelect }
                     </label>
                     <button
                       type="button"
+                      aria-pressed={allPeople}
                       className={allPeople ? "obs-toggle is-on" : "obs-toggle"}
                       onClick={() => setAllPeople((v) => !v)}
                     >

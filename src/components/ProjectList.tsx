@@ -423,6 +423,7 @@ export function ProjectList({ projects, onReorder, showEstimates, onToggleEstima
           type="button"
           className={`bv-colhead-size ${showEstimates ? "is-on" : ""}`}
           onClick={onToggleEstimates}
+          aria-pressed={showEstimates}
           title={showEstimates ? "Ukryj rozmiary" : "Pokaż rozmiary"}
         >
           {showEstimates ? <Eye size={11} /> : <EyeOff size={11} />}
@@ -549,6 +550,7 @@ export function ProjectList({ projects, onReorder, showEstimates, onToggleEstima
                 <button
                   type="button"
                   className={`bv-link ${isLinkingSource ? "is-active" : ""}`}
+                  aria-pressed={isLinkingSource}
                   aria-label={
                     isLinkingSource
                       ? `Anuluj blokowanie przez ${project.name}`

@@ -156,7 +156,9 @@ function PhaseColumn({
           <tbody>
             {rows.map((row) => (
               <tr key={row.key}>
-                <td title={`${row.label} pracuje z produktywnością ${fmt(row.focus * 100)}%`}>
+                {/* No native title here: the tip is pointer-events: none, so
+                    it could never surface — the visible cells carry the story. */}
+                <td>
                   {row.label}
                   {row.setsPace && <i className="atl-tip-star">▲</i>}
                   {row.isBurst && <i className="atl-tip-star">*</i>}

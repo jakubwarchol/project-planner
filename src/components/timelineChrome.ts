@@ -17,6 +17,23 @@ export function rungRoles(rung: LadderRung): string {
     .join(", ");
 }
 
+/** Arrow-key roving for segmented controls and radio strips: ← → moves to the
+ *  neighbouring tab/radio and picks it, wrapping at the ends. Attach to the
+ *  container carrying role=tablist or role=radiogroup; the active item holds
+ *  tabIndex 0 and the rest -1, so the group costs one Tab stop. */
+export function groupArrowNav(event: { key: string; currentTarget: HTMLElement; preventDefault: () => void }): void {
+  if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+  const items = Array.from(
+    event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"], [role="radio"]'),
+  ).filter((el) => !el.disabled);
+  const current = items.indexOf(document.activeElement as HTMLButtonElement);
+  if (current === -1 || items.length < 2) return;
+  event.preventDefault();
+  const next = items[(current + (event.key === "ArrowRight" ? 1 : items.length - 1)) % items.length];
+  next.focus();
+  next.click();
+}
+
 /** Ordered from data to results — dane wejściowe | wyniki | hipotezy. The
  *  hairlines in the nav rail sit on the group boundaries, and ⌘1…⌘6 follow
  *  this order, so it is the one place the sequence is defined. */

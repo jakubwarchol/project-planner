@@ -11,7 +11,7 @@ import {
 } from "../lib/estimation";
 import type { Capability, Person, TeamCode } from "../types";
 import { NumberField } from "./NumberField";
-import { CAPABILITY_HUES, MOD, fmt, fmt2, plCount, solid } from "./timelineChrome";
+import { CAPABILITY_HUES, MOD, fmt, fmt2, groupArrowNav, plCount, solid } from "./timelineChrome";
 import "./timeline.css";
 
 interface TeamViewProps {
@@ -87,20 +87,27 @@ function FtePicker({
         {fmt2(value)}
       </button>
       {open && (
-        <span className="tw-fte-pop">
-          {FTE_OPTIONS.map((option) => (
-            <button
-              key={option}
-              type="button"
-              className={`tw-fte-opt ${Math.abs(option - value) < 0.005 ? "is-active" : ""}`}
-              onClick={() => {
-                onPick(option);
-                setOpen(false);
-              }}
-            >
-              {fmt2(option)}
-            </button>
-          ))}
+        <span className="tw-fte-pop" role="radiogroup" aria-label={label} onKeyDown={groupArrowNav}>
+          {FTE_OPTIONS.map((option) => {
+            const current = Math.abs(option - value) < 0.005;
+            const hasCurrent = FTE_OPTIONS.some((o) => Math.abs(o - value) < 0.005);
+            return (
+              <button
+                key={option}
+                type="button"
+                role="radio"
+                aria-checked={current}
+                tabIndex={current || (!hasCurrent && option === FTE_OPTIONS[0]) ? 0 : -1}
+                className={`tw-fte-opt ${current ? "is-active" : ""}`}
+                onClick={() => {
+                  onPick(option);
+                  setOpen(false);
+                }}
+              >
+                {fmt2(option)}
+              </button>
+            );
+          })}
         </span>
       )}
     </span>
@@ -319,7 +326,7 @@ export function TeamView({ theme }: TeamViewProps) {
                       title={`Produktywność ${fmt(person.focusFactor * 100)}% — z ${fmt2(total)} FTE zostaje ${fmt2(personEffectiveFte(person))} FTE pracy projektowej`}
                     >
                       <NumberField
-                        key={`${person.id}-focus`}
+                        subject={`${person.id}-focus`}
                         initial={person.focusFactor * 100}
                         label={`Produktywność — ${person.name}`}
                         min={5}

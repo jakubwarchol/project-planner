@@ -28,7 +28,7 @@ import {
   type StaffingWindow,
 } from "../../lib/staffing";
 import type { Capability, Leave, Person, Project, StaffingAssignment } from "../../types";
-import { buildHueMap } from "../timelineChrome";
+import { buildHueMap, groupArrowNav } from "../timelineChrome";
 import { PeopleLoadView } from "./PeopleLoadView";
 import { ProjectStaffingView } from "./ProjectStaffingView";
 import { StaffingPanelView } from "./StaffingPanelView";
@@ -150,11 +150,14 @@ export function ObsadaWorkspace({ projects, theme }: ObsadaWorkspaceProps) {
           <span className="atl-chip">{chip}</span>
         </div>
 
-        <div className="atl-seg obs-tabs">
+        <div className="atl-seg obs-tabs" role="tablist" aria-label="Widoki obsady" onKeyDown={groupArrowNav}>
           {TABS.map((t) => (
             <button
               key={t.id}
               type="button"
+              role="tab"
+              aria-selected={t.id === tab}
+              tabIndex={t.id === tab ? 0 : -1}
               className={t.id === tab ? "is-active" : undefined}
               onClick={() => setTab(t.id)}
             >

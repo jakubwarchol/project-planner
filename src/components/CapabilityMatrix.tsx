@@ -23,7 +23,7 @@ import {
 import { usePlanner } from "../state/plannerContext";
 import type { Capability, CapabilityCell, Estimate, EstimationSettings, Project } from "../types";
 import { NumberField } from "./NumberField";
-import { MOD, fmt, fmt2, plCount } from "./timelineChrome";
+import { MOD, fmt, fmt2, groupArrowNav, plCount } from "./timelineChrome";
 import "./capabilityMatrix.css";
 
 interface CapabilityMatrixProps {
@@ -434,10 +434,11 @@ export function CapabilityMatrix({
             <>
               <button
                 type="button"
+                role="switch"
                 className={`cm2-crew-toggle ${showCrew ? "is-on" : ""}`}
                 onClick={() => setShowCrew((v) => !v)}
                 title="Pokaż wyliczoną przez model załogę pod każdym sufitem"
-                aria-pressed={showCrew}
+                aria-checked={showCrew}
               >
                 <span className="cm2-switch">
                   <span className="cm2-switch-knob" />
@@ -449,15 +450,19 @@ export function CapabilityMatrix({
                 className={`cm2-btn ${showProposals ? "is-on" : ""}`}
                 onClick={() => setShowProposals((v) => !v)}
                 title="Znajdź sufity, których podniesienie faktycznie skraca plan"
+                aria-expanded={showProposals}
               >
                 <span className="cm2-spark">✦</span>
                 <span>Propozycje sufitów</span>
               </button>
             </>
           )}
-          <div className="cm2-seg">
+          <div className="cm2-seg" role="tablist" aria-label="Zakładki wycen" onKeyDown={groupArrowNav}>
             <button
               type="button"
+              role="tab"
+              aria-selected={tab === "days"}
+              tabIndex={tab === "days" ? 0 : -1}
               className={tab === "days" ? "is-active" : undefined}
               onClick={() => setTab("days")}
             >
@@ -465,6 +470,9 @@ export function CapabilityMatrix({
             </button>
             <button
               type="button"
+              role="tab"
+              aria-selected={tab === "settings"}
+              tabIndex={tab === "settings" ? 0 : -1}
               className={tab === "settings" ? "is-active" : undefined}
               onClick={() => setTab("settings")}
             >
@@ -477,6 +485,7 @@ export function CapabilityMatrix({
             onClick={() => setShowHelp((v) => !v)}
             title="Jak czytać ten ekran"
             aria-label="Jak czytać ten ekran"
+            aria-expanded={showHelp}
           >
             <HelpCircle size={14} />
           </button>
@@ -503,6 +512,7 @@ export function CapabilityMatrix({
                   initial={settings.estimateValues[estimate]}
                   label={`Waga rozmiaru ${estimate}`}
                   max={9999}
+                  variant="form"
                   className="cm2-field"
                   deferCommit
                   selectOnFocus
@@ -527,10 +537,10 @@ export function CapabilityMatrix({
             <div className="cm2-card-row">
               <span className="cm2-card-label">dni na jednostkę wagi</span>
               <NumberField
-                key="days-per-value"
                 initial={settings.daysPerValue}
                 label="Dni na jednostkę wagi"
                 max={999}
+                variant="form"
                 className="cm2-field"
                 deferCommit
                 selectOnFocus
@@ -540,11 +550,11 @@ export function CapabilityMatrix({
             <div className="cm2-card-row">
               <span className="cm2-card-label">dni robocze w miesiącu</span>
               <NumberField
-                key="working-days"
                 initial={settings.workingDaysPerMonth}
                 label="Dni robocze w miesiącu"
                 max={31}
                 decimals={1}
+                variant="form"
                 className="cm2-field"
                 deferCommit
                 selectOnFocus
@@ -571,12 +581,12 @@ export function CapabilityMatrix({
             <div className="cm2-card-row">
               <span className="cm2-card-label">minimalna obsada (0–1)</span>
               <NumberField
-                key="min-staffing-fraction"
                 initial={settings.minStaffingFraction}
                 label="Minimalna obsada jako ułamek wyliczonej załogi"
                 min={0.05}
                 max={1}
                 decimals={2}
+                variant="form"
                 className="cm2-field"
                 deferCommit
                 selectOnFocus
@@ -602,12 +612,12 @@ export function CapabilityMatrix({
             <div className="cm2-card-row">
               <span className="cm2-card-label">próg (FTE)</span>
               <NumberField
-                key="min-crew-fte"
                 initial={settings.minCrewFte}
                 label="Najmniejsze FTE, jakie wolno rozłożyć na całą fazę"
                 min={0.01}
                 max={1}
                 decimals={2}
+                variant="form"
                 className="cm2-field"
                 deferCommit
                 selectOnFocus
@@ -747,6 +757,7 @@ export function CapabilityMatrix({
                           <button
                             type="button"
                             className="cm2-plan-toggle"
+                            aria-pressed={inPlan}
                             aria-label={
                               inPlan
                                 ? `Wyjmij ${project.name} z planu`
@@ -834,10 +845,11 @@ export function CapabilityMatrix({
                                     data-cm-col={`${capability}:days`}
                                   >
                                     <NumberField
-                                      key={`${project.id}-${capability}-days`}
+                                      subject={`${project.id}-${capability}-days`}
                                       initial={cell.days}
                                       label={`Dni nakładu ${CAPABILITY_LABELS[capability]} dla ${project.name}`}
                                       max={9999}
+                                      variant="grid"
                                       className="cm2-input"
                                       placeholder="0"
                                       blankZero

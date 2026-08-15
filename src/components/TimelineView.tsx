@@ -22,7 +22,7 @@ import { usePlanner } from "../state/plannerContext";
 import type { Project, VariantCeilings } from "../types";
 import { HiringPlanDrawer } from "./HiringPlanDrawer";
 import { VariantEditor } from "./VariantEditor";
-import { MON, fmt, monthLabel, optimizedLabel, plCount, rungRoles, signed, weeksOf } from "./timelineChrome";
+import { MON, fmt, groupArrowNav, monthLabel, optimizedLabel, plCount, rungRoles, signed, weeksOf } from "./timelineChrome";
 import "./timeline.css";
 
 const CAPS_KEY = "planner-capability-caps";
@@ -553,7 +553,7 @@ export function TimelineView({ projects, theme, initialOptimizerOpen }: Timeline
         </span>
         <span className="sv-vr" />
         <span className="atl-eyebrow">porównanie</span>
-        <div className="atl-seg">
+        <div className="atl-seg" role="tablist" aria-label="Sposób porównania" onKeyDown={groupArrowNav}>
           {(
             [
               { id: "serify", label: "serify" },
@@ -563,6 +563,10 @@ export function TimelineView({ projects, theme, initialOptimizerOpen }: Timeline
             <button
               key={m.id}
               type="button"
+              role="tab"
+              aria-selected={fillMode === m.id}
+              tabIndex={fillMode === m.id ? 0 : -1}
+              title={m.label}
               className={`atl-seg-text ${fillMode === m.id ? "is-active" : ""}`}
               onClick={() => setFillMode(m.id)}
             >
@@ -576,6 +580,7 @@ export function TimelineView({ projects, theme, initialOptimizerOpen }: Timeline
           className={`sv-opt-toggle ${drawerOpen ? "is-on" : ""}`}
           onClick={() => setDrawerOpen((v) => !v)}
           disabled={plannedProjects.length === 0}
+          aria-expanded={drawerOpen}
           title={plannedProjects.length === 0 ? "Brak projektów w planie" : undefined}
         >
           <span className="atl-spark">✦</span> Optymalizuj…

@@ -20,7 +20,7 @@ import {
 } from "../../lib/staffing";
 import type { Capability, Leave, Person, Team } from "../../types";
 import type { StaffingApi } from "../../hooks/useStaffing";
-import { fmt, fmt2, plCount, solid } from "../timelineChrome";
+import { fmt, fmt2, groupArrowNav, plCount, solid } from "../timelineChrome";
 import { AxisBackdrop, AxisHeader, ObsadaToolbar } from "./ObsadaGrid";
 import { AXIS_H, useTimelineScroll } from "./timelineScroll";
 import { buildObsadaAxis, focusLabel, shortDay, stepTo } from "./axis";
@@ -289,9 +289,12 @@ export function PeopleLoadView({ ctx, people, teams, staffing }: PeopleLoadViewP
           </span>
         }
       >
-        <div className="atl-seg">
+        <div className="atl-seg" role="tablist" aria-label="Grupowanie osób" onKeyDown={groupArrowNav}>
           <button
             type="button"
+            role="tab"
+            aria-selected={grouping === "team"}
+            tabIndex={grouping === "team" ? 0 : -1}
             className={grouping === "team" ? "is-active" : undefined}
             onClick={() => setGrouping("team")}
           >
@@ -299,6 +302,9 @@ export function PeopleLoadView({ ctx, people, teams, staffing }: PeopleLoadViewP
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={grouping === "capability"}
+            tabIndex={grouping === "capability" ? 0 : -1}
             className={grouping === "capability" ? "is-active" : undefined}
             onClick={() => setGrouping("capability")}
           >
@@ -350,6 +356,7 @@ export function PeopleLoadView({ ctx, people, teams, staffing }: PeopleLoadViewP
                           type="button"
                           className="obs-name-add"
                           title="Dodaj nieobecność"
+                          aria-label={`Dodaj nieobecność — ${row.person.name}`}
                           onClick={() => setLeaveDraft({ personId: row.person.id })}
                         >
                           <Plus size={12} />

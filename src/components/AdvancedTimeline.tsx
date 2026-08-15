@@ -26,6 +26,7 @@ import {
   buildAxis,
   buildHueMap,
   fmt,
+  groupArrowNav,
   plCount,
   soft,
   solid,
@@ -407,6 +408,7 @@ export function AdvancedTimeline({ projects, pools, onOpenMatrix, theme }: Advan
                       <span
                         className={`atl-fte ${isPace1 ? "is-pace1" : ""} ${isPace2 ? "is-pace2" : ""}`}
                         role="radiogroup"
+                        onKeyDown={groupArrowNav}
                         aria-label={`Maks. obsada ${CAPABILITY_LABELS[capability]}${paceNote ? ` — ${paceNote}` : ""}`}
                         title={
                           paceNote
@@ -414,15 +416,21 @@ export function AdvancedTimeline({ projects, pools, onOpenMatrix, theme }: Advan
                             : `${CAPABILITY_LABELS[capability]} ma zapas — załoga jest zwolniona, żeby skończyć razem z resztą, więc podniesienie tego sufitu niczego nie zmieni.`
                         }
                       >
-                        {CEILING_FTE_STEPS.map((v) => {
+                        {CEILING_FTE_STEPS.map((v, i, steps) => {
                           const on = cell.maxFte >= v - CEILING_FTE_EPS;
                           const current = Math.abs(cell.maxFte - v) < CEILING_FTE_EPS;
+                          // Roving tabindex: the chosen stop is the group's one
+                          // Tab stop; with nothing on a step, the first stop is.
+                          const hasCurrent = steps.some(
+                            (s) => Math.abs(cell.maxFte - s) < CEILING_FTE_EPS,
+                          );
                           return (
                             <button
                               key={v}
                               type="button"
                               role="radio"
                               aria-checked={current}
+                              tabIndex={current || (!hasCurrent && i === 0) ? 0 : -1}
                               className={`atl-fte-slot ${on ? "is-on" : ""} ${current ? "is-current" : ""}`}
                               title={`Ustaw maks. obsadę ${CAPABILITY_LABELS[capability]} na ${fmt(v)} FTE`}
                               onClick={() => setCell(project.id, capability, { maxFte: v })}
@@ -592,14 +600,16 @@ export function AdvancedTimeline({ projects, pools, onOpenMatrix, theme }: Advan
         <div className="atl-spacer" />
 
         <div className="atl-group">
-          <span className="atl-eyebrow" title="gęstość wierszy">
-            gęstość
-          </span>
-          <div className="atl-seg">
+          <span className="atl-eyebrow">gęstość</span>
+          <div className="atl-seg" role="tablist" aria-label="Gęstość wierszy" onKeyDown={groupArrowNav}>
             {DENSITIES.map((d) => (
               <button
                 key={d.id}
                 type="button"
+                role="tab"
+                aria-selected={d.id === D.id}
+                tabIndex={d.id === D.id ? 0 : -1}
+                aria-label={`Gęstość ${d.label}`}
                 className={`atl-seg-icon ${d.id === D.id ? "is-active" : ""}`}
                 onClick={() => setDensityId(d.id)}
               >
@@ -607,14 +617,18 @@ export function AdvancedTimeline({ projects, pools, onOpenMatrix, theme }: Advan
               </button>
             ))}
           </div>
-          <span className="atl-eyebrow" title="miesięcy na ekran" style={{ paddingLeft: 3 }}>
+          <span className="atl-eyebrow" style={{ paddingLeft: 3 }}>
             zoom
           </span>
-          <div className="atl-seg">
+          <div className="atl-seg" role="tablist" aria-label="Miesięcy na ekran" onKeyDown={groupArrowNav}>
             {ZOOMS.map((z) => (
               <button
                 key={z.id}
                 type="button"
+                role="tab"
+                aria-selected={Math.abs(z.ppm - ppm) < 0.5}
+                tabIndex={Math.abs(z.ppm - ppm) < 0.5 ? 0 : -1}
+                aria-label={`Zoom ${z.label}`}
                 className={`atl-seg-icon ${Math.abs(z.ppm - ppm) < 0.5 ? "is-active" : ""}`}
                 onClick={() => setPpm(z.ppm)}
               >
@@ -626,6 +640,7 @@ export function AdvancedTimeline({ projects, pools, onOpenMatrix, theme }: Advan
             type="button"
             className={`atl-btn ${keyOpen ? "is-on" : ""}`}
             onClick={() => setKeyOpen((v) => !v)}
+            aria-expanded={keyOpen}
           >
             Legenda
           </button>
@@ -664,7 +679,9 @@ export function AdvancedTimeline({ projects, pools, onOpenMatrix, theme }: Advan
             <button
               type="button"
               className="atl-collapse"
-              title="zwiń kolumnę projektu"
+              title={nameCollapsed ? "rozwiń kolumnę projektu" : "zwiń kolumnę projektu"}
+              aria-label={nameCollapsed ? "Rozwiń kolumnę projektu" : "Zwiń kolumnę projektu"}
+              aria-pressed={nameCollapsed}
               onClick={() => setNameCollapsed((v) => !v)}
             >
               {nameCollapsed ? <ChevronsRight size={11} /> : <ChevronsLeft size={11} />}
