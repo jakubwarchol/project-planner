@@ -237,15 +237,20 @@ export function TimelineView({
       const id = newId("variant");
       // The label carries the hire, because that is what distinguishes this
       // variant from its siblings: "+3: BE×2 · UX" beats "Optymalizacja (4)".
+      // The absolute team size rides along because "+N" is relative to the
+      // baseline selected at creation — baselines change and get deleted, and
+      // a "+4" built on a big baseline once read as smaller than a "+7" built
+      // on the roster, which cost a real afternoon of confusion.
       const who = CAPABILITY_ORDER.filter((c) => (scenario.byCapability[c] ?? 0) > 0)
         .map((c) => {
           const n = scenario.byCapability[c] ?? 0;
           return n > 1 ? `${c}×${n}` : c;
         })
         .join(" · ");
+      const total = CAPABILITY_ORDER.reduce((sum, c) => sum + (vector[c] ?? 0), 0);
       const label = optimizedLabel(
         variants.map((v) => v.label),
-        `+${scenario.hires}: ${who}`,
+        `+${scenario.hires} → ${fmt(total)} FTE: ${who}`,
       );
       // Straight through addVariant, not createVariant — clampFte would
       // re-round the vector and store a different plan than the drawer showed.
@@ -285,10 +290,11 @@ export function TimelineView({
           return n > 1 ? `${c}×${n}` : c;
         })
         .join(" · ");
+      const total = CAPABILITY_ORDER.reduce((sum, c) => sum + (rung.pools[c] ?? 0), 0);
       const core =
         rung.hires === 0
-          ? `sufity ×${raisedCells}`
-          : `+${rung.hires}: ${who}${raisedCells > 0 ? ` · sufity ×${raisedCells}` : ""}`;
+          ? `sufity ×${raisedCells} (${fmt(total)} FTE)`
+          : `+${rung.hires} → ${fmt(total)} FTE: ${who}${raisedCells > 0 ? ` · sufity ×${raisedCells}` : ""}`;
       const label = optimizedLabel(
         variants.map((v) => v.label),
         core,
