@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, DragEvent, KeyboardEvent as ReactKeyboardEvent } from "react";
-import { Eye, EyeOff, GripVertical, HelpCircle, X } from "lucide-react";
+import { Eye, EyeOff, GripVertical, HelpCircle, WandSparkles, X } from "lucide-react";
 import { useCapabilityMatrix } from "../hooks/useCapabilityMatrix";
 import { useCapabilitySchedule, earliestStartOffsets } from "../hooks/useCapabilitySchedule";
 import { useCeilingProposal, type CeilingProposalApi } from "../hooks/useCeilingProposal";
@@ -23,12 +23,23 @@ import {
 import { usePlanner } from "../state/plannerContext";
 import type { Capability, CapabilityCell, Estimate, EstimationSettings, Project } from "../types";
 import { NumberField } from "./NumberField";
-import { MOD, fmt, fmt2, groupArrowNav, plCount } from "./timelineChrome";
+import { MOD, SCREENS, fmt, fmt2, plCount } from "./timelineChrome";
 import "./capabilityMatrix.css";
+import {
+  Gap,
+  IconButton,
+  Legend,
+  PillButton,
+  ScreenFooter,
+  ScreenHeader,
+  Toggle,
+  UnderlineTabs,
+  type ResolvedTheme,
+} from "../design";
 
 interface CapabilityMatrixProps {
   projects: Project[];
-  theme: "auto" | "light" | "dark";
+  theme: ResolvedTheme;
   /** The reverse link: when the autopilot is blocked on empty pools, the
    *  answer lives in Symulacje (transfers and hiring). */
   onOpenCompareOptimizer: () => void;
@@ -67,7 +78,7 @@ const HELP_ITEMS: { token: string; tone?: "accent" | "warn"; title: string; body
     token: "0,5–3",
     tone: "accent",
     title: "Pasek na dole: maksymalne obłożenie (FTE)",
-    body: "Ile najwięcej osób tej kompetencji ma sens pracować równolegle. Jeden segment paska to pół etatu, zakres 0,5–3,0 — kliknij segment, aby ustawić sufit; wybrany segment zawsze pokazuje swoją wartość, a podpisy 1 / 2 / 3 pojawiają się pod kursorem. Nie budżet, a granica sensownego zrównoleglenia: 60 dni przy max 2 FTE to około półtora miesiąca.",
+    body: "Ile najwięcej osób tej kompetencji ma sens pracować równolegle. Jeden segment paska to pół etatu, zakres 0,5–3,0 — kliknij segment, aby ustawić sufit; pasek rozwija się pod kursorem i wtedy pokazuje podpisy wartości. Nie budżet, a granica sensownego zrównoleglenia: 60 dni przy max 2 FTE to około półtora miesiąca.",
   },
   {
     token: "1,4",
@@ -415,82 +426,63 @@ export function CapabilityMatrix({
   const maxWeight = Math.max(...ESTIMATE_ORDER.map((e) => settings.estimateValues[e]));
   const horizonDelta = schedule.horizonMonths - (openingHorizon.current ?? 0);
   const showHorizonDelta = Number.isFinite(horizonDelta) && Math.abs(horizonDelta) >= 0.05;
+  const plannedDaysTotal = CAPABILITY_ORDER.reduce((sum, c) => sum + totals.planned[c], 0);
 
   return (
-    <div className="cm2" data-theme={theme === "auto" ? undefined : theme}>
-      <header className="cm2-header">
-        <div className="cm2-title">
-          <b>Wyceny</b>
-          <span className="cm2-chip">
-            {plCount(projects.length, "projekt", "projekty", "projektów")}
-          </span>
-          <span className="cm2-chip is-muted">{outOfPlanCount} poza planem</span>
-        </div>
-
-        <div className="cm2-spacer" />
-
-        <div className="cm2-tools">
-          {tab === "days" && (
-            <>
-              <button
-                type="button"
-                role="switch"
-                className={`cm2-crew-toggle ${showCrew ? "is-on" : ""}`}
-                onClick={() => setShowCrew((v) => !v)}
-                title="Pokaż wyliczoną przez model załogę pod każdym sufitem"
-                aria-checked={showCrew}
-              >
-                <span className="cm2-switch">
-                  <span className="cm2-switch-knob" />
-                </span>
-                <span>załoga</span>
-              </button>
-              <button
-                type="button"
-                className={`cm2-btn ${showProposals ? "is-on" : ""}`}
-                onClick={() => setShowProposals((v) => !v)}
-                title="Znajdź sufity, których podniesienie faktycznie skraca plan"
-                aria-expanded={showProposals}
-              >
-                <span className="cm2-spark">✦</span>
-                <span>Propozycje sufitów</span>
-              </button>
-            </>
-          )}
-          <div className="cm2-seg" role="tablist" aria-label="Zakładki wycen" onKeyDown={groupArrowNav}>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={tab === "days"}
-              tabIndex={tab === "days" ? 0 : -1}
-              className={tab === "days" ? "is-active" : undefined}
-              onClick={() => setTab("days")}
+    <div className="cm2" data-theme={theme}>
+      <ScreenHeader
+        eyebrow="Wyceny"
+        value={fmt(plannedDaysTotal)}
+        unit="dni nakładu"
+        actions={
+          <>
+            {tab === "days" && (
+              <>
+                <Toggle
+                  checked={showCrew}
+                  onChange={setShowCrew}
+                  title="Pokaż wyliczoną przez model załogę pod każdym sufitem"
+                >
+                  załoga
+                </Toggle>
+                <PillButton
+                  icon={<WandSparkles size={13} strokeWidth={1.75} />}
+                  active={showProposals}
+                  onClick={() => setShowProposals((v) => !v)}
+                  title="Znajdź sufity, których podniesienie faktycznie skraca plan"
+                  aria-expanded={showProposals}
+                >
+                  Propozycje sufitów
+                </PillButton>
+              </>
+            )}
+            <UnderlineTabs
+              label="Zakładki wycen"
+              value={tab}
+              onChange={setTab}
+              items={[
+                { id: "days" as const, label: "dni nakładu" },
+                { id: "settings" as const, label: "ustawienia" },
+              ]}
+            />
+            <IconButton
+              label="Jak czytać ten ekran"
+              size="lg"
+              filled
+              active={showHelp}
+              onClick={() => setShowHelp((v) => !v)}
+              aria-expanded={showHelp}
             >
-              dni nakładu
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={tab === "settings"}
-              tabIndex={tab === "settings" ? 0 : -1}
-              className={tab === "settings" ? "is-active" : undefined}
-              onClick={() => setTab("settings")}
-            >
-              ustawienia
-            </button>
-          </div>
-          <button
-            type="button"
-            className={`cm2-icon-btn ${showHelp ? "is-on" : ""}`}
-            onClick={() => setShowHelp((v) => !v)}
-            title="Jak czytać ten ekran"
-            aria-label="Jak czytać ten ekran"
-            aria-expanded={showHelp}
-          >
-            <HelpCircle size={14} />
-          </button>
-        </div>
-      </header>
+              <HelpCircle size={13} strokeWidth={1.75} />
+            </IconButton>
+          </>
+        }
+      >
+        Jasność komórki niesie ciężar wyceny, więc wąskie gardła widać bez czytania liczb.
+        Pasek pod liczbą to sufit obłożenia.{" "}
+        {plCount(projects.length, "projekt", "projekty", "projektów")}, {outOfPlanCount} poza
+        planem.
+      </ScreenHeader>
 
       {tab === "settings" ? (
         <div className="cm2-settings">
@@ -503,10 +495,7 @@ export function CapabilityMatrix({
                 key={estimate}
                 style={{ "--pill": sizeColor(estimate) } as CSSProperties}
               >
-                <span className="cm2-size">
-                  <span className="cm2-size-dot" />
-                  <span>{estimate}</span>
-                </span>
+                <span className="cm2-size">{estimate}</span>
                 <NumberField
                   key={`weight-${estimate}`}
                   initial={settings.estimateValues[estimate]}
@@ -637,9 +626,8 @@ export function CapabilityMatrix({
         <div className="cm2-scroll">
           <div className="cm2-canvas" ref={gridRef} onKeyDown={handleGridKeyDown}>
             <div className="cm2-cols">
-              <div className="cm2-cols-name">
-                <span style={{ flex: 1 }}>projekt</span>
-              </div>
+              <div className="cm2-cols-name" />
+
               {CAPABILITY_ORDER.map((capability) => {
                 const months = pressure.months[capability];
                 const isWall = capability === pressure.wallCap;
@@ -678,7 +666,7 @@ export function CapabilityMatrix({
                   </div>
                 );
               })}
-              <div className="cm2-cols-ref">suma / ref</div>
+              <div className="cm2-cols-ref">suma</div>
             </div>
 
             {byCategory.map(({ category, projects: catProjects }) => {
@@ -777,8 +765,7 @@ export function CapabilityMatrix({
                             style={{ "--pill": sizeColor(project.estimate) } as CSSProperties}
                             title={`rozmiar ${project.estimate} — sugeruje ${fmt(reference)} dni`}
                           >
-                            <span className="cm2-size-dot" />
-                            <span>{project.estimate}</span>
+                            {project.estimate}
                           </span>
                           <span className="cm2-name-text">{project.name}</span>
                         </div>
@@ -810,10 +797,18 @@ export function CapabilityMatrix({
                           const ceilCurrent = CEIL_STEPS.find(
                             (v) => Math.abs(cell.maxFte - v) < CEIL_EPS,
                           );
+                          // v5 reads effort as a monochrome heat wash: the
+                          // weight of the estimate as lightness, saturating
+                          // around the heaviest single cells in the portfolio.
+                          const heat =
+                            !off && !flagged && days > 0
+                              ? `rgba(var(--heat-ch), ${(0.022 + Math.min(0.18, (days / 420) * 0.18)).toFixed(3)})`
+                              : undefined;
                           return (
                             <div
                               key={capability}
                               className={`cm2-cell ${off ? "is-off" : ""} ${flagged ? "is-flagged" : ""}`}
+                              style={heat ? ({ "--heat": heat } as CSSProperties) : undefined}
                               onClick={(e) => {
                                 if (e.shiftKey) {
                                   e.preventDefault();
@@ -957,7 +952,6 @@ export function CapabilityMatrix({
                           >
                             <div className="cm2-ref-nums">
                               <b className={silentlyUnscheduled ? "is-warn" : ""}>{fmt(sum)}</b>
-                              <span className="cm2-ref-of">/ {fmt(reference)}</span>
                             </div>
                             <div className="cm2-ref-track">
                               <div
@@ -979,78 +973,54 @@ export function CapabilityMatrix({
         </div>
       )}
 
-      <footer className="cm2-footer">
-        {tab === "settings" ? (
-          <>
-            <span>zmiany wpływają na wszystkie projekty i harmonogram od razu</span>
-            <span style={{ flex: 1 }} />
-            <span>
-              {MOD}1…{MOD}6 przeskakuje między widokami
-            </span>
-          </>
-        ) : (
-          <>
-            <div className="cm2-foot-group">
+      {tab === "settings" ? (
+        <ScreenFooter>
+          <span>zmiany wpływają na wszystkie projekty i harmonogram od razu</span>
+          <Gap />
+          <span>
+            {MOD}1…{MOD}{SCREENS.length} przeskakuje między widokami
+          </span>
+        </ScreenFooter>
+      ) : (
+        <ScreenFooter>
+          <Legend color="rgba(var(--heat-ch), 0.04)">lekka wycena</Legend>
+          <Legend color="rgba(var(--heat-ch), 0.20)">ciężka wycena</Legend>
+          {/* Every project runs two phases and each has its own pace-setter,
+              so a row can carry two coloured strips. The legend says which is
+              which — otherwise "two purples" reads as a bug. */}
+          <Legend color="var(--accent)">tempo inicjacji</Legend>
+          <Legend color="var(--pace2)">tempo budowy</Legend>
+          <span className="cm2-horizon" title="ile potrwa cały plan przy obecnych sufitach i puli">
+            <span className="cm2-eyebrow">horyzont</span>
+            <b>{fmtM(schedule.horizonMonths)} mies.</b>
+            {showHorizonDelta && (
               <span
-                className="cm2-horizon"
-                title="ile potrwa cały plan przy obecnych sufitach i puli"
+                className={`cm2-delta ${horizonDelta < 0 ? "is-ok" : "is-warn"}`}
+                title="zmiana od otwarcia tego ekranu"
               >
-                <span className="cm2-eyebrow">horyzont</span>
-                <b>{fmtM(schedule.horizonMonths)} mies.</b>
-                {showHorizonDelta && (
-                  <span
-                    className={`cm2-delta ${horizonDelta < 0 ? "is-ok" : "is-warn"}`}
-                    title="zmiana od otwarcia tego ekranu"
-                  >
-                    {signed(horizonDelta)}
-                  </span>
-                )}
+                {signed(horizonDelta)}
               </span>
-              <span className="cm2-foot-rule" />
-              {/* Every project runs two phases and each has its own pace-setter,
-                  so a row can carry two coloured strips. The legend says which
-                  is which — otherwise "two purples" reads as a bug. */}
-              <span
-                className="cm2-legend"
-                title="Projekt biegnie w dwóch fazach. W każdej jedna kompetencja pracuje na swoim maksymalnym obłożeniu i wyznacza długość tej fazy — tylko jej sufit warto podnosić. Pozostałe mają zapas."
-              >
-                <span className="cm2-eyebrow">tempo fazy</span>
-                <span className="cm2-legend-item">
-                  <i className="cm2-legend-chip is-pace1" />
-                  <span>inicjacja · PM UX TL</span>
+            )}
+          </span>
+          <Gap />
+          <span
+            className="cm2-tally"
+            title="ile faz w planie ta kompetencja zatrzymuje na swoim maksymalnym obłożeniu"
+          >
+            <span>tempo wyznacza</span>
+            {paceTally.length ? (
+              paceTally.slice(0, 3).map(([capability, n]) => (
+                <span className="cm2-tally-item" key={capability}>
+                  <b>{capability}</b>
+                  <span>×{n}</span>
                 </span>
-                <span className="cm2-legend-item">
-                  <i className="cm2-legend-chip is-pace2" />
-                  <span>budowa · PM TL BE FE QA SEC</span>
-                </span>
-                <span className="cm2-legend-item">
-                  <i className="cm2-legend-chip" />
-                  <span>zapas</span>
-                </span>
-              </span>
-              <span className="cm2-foot-rule" />
-              <span
-                className="cm2-tally"
-                title="ile faz w planie ta kompetencja zatrzymuje na swoim maksymalnym obłożeniu"
-              >
-                <span className="cm2-eyebrow">tempo wyznacza</span>
-                {paceTally.length ? (
-                  paceTally.slice(0, 3).map(([capability, n]) => (
-                    <span className="cm2-tally-item" key={capability}>
-                      <b>{capability}</b>
-                      <span>×{n}</span>
-                    </span>
-                  ))
-                ) : (
-                  <span>—</span>
-                )}
-              </span>
-            </div>
-            <span style={{ flex: 1 }} />
-            <span>tab i ↑↓ po komórkach · shift + klik wyłącza kompetencję</span>
-          </>
-        )}
-      </footer>
+              ))
+            ) : (
+              <span>—</span>
+            )}
+          </span>
+        </ScreenFooter>
+      )}
 
       {showHelp && (
         <aside className="cm2-drawer is-help" aria-label="Jak czytać ten ekran">

@@ -1,85 +1,8 @@
-/* Design tokens for every screen: .bv is the page shell, .atl the two
-   full-window timeline views. Light is the base; dark comes from the OS unless
-   a view's theme control overrides it. */
-.atl,
-.bv {
-  --bg: #e4e9ee;
-  --surface: #ffffff;
-  --surface-2: #eef2f6;
-  --band: #f7f9fb;
-  --band-alt: #e6ebf0;
-  --line: #ccd4dc;
-  --line-soft: #dde3e9;
-  --line-strong: #9aa6b1;
-  --ink: #0d1216;
-  --ink-2: #3b464f;
-  --ink-3: #4e5962;
-  --ink-4: #5c666e;
-  --accent: #56409e;
-  --accent-2: #43317f;
-  --accent-soft: #c6bbe8;
-  --accent-line: #8a76d4;
-  --accent-wash: rgba(86, 64, 158, 0.1);
-  /* The build phase's pace colour — matches the matrix strip so the two
-     screens say the same thing with the same hue. */
-  --pace2: #0f6b78;
-  --bar-l: 44%;
-  --bar-c: 0.095;
-  --bar-soft-l: 74%;
-  --bar-soft-c: 0.05;
-  --bar-env-l: 58%;
-  --bar-env-c: 0.06;
-  --on-bar: #ffffff;
-  --warn: #8f4413;
-  --warn-wash: rgba(143, 68, 19, 0.12);
-  /* "Covered" — obsada is the one place with a positive state worth a colour
-     of its own, because everything else in the app is a quantity, not a
-     pass/fail. */
-  --ok: #2f6b4f;
-  --ok-wash: rgba(47, 107, 79, 0.12);
-  /* Budget-year wins and the reference-plan ghosts on the Symulacje chart. */
-  --win: #1f6b4d;
-  --win-line: #6faa8f;
-  --win-edge: oklch(38% 0.075 158);
-  --ghost: #c6ced6;
-  --ghost-soft: #e2e7eb;
-  --track: #dbe2e8;
-  --idle: #4a5560;
-  --idle-wash: rgba(74, 85, 96, 0.08);
-  --row-hover: #dde5ec;
-  --name-hover: #e3eaf0;
-  --shadow: rgba(13, 18, 22, 0.14) 0 10px 24px -6px, rgba(13, 18, 22, 0.1) 0 4px 8px -4px;
-  --atl-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
-  --atl-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-  /* Control tokens — the one geometry every control draws from. Same values
-     in both themes, so no dark override. */
-  --ctl-h: 26px;
-  --ctl-r: 3px;
-  --ctl-px: 11px;
-  --field-r: 3px;
-  --focus-ring: 2px solid var(--accent-line);
-  /* The scrim behind a label riding a coloured bar. */
-  --bar-scrim: rgba(12, 16, 20, 0.5);
-}
-
-/* One focus ring for everything keyboard-reachable; never removed without a
-   replacement. Controls sitting flush in tight rows or clipped containers pull
-   the ring inward with a negative offset instead of opting out. */
-/* :where keeps this at (0,1,0), so a control's own :focus-visible override
-   wins regardless of which stylesheet the bundler emits first. */
-.atl :where(:focus-visible),
-.bv :where(:focus-visible) {
-  outline: var(--focus-ring);
-  outline-offset: 1px;
-}
+/* The page shell (.bv) and the two full-window timeline views (.atl).
+   Palette, geometry and the shared chrome live in src/design — this file only
+   describes what is particular to these screens. */
 
 .atl-seg button:focus-visible,
-.obs-tabs button:focus-visible,
-.rail-tab:focus-visible,
-.rail-icon:focus-visible {
-  outline-offset: -2px;
-}
-
 /* NumberField variants — numbers are mono and right-aligned in both. The grid
    cell stays borderless until hover; the form field carries its border. Call
    sites add their own class only for width and font-size. */
@@ -92,18 +15,17 @@
 }
 
 .nf-grid {
-  border: 1px solid transparent;
+  border: 0;
   border-radius: var(--field-r);
   background: transparent;
 }
 
 .nf-grid:hover {
-  border-color: var(--line);
+  background: var(--ghost-soft);
 }
 
 .nf-grid:focus {
-  border-color: var(--accent-line);
-  background: var(--surface-2);
+  background: var(--ghost);
 }
 
 .nf-grid:focus-visible {
@@ -111,116 +33,25 @@
 }
 
 .nf-form {
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: var(--field-r);
-  background: var(--surface-2);
+  background: var(--ghost-soft);
 }
 
 .nf-form:focus {
-  border-color: var(--accent-line);
-  background: var(--surface);
+  background: var(--ghost);
 }
 
 .nf-grid[aria-invalid="true"],
 .nf-form[aria-invalid="true"] {
-  border-color: var(--warn);
   background: var(--warn-wash);
-}
-
-@media (prefers-color-scheme: dark) {
-  .atl:not([data-theme="light"]),
-  .bv:not([data-theme="light"]) {
-    --bg: #0b0f12;
-    --surface: #12171c;
-    --surface-2: #192026;
-    --band: #141a20;
-    --band-alt: #1b232a;
-    --line: #2b343d;
-    --line-soft: #222a31;
-    --line-strong: #4b5762;
-    --ink: #f2f6f9;
-    --ink-2: #b6c2cd;
-    --ink-3: #9aa8b5;
-    --ink-4: #8895a1;
-    --accent: #b09bff;
-    --accent-2: #c9bcff;
-    --accent-soft: #3a2f6b;
-    --accent-line: #6f5ec0;
-    --accent-wash: rgba(176, 155, 255, 0.14);
-    --pace2: #6fd3e0;
-    --bar-l: 72%;
-    --bar-c: 0.11;
-    --bar-soft-l: 45%;
-    --bar-soft-c: 0.06;
-    --bar-env-l: 58%;
-    --bar-env-c: 0.07;
-    --on-bar: #0b0f12;
-    --warn: #f0a068;
-    --warn-wash: rgba(240, 160, 104, 0.15);
-    --ok: #7bc4a0;
-    --ok-wash: rgba(123, 196, 160, 0.14);
-    --track: #1e262d;
-    --idle: #9aa8b5;
-    --idle-wash: rgba(154, 168, 181, 0.1);
-    --row-hover: #222b33;
-    --name-hover: #27313a;
-    --win: #7fc79b;
-    --win-line: #3f6b53;
-    --win-edge: oklch(62% 0.09 158);
-    --ghost: #3a444d;
-    --ghost-soft: #232b32;
-    --shadow: rgba(0, 0, 0, 0.55) 0 10px 24px -6px, rgba(0, 0, 0, 0.4) 0 4px 8px -4px;
-  }
-}
-
-.atl[data-theme="dark"],
-.bv[data-theme="dark"] {
-  --bg: #0b0f12;
-  --surface: #12171c;
-  --surface-2: #192026;
-  --band: #141a20;
-  --band-alt: #1b232a;
-  --line: #2b343d;
-  --line-soft: #222a31;
-  --line-strong: #4b5762;
-  --ink: #f2f6f9;
-  --ink-2: #b6c2cd;
-  --ink-3: #9aa8b5;
-  --ink-4: #8895a1;
-  --accent: #b09bff;
-  --accent-2: #c9bcff;
-  --accent-soft: #3a2f6b;
-  --accent-line: #6f5ec0;
-  --accent-wash: rgba(176, 155, 255, 0.14);
-  --pace2: #6fd3e0;
-  --bar-l: 72%;
-  --bar-c: 0.11;
-  --bar-soft-l: 45%;
-  --bar-soft-c: 0.06;
-  --bar-env-l: 58%;
-  --bar-env-c: 0.07;
-  --on-bar: #0b0f12;
-  --warn: #f0a068;
-  --warn-wash: rgba(240, 160, 104, 0.15);
-  --ok: #7bc4a0;
-  --ok-wash: rgba(123, 196, 160, 0.14);
-  --win: #7fc79b;
-  --win-line: #3f6b53;
-  --win-edge: oklch(62% 0.09 158);
-  --ghost: #3a444d;
-  --ghost-soft: #232b32;
-  --track: #1e262d;
-  --idle: #9aa8b5;
-  --idle-wash: rgba(154, 168, 181, 0.1);
-  --row-hover: #222b33;
-  --name-hover: #27313a;
-  --shadow: rgba(0, 0, 0, 0.55) 0 10px 24px -6px, rgba(0, 0, 0, 0.4) 0 4px 8px -4px;
+  color: var(--warn);
 }
 
 .atl {
   position: fixed;
-  /* Below the nav rail — the one piece of chrome every screen shares. */
-  inset: 26px 0 0 0;
+  /* Right of the nav rail — the one piece of chrome every screen shares. */
+  inset: 0 0 0 var(--ds-rail-w);
   z-index: 100;
   display: flex;
   flex-direction: column;
@@ -246,43 +77,6 @@
 
 /* Header */
 
-.atl-header {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 0 14px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--line);
-  overflow-x: auto;
-  overflow-y: hidden;
-}
-
-.atl-title {
-  flex: none;
-  display: flex;
-  align-items: baseline;
-  gap: 9px;
-  white-space: nowrap;
-}
-
-.atl-title b {
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-
-.atl-chip {
-  font-family: var(--atl-mono);
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--accent);
-  border: 1px solid var(--accent-line);
-  border-radius: 2px;
-  padding: 1px 4px;
-}
-
 .atl-group {
   flex: none;
   display: flex;
@@ -293,49 +87,58 @@
 }
 
 .atl-group.is-divided {
-  padding-left: 4px;
-  border-left: 1px solid var(--line);
+  padding-left: 12px;
 }
 
 .atl-eyebrow {
-  font-family: var(--atl-mono);
-  font-size: 9.5px;
-  letter-spacing: 0.07em;
+  font-family: var(--mono);
+  font-size: var(--ds-eyebrow-size);
+  letter-spacing: var(--ds-eyebrow-track);
   text-transform: uppercase;
-  color: var(--ink-3);
+  color: var(--ink-4);
 }
 
+/* v5 has one mode switch: a word, underlined when current. */
 .atl-seg {
   display: flex;
-  border: 1px solid var(--line-strong);
-  border-radius: 3px;
-  overflow: hidden;
+  align-items: flex-end;
+  gap: 16px;
 }
 
 .atl-seg button {
+  position: relative;
   border: 0;
-  height: var(--ctl-h);
-  padding: 0 12px;
+  padding: 0 0 6px;
   background: transparent;
-  color: var(--ink-2);
+  color: var(--ink-4);
   /* Stated here, not inherited: an unstyled <button> falls back to the
      browser's 13.3px, which is how segments drifted apart between screens. */
-  font-size: 11.5px;
+  font-size: 12px;
   cursor: pointer;
+  white-space: nowrap;
 }
 
-.atl-seg button + button {
-  border-left: 1px solid var(--line-strong);
+.atl-seg button:hover {
+  color: var(--ink-2);
 }
 
 .atl-seg button.is-active {
-  background: var(--accent);
-  color: var(--on-bar);
+  color: var(--ink);
+}
+
+.atl-seg button.is-active::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--ink);
 }
 
 .atl-seg .atl-seg-text {
-  padding: 0 12px;
-  font-size: 11.5px;
+  padding: 0 0 6px;
+  font-size: 12px;
   /* Variant labels carry team size and raise counts now; a long list must
    * squeeze, not shove Edytuj/Optymalizuj off the screen. Full text lives in
    * the button's title. */
@@ -350,44 +153,41 @@
 }
 
 .atl-seg .atl-seg-icon {
-  width: 30px;
-  padding: 0;
-  font-family: var(--atl-mono);
-  font-size: 10.5px;
+  min-width: 18px;
+  padding: 0 0 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  text-align: center;
 }
 
 .atl-btn {
-  border: 1px solid var(--line-strong);
-  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  background: var(--surface-2);
   color: var(--ink-2);
   height: var(--ctl-h);
   padding: 0 var(--ctl-px);
   border-radius: var(--ctl-r);
-  font-size: 11.5px;
+  font-size: 12px;
   cursor: pointer;
   white-space: nowrap;
 }
 
 .atl-btn:hover {
   color: var(--ink);
-  border-color: var(--accent-line);
 }
 
 .atl-btn.is-on {
-  background: var(--surface-2);
-  color: var(--ink);
+  background: var(--ink);
+  color: var(--bg);
 }
 
 .atl-btn.is-mono {
-  font-family: var(--atl-mono);
-  font-size: 10.5px;
+  font-family: var(--mono);
+  font-size: 11px;
   letter-spacing: 0.06em;
-}
-
-.atl-rule {
-  width: 1px;
-  height: 22px;
-  background: var(--line);
 }
 
 .atl-spacer {
@@ -441,27 +241,13 @@
   background: var(--warn-wash);
 }
 
-.atl-key-wait {
-  width: 34px;
-  height: 15px;
-  border: 1px dashed var(--accent-line);
-  border-radius: 2px;
-  background: repeating-linear-gradient(90deg, var(--accent-wash) 0 3px, transparent 3px 6px);
-}
-
-.atl-key-num {
-  font-family: var(--atl-mono);
-  font-size: 11px;
-  color: var(--ink);
-}
-
 /* Scroll body */
 
 .atl-scroll {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  background: var(--surface);
+  background: var(--bg);
   position: relative;
 }
 
@@ -588,17 +374,6 @@
   font-size: 10.5px;
 }
 
-.atl-band-badge {
-  font-family: var(--atl-mono);
-  font-size: 9.5px;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-  border: 1px solid var(--line-strong);
-  border-radius: 2px;
-  padding: 0 4px;
-}
-
 /* Rows */
 
 .atl-rows {
@@ -696,23 +471,6 @@
   border-radius: 1px;
 }
 
-.atl-seg-people {
-  position: absolute;
-  left: 3px;
-  font-family: var(--atl-mono);
-  font-size: 10px;
-  line-height: 1;
-}
-
-.atl-bar-over {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: -1px;
-  height: 0;
-  border-top: 2px solid var(--warn);
-}
-
 .atl-out-label {
   position: absolute;
   display: flex;
@@ -724,114 +482,19 @@
   font-size: 10px;
 }
 
-.atl-empty-name {
-  position: sticky;
-  left: 0;
-  z-index: 4;
-  flex: none;
-  background: var(--band);
-  border-right: 1px solid var(--line-strong);
-  display: flex;
-  align-items: center;
-  padding: 0 14px;
-  font-family: var(--atl-mono);
-  font-size: 10px;
-  color: var(--ink-4);
-}
-
-.atl-empty-note {
-  position: relative;
-  flex: none;
-  display: flex;
-  align-items: center;
-  padding-left: 11px;
-  font-size: 12px;
-  color: var(--ink-4);
-}
-
 /* Hand-offs */
-
-.atl-flow {
-  position: absolute;
-  top: 0;
-  z-index: 3;
-  pointer-events: none;
-  overflow: visible;
-}
-
-.atl-flow-chips {
-  position: absolute;
-  top: 0;
-  z-index: 3;
-  pointer-events: none;
-}
-
-.atl-flow-chip {
-  position: absolute;
-  height: 15px;
-  padding: 0 5px;
-  background: var(--surface);
-  border-radius: 2px;
-  font-family: var(--atl-mono);
-  font-size: 10px;
-  line-height: 13px;
-}
 
 /* Spare lane */
 
-.atl-spare {
-  display: flex;
-  background: var(--idle-wash);
-  border-top: 1px solid var(--line-soft);
-}
-
-.atl-spare-name {
-  position: sticky;
-  left: 0;
-  z-index: 4;
-  flex: none;
-  background: var(--band-alt);
-  border-right: 1px solid var(--line-strong);
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  padding: 0 10px;
-  font-family: var(--atl-mono);
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--idle);
-}
-
-.atl-spare-block {
-  position: absolute;
-  bottom: 6px;
-  background: repeating-linear-gradient(45deg, var(--idle) 0 1px, transparent 1px 5px);
-  border: 1px solid var(--idle);
-  border-radius: 2px;
-}
-
-.atl-spare-label {
-  position: absolute;
-  top: 6px;
-  font-family: var(--atl-mono);
-  font-size: 11px;
-  line-height: 1;
-  color: var(--ink-2);
-  white-space: nowrap;
-}
-
 /* Popover */
 
+/* The ceiling editor — v5's anchored popover. It wears .ds-popover for its
+   surface and keeps its own dismissal, because it also toggles from the bar
+   that opened it. */
 .atl-pop {
-  position: absolute;
   z-index: 30;
   width: 196px;
-  background: var(--surface);
-  border: 1px solid var(--line-strong);
-  border-radius: 4px;
-  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.28);
-  padding: 9px 10px 8px;
+  gap: 7px;
 }
 
 .atl-pop-head {
@@ -842,35 +505,6 @@
   margin-bottom: 7px;
   font-size: 11px;
   color: var(--ink-2);
-}
-
-.atl-pop-max {
-  font-family: var(--atl-mono);
-  font-size: 10px;
-  color: var(--ink-3);
-}
-
-.atl-pop-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3px;
-  margin-bottom: 8px;
-}
-
-.atl-pop-grid button {
-  width: 24px;
-  height: 22px;
-  font-family: var(--atl-mono);
-  font-size: 11px;
-  border-radius: 2px;
-  cursor: pointer;
-  padding: 0;
-}
-
-.atl-pop-note {
-  font-size: 11px;
-  color: var(--ink-3);
-  margin: 0 0 8px;
 }
 
 .atl-pop-foot {
@@ -1004,16 +638,13 @@
 
 /* Hover breakdown — faza 1 / faza 2 side by side, with the FTE arithmetic. */
 
+/* Wears .ds-popover for its surface; all that is particular to the tip is
+   that it is pinned to the pointer and cannot be interacted with. */
 .atl-tip {
   position: fixed;
   z-index: 60;
   pointer-events: none;
   width: 460px;
-  background: var(--surface);
-  border: 1px solid var(--line-strong);
-  border-radius: 4px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.32);
-  padding: 10px 12px 9px;
   color: var(--ink-2);
 }
 
@@ -1246,320 +877,26 @@
 
 /* Footer */
 
-.atl-footer {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  padding: 0 18px;
-  background: var(--surface-2);
-  border-top: 1px solid var(--line);
-  font-family: var(--atl-mono);
-  font-size: 10px;
-  letter-spacing: 0.04em;
-  color: var(--ink-3);
-  overflow-x: auto;
-  white-space: nowrap;
-}
-
-/* Comparison view: the whole-plan band leads, so it reads as the headline. */
-.atl-band-total .atl-band-head {
-  background: var(--surface-2);
-}
-
-.atl-band-total .atl-band-name {
-  background: var(--surface-2);
-}
-
-.atl-band-total .atl-band-name b {
-  letter-spacing: 0.02em;
-}
-
 /* ── Nav rail (26px of view names above every screen) ───────────────────── */
 
-.rail {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 26px;
-  z-index: 500;
-  display: flex;
-  align-items: stretch;
-  gap: 10px;
-  padding: 0 10px;
-  background: var(--surface-2);
-  border-bottom: 1px solid var(--line);
-  font-family: var(--atl-sans);
-}
-
-.rail-logo {
-  flex: none;
-  align-self: center;
-  width: 10px;
-  height: 10px;
-  border-radius: 2px;
-  background: var(--accent);
-}
-
-.rail-tabs {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: stretch;
-}
-
-.rail-slot {
-  display: flex;
-  align-items: stretch;
-}
-
-.rail-divider {
-  align-self: center;
-  width: 1px;
-  height: 12px;
-  margin: 0 7px;
-  background: var(--line);
-}
-
-.rail-tab {
-  position: relative;
-  display: flex;
-  align-items: center;
-  padding: 0 9px;
-  border: 0;
-  background: transparent;
-  color: var(--ink-3);
-  font-size: 11px;
-  letter-spacing: 0.01em;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.rail-tab:hover {
-  color: var(--ink);
-}
-
-.rail-tab::after {
-  content: "";
-  position: absolute;
-  left: 6px;
-  right: 6px;
-  bottom: 0;
-  height: 2px;
-  background: transparent;
-}
-
-.rail-tab.is-active {
-  color: var(--ink);
-  font-weight: 600;
-}
-
-.rail-tab.is-active::after {
-  background: var(--accent);
-}
-
-.rail-actions {
-  position: relative;
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.rail-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border: 0;
-  border-radius: 3px;
-  background: transparent;
-  color: var(--ink-3);
-  cursor: pointer;
-}
-
-.rail-icon:hover,
-.rail-icon.is-on {
-  color: var(--ink);
-  background: var(--row-hover);
-}
-
-.rail-help {
-  position: absolute;
-  top: 24px;
-  right: 0;
-  z-index: 600;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  width: 340px;
-  padding: 10px 12px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  box-shadow: 0 8px 24px rgba(10, 14, 18, 0.18);
-  font-size: 11.5px;
-  color: var(--ink-2);
-}
-
-.rail-help-row {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.rail-help-row b {
-  flex: none;
-  width: 74px;
-  font-weight: 600;
-  color: var(--ink);
-}
-
-.rail-help-row span {
-  flex: 1;
-  min-width: 0;
-}
-
-.rail-help-row kbd {
-  flex: none;
-  font-family: var(--atl-mono);
-  font-size: 10px;
-  color: var(--ink-3);
-  border: 1px solid var(--line);
-  border-radius: 3px;
-  padding: 0 4px;
-  background: var(--surface-2);
-}
-
-.rail-help-foot {
-  margin: 2px 0 0;
-  padding-top: 6px;
-  border-top: 1px solid var(--line-soft);
-  font-family: var(--atl-mono);
-  font-size: 10px;
-  letter-spacing: 0.04em;
-  color: var(--ink-3);
-}
-
-/* ── Basic view (the page behind the timelines) ─────────────────────────── */
-
+/* The shell: the rail down the left, one screen filling the rest. Screens
+   own their own scrolling, so the shell itself never does. */
 .bv {
-  min-height: 100vh;
+  height: 100vh;
   display: flex;
-  flex-direction: column;
-  /* Room for the fixed nav rail. */
-  padding-top: 26px;
+  overflow: hidden;
   background: var(--bg);
   color: var(--ink);
-  font-family: var(--atl-sans);
+  font-family: var(--sans);
   font-size: 13px;
   -webkit-font-smoothing: antialiased;
 }
 
-.bv-header {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 0 20px;
-  height: 56px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--line);
-  overflow-x: auto;
-  overflow-y: hidden;
-}
-
-.bv-count {
-  font-family: var(--atl-mono);
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-  border: 1px solid var(--line-strong);
-  border-radius: 2px;
-  padding: 1px 4px;
-  white-space: nowrap;
-}
-
-.bv-body {
-  flex: 1;
-  display: flex;
-  justify-content: center;
-  padding: 28px 20px 40px;
-}
-
-.bv-column {
-  width: 100%;
-  max-width: 1080px;
+/* v5 has no cards on this screen — a section is a rule and its rows,
+   full-bleed to the screen gutter. */
+.bv-card {
   display: flex;
   flex-direction: column;
-  gap: 24px;
-}
-
-.bv-card {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.bv-card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  height: 38px;
-  padding: 0 16px;
-  background: var(--band-alt);
-  border-bottom: 1px solid var(--line-strong);
-}
-
-.bv-card-title {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  min-width: 0;
-}
-
-.bv-card-title b {
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.bv-card-sub {
-  font-family: var(--atl-mono);
-  font-size: 10.5px;
-  color: var(--ink-3);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.bv-card-hint {
-  font-family: var(--atl-mono);
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-  white-space: nowrap;
-}
-
-.bv-colhead {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  height: 26px;
-  padding: 0 16px;
-  background: var(--surface-2);
-  border-bottom: 1px solid var(--line);
-  font-family: var(--atl-mono);
-  font-size: 9.5px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ink-3);
 }
 
 /* Backlog rows */
@@ -1567,14 +904,13 @@
 .bv-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  height: 40px;
-  padding: 0 16px;
-  border-bottom: 1px solid var(--line-soft);
+  gap: 16px;
+  height: var(--ds-row-h);
+  padding: 0 var(--ds-pad-x);
 }
 
-.bv-row:last-child {
-  border-bottom: none;
+.bv-row:hover {
+  background: var(--row-hover);
 }
 
 .bv-row.is-dragging {
@@ -1645,168 +981,119 @@
   align-items: center;
   justify-content: center;
   color: var(--ink-4);
+  opacity: 0.55;
   cursor: grab;
 }
 
 .bv-row-hue {
-  width: 3px;
-  height: 22px;
+  width: 4px;
+  height: 26px;
+  border-radius: 2px;
   flex: none;
 }
 
 .bv-row-name {
   flex: 1;
   min-width: 0;
-  font-size: 13px;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+  color: var(--ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .bv-size {
-  width: 78px;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-
-.bv-colhead-size {
-  width: 78px;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  border: 0;
-  background: transparent;
-  margin: 0;
-  padding: 0;
-  letter-spacing: inherit;
-  text-transform: inherit;
-  color: var(--ink-3);
-  cursor: pointer;
-}
-
-.bv-colhead-size svg {
+  width: 34px;
   flex: none;
-}
-
-.bv-colhead-size:hover {
-  color: var(--ink);
-}
-
-.bv-colhead-size.is-on {
-  color: var(--accent);
-}
-
-.bv-size-ticks {
   display: flex;
-  gap: 1.5px;
-  align-items: flex-end;
-}
-
-.bv-size-ticks i {
-  display: block;
-  width: 2px;
+  align-items: center;
 }
 
 .bv-size-label {
-  font-family: var(--atl-mono);
-  font-size: 10.5px;
-  color: var(--ink-2);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
 }
 
 .bv-row-cat {
-  width: 148px;
-  font-family: var(--atl-mono);
-  font-size: 10.5px;
-  letter-spacing: 0.02em;
-  color: var(--ink-2);
+  width: 150px;
+  flex: none;
+  font-size: 11.5px;
+  color: var(--ink-4);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.bv-move {
-  width: 72px;
-  display: flex;
-  gap: 4px;
-  justify-content: flex-end;
-}
-
-.bv-move button {
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--line-strong);
-  border-radius: 2px;
-  background: transparent;
-  color: var(--ink-2);
-  cursor: pointer;
-}
-
-.bv-move button:hover:not(:disabled) {
-  color: var(--ink);
-  border-color: var(--accent-line);
-}
-
-.bv-move button:disabled {
-  color: var(--line-strong);
-  cursor: default;
-}
-
+.bv-move,
 .bv-crud {
-  width: 88px;
+  flex: none;
   display: flex;
-  gap: 4px;
+  gap: 2px;
   justify-content: flex-end;
+  color: var(--ink-4);
 }
 
+.bv-move {
+  width: 78px;
+}
+
+.bv-move button,
 .bv-crud button {
-  width: 26px;
-  height: 20px;
+  width: var(--ds-icon-btn);
+  height: var(--ds-icon-btn);
   padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--line-strong);
-  border-radius: 2px;
+  border: 0;
+  border-radius: 50%;
   background: transparent;
-  color: var(--ink-2);
+  color: inherit;
   font-size: 11px;
   cursor: pointer;
 }
 
-.bv-crud .bv-link:hover {
+.bv-move button:hover:not(:disabled),
+.bv-crud button:hover:not(:disabled) {
   color: var(--ink);
-  border-color: var(--accent-line);
+}
+
+.bv-move button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.bv-move button:focus-visible,
+.bv-crud button:focus-visible {
+  outline-offset: -2px;
+}
+
+.bv-crud {
+  /* A gap before the pair that changes the project rather than its place. */
+  width: 96px;
+  gap: 2px;
 }
 
 .bv-crud .bv-link.is-active {
-  color: #fff;
   background: var(--accent);
-  border-color: var(--accent);
-}
-
-.bv-crud .bv-edit:hover {
-  color: var(--ink);
-  border-color: var(--accent-line);
+  color: var(--on-bar);
 }
 
 .bv-crud .bv-delete:hover {
   color: var(--warn);
-  border-color: var(--warn);
 }
 
 .bv-crud .bv-delete.is-confirming {
   width: auto;
-  padding: 0 6px;
+  padding: 0 8px;
+  border-radius: calc(var(--ds-icon-btn) / 2);
+  font-family: var(--mono);
   font-size: 9.5px;
   letter-spacing: 0.03em;
-  color: #fff;
   background: var(--warn);
-  border-color: var(--warn);
+  color: var(--on-bar);
 }
 
 /* Project editor — a centred modal. Nine fields (name, description, size,
@@ -1921,69 +1208,67 @@
   box-shadow: inset 2px 0 0 var(--accent);
 }
 
+/* Filled wells rather than outlined boxes — the "bez linii" rule applied to
+   input. Focus brightens the well instead of drawing a border. */
 .bv-input,
 .bv-select {
   font-size: 13px;
   color: var(--ink);
-  background: var(--surface);
-  border: 1px solid var(--line);
+  background: var(--ghost-soft);
+  border: 0;
   border-radius: var(--field-r);
-  padding: 5px 7px;
+  padding: 7px 9px;
 }
 
 .bv-input:focus,
 .bv-select:focus {
-  border-color: var(--accent);
+  background: var(--ghost);
+  outline-offset: -2px;
+}
+
+/* Confirm and dismiss, the shape .ds-btn draws them: a taller capsule,
+   inverted for the one that commits. */
+.bv-save,
+.bv-cancel,
+.sim-btn,
+.sim-btn-accent {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  height: var(--ds-ctl-h-lg);
+  border: 0;
+  border-radius: calc(var(--ds-ctl-h-lg) / 2);
+  padding: 0 14px;
+  background: var(--ghost);
+  color: var(--ink-2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.bv-cancel:hover,
+.sim-btn:hover:not(:disabled) {
+  color: var(--ink);
 }
 
 .bv-save,
-.bv-cancel {
-  font-size: 11.5px;
-  height: var(--ctl-h);
-  border-radius: var(--ctl-r);
-  padding: 0 var(--ctl-px);
-  cursor: pointer;
+.sim-btn-accent {
+  padding: 0 16px;
+  background: var(--ink);
+  color: var(--bg);
+  font-weight: 600;
 }
 
-.bv-save {
-  color: var(--on-bar);
-  background: var(--accent);
-  border: 1px solid var(--accent);
+.bv-save:hover:not(:disabled),
+.sim-btn-accent:hover:not(:disabled) {
+  opacity: 0.9;
 }
 
-.bv-save:disabled {
-  border-color: var(--line);
-  background: transparent;
-  color: var(--ink-4);
+.bv-save:disabled,
+.sim-btn:disabled,
+.sim-btn-accent:disabled {
+  opacity: 0.45;
   cursor: default;
-}
-
-.bv-cancel {
-  color: var(--ink-2);
-  background: transparent;
-  border: 1px solid var(--line);
-}
-
-.bv-cancel:hover {
-  color: var(--ink);
-  border-color: var(--accent-line);
-}
-
-.bv-add-project {
-  margin: 8px 16px 12px;
-  font-size: 11.5px;
-  color: var(--ink-2);
-  background: transparent;
-  border: 1px dashed var(--line);
-  border-radius: var(--ctl-r);
-  padding: 7px 10px;
-  cursor: pointer;
-  text-align: left;
-}
-
-.bv-add-project:hover {
-  color: var(--ink);
-  border-color: var(--accent-line);
 }
 
 /* Queue rows */
@@ -2083,24 +1368,6 @@
   color: var(--ink-3);
   white-space: nowrap;
 }
-
-.bv-footer {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  height: 32px;
-  padding: 0 20px;
-  background: var(--surface-2);
-  border-top: 1px solid var(--line);
-  font-family: var(--atl-mono);
-  font-size: 10px;
-  letter-spacing: 0.04em;
-  color: var(--ink-3);
-  overflow-x: auto;
-  white-space: nowrap;
-}
-
 
 /* ── Variant editor ─────────────────────────────────────────────────────── */
 
@@ -2247,29 +1514,21 @@
 .ve-number {
   font-size: 13px;
   color: var(--ink);
-  background: var(--surface);
-  border: 1px solid var(--line);
+  background: var(--ghost-soft);
+  border: 0;
   border-radius: var(--field-r);
-  padding: 6px 8px;
+  padding: 7px 9px;
 }
 
 .ve-text:focus,
 .ve-number:focus {
-  border-color: var(--accent);
+  background: var(--ghost);
+  outline-offset: -2px;
 }
 
 .ve-number {
   width: 56px;
   text-align: center;
-}
-
-.ve-number-static {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--ink-3);
-  background: var(--surface-2);
-  border-style: dashed;
 }
 
 .ve-copy {
@@ -2496,43 +1755,11 @@
   gap: 2px;
 }
 
-.tw-band-head {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  padding: 0 4px 8px;
-  font-size: 14px;
-  color: var(--ink);
-}
-
-.tw-band-count {
-  font-size: 12px;
-  color: var(--ink-3);
-}
-
-.tw-band-fte {
-  font-family: var(--atl-mono);
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  color: var(--ink-3);
-}
-
-.tw-colhead {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 0 10px 6px;
-  font-size: 10.5px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--ink-4);
-}
-
 /* One set of widths drives the header and every row — the columns are declared
    here rather than as inline styles per cell so the two can't drift apart. */
 .tw-c-name {
-  flex: 0 0 190px;
-  width: 190px;
+  flex: 0 0 200px;
+  width: 200px;
 }
 
 .tw-c-split {
@@ -2540,33 +1767,41 @@
   min-width: 0;
 }
 
-/* Wide enough for the word "produktywność" in the header — at 88px it
-   overflowed its own column and collided with "razem". */
+/* Abbreviated because the column is sized for its number, not its name. */
 .tw-c-prod {
-  flex: 0 0 106px;
-  width: 106px;
+  flex: 0 0 64px;
+  width: 64px;
   text-align: right;
 }
 
 .tw-c-total {
-  flex: 0 0 54px;
-  width: 54px;
+  flex: 0 0 40px;
+  width: 40px;
   text-align: right;
 }
 
 .tw-c-act {
-  flex: 0 0 82px;
-  width: 82px;
+  flex: 0 0 24px;
+  width: 24px;
   display: flex;
   justify-content: flex-end;
+}
+
+/* The band's column names, on the same widths as its rows. */
+.tw-colhead {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  padding: 2px var(--ds-pad-x) 8px;
 }
 
 .tw-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 6px 10px;
-  border-bottom: 1px solid var(--line-soft);
+  gap: 18px;
+  min-height: 46px;
+  padding: 4px var(--ds-pad-x);
 }
 
 .tw-row:hover {
@@ -2585,66 +1820,94 @@
   border-color: var(--line);
 }
 
-/* Bar and chips share the split column: the bar answers "how is this person
-   divided" at a glance, the chips are where it gets edited. */
+/* The bar is the control now: it fills the column, and each segment is the
+   button that changes that capability's share. The plus sits after it. */
 .tw-split-cell {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
-/* Fixed-ish width so every row's bar starts and ends on the same pixels —
-   proportions are only comparable down a column if the scale is shared. */
+/* A fixed measure, not a stretch: proportions only compare down a column if
+   every row's bar is the same length. */
 .tw-split {
-  flex: 0 1 230px;
-  min-width: 140px;
+  flex: 0 0 420px;
+  width: 420px;
+  min-width: 0;
   display: flex;
   height: 26px;
-  border: 1px solid var(--line);
-  border-radius: 3px;
+  border: 0;
+  border-radius: var(--ds-r-bar);
   background: var(--surface-2);
-  overflow: hidden;
+  /* Not clipped: a segment's menu hangs below the bar. The end segments
+     round themselves instead, so the bar still reads as one pill. */
+  overflow: visible;
 }
 
+/* Over-allocation rings the bar from inside — a border would change its
+   height and break the row's rhythm. */
 .tw-split.is-over {
-  border-color: var(--warn);
+  box-shadow: inset 0 0 0 1.5px var(--warn);
 }
 
-.tw-split-seg {
+/* Carries the segment's share of the bar; the button inside fills it. */
+.tw-split-slot {
   display: flex;
-  align-items: center;
-  justify-content: center;
   min-width: 0;
+}
+
+/* Two classes deep so the segment's geometry beats .tw-picker-btn's own
+   regardless of which stylesheet the bundler emits first. */
+.tw-picker-btn.tw-split-seg {
+  flex: 1;
+  height: 100%;
+  min-width: 0;
+  gap: 0;
+  padding: 0;
+  border-radius: 0;
+  justify-content: center;
   overflow: hidden;
   white-space: nowrap;
-  border-right: 1px solid var(--surface);
-  font-family: var(--atl-mono);
-  font-size: 10px;
+  border-right: 2px solid var(--bg);
+  font-family: var(--mono);
+  font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
   /* The label rides on the segment, not on the page, so it follows the
      bar-contrast token — --ink would vanish into a light bar in dark mode,
      where the palette deliberately inverts. */
   color: var(--on-bar);
 }
 
-.tw-split-seg:last-child {
+.tw-split-slot:last-child .tw-split-seg {
   border-right: 0;
 }
 
-/* One chip per capability a person splits their time across. Wraps rather
-   than scrolls — someone on three capabilities is unusual enough that a taller
-   row is better than a hidden one. */
-.tw-allocs {
-  flex: 1 1 auto;
-  min-width: 0;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
+.tw-split-slot:first-child .tw-split-seg {
+  border-top-left-radius: var(--ds-r-bar);
+  border-bottom-left-radius: var(--ds-r-bar);
 }
 
-/* Ties the chip to its slice of the bar beside it. */
+/* Only when the segments reach the end. A part-time person's last segment
+   stops mid-track, and a rounded edge there would read as the end of the
+   bar rather than the end of their commitment. */
+.tw-split.is-full .tw-split-slot:last-child .tw-split-seg {
+  border-top-right-radius: var(--ds-r-bar);
+  border-bottom-right-radius: var(--ds-r-bar);
+}
+
+/* Hover and open are a scrim over the segment's own colour — a background
+   swap would lose the capability the segment stands for. */
+.tw-picker-btn.tw-split-seg:hover,
+.tw-picker-btn.tw-split-seg.is-on {
+  box-shadow: inset 0 0 0 999px rgba(255, 255, 255, 0.18);
+}
+
+.tw-picker-btn.tw-split-seg:focus-visible {
+  outline-offset: -2px;
+}
+
+/* Names the capability in the add menu. */
 .tw-alloc-dot {
   width: 6px;
   height: 6px;
@@ -2652,50 +1915,62 @@
   flex: none;
 }
 
-.tw-alloc {
+/* ── the picker: one anchored menu, used for FTE and for capabilities ── */
+
+.tw-picker {
+  position: relative;
+  display: inline-flex;
+}
+
+.tw-picker-btn {
   display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 2px 4px 2px 7px;
-  border: 1px solid var(--line);
-  border-radius: 3px;
-  background: var(--surface);
-}
-
-.tw-alloc b {
-  font-family: var(--atl-mono);
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  color: var(--ink-2);
-}
-
-.tw-alloc input {
-  width: 52px;
-}
-
-.tw-alloc-drop {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  padding: 0;
-  border: 0;
-  border-radius: 2px;
-  background: transparent;
-  color: var(--ink-4);
-  cursor: pointer;
-}
-
-.tw-alloc-drop:hover {
-  color: var(--warn);
-  background: var(--warn-wash);
-}
-
-.tw-alloc-add {
+  gap: 7px;
   height: 26px;
-  font-size: 11px;
-  color: var(--ink-3);
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--ds-r-bar);
+  background: transparent;
+  color: var(--ink-2);
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tw-picker-btn:hover,
+.tw-picker-btn.is-on {
+  background: var(--ghost);
+  color: var(--ink);
+}
+
+/* Bare and round, like every other icon-only button in v5. */
+.tw-picker-btn.tw-alloc-add {
+  flex: none;
+  width: var(--ds-icon-btn);
+  height: var(--ds-icon-btn);
+  padding: 0;
+  justify-content: center;
+  border-radius: 50%;
+  color: var(--ink-4);
+}
+
+.tw-alloc-add svg {
+  display: block;
+  flex: none;
+}
+
+/* Only the anchoring is local — .ds-popover.is-menu carries the layout. */
+.tw-picker-pop {
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+}
+
+/* A segment's menu hangs under the segment, which can sit far right; pinning
+   it to the right edge keeps it on screen for the last capability in a bar. */
+.tw-split-slot:last-child .tw-picker-pop {
+  left: auto;
+  right: 0;
 }
 
 /* Number and unit share one framed box so "70" and "%" read as a single
@@ -2704,28 +1979,29 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  height: 24px;
-  border: 1px solid var(--line);
+  height: 26px;
+  border: 0;
   border-radius: var(--field-r);
-  background: var(--surface);
+  background: transparent;
   overflow: hidden;
 }
 
-/* The frame is the field; the ring hugs the inner input's box. */
+.tw-prod:hover,
 .tw-prod:focus-within {
-  border-color: var(--accent-line);
+  background: var(--ghost-soft);
 }
 
 .tw-prod input {
-  width: 52px;
+  /* Sized to the 64px column it shares with the % — three digits fit, and
+     the field stops short of colliding with its own unit. */
+  width: 40px;
   height: 100%;
   border: 0;
   background: transparent;
   padding: 0 2px;
   text-align: right;
-  font-family: var(--atl-mono);
-  font-size: 11px;
-  font-weight: 600;
+  font-family: var(--mono);
+  font-size: 12px;
   color: var(--ink);
 }
 
@@ -2741,10 +2017,10 @@
 }
 
 .tw-prod-unit {
-  font-family: var(--atl-mono);
+  font-family: var(--mono);
   font-size: 10px;
   color: var(--ink-4);
-  padding: 0 7px 0 1px;
+  padding: 0 6px 0 1px;
 }
 
 .tw-total {
@@ -2796,261 +2072,11 @@
   cursor: default;
 }
 
-.atl-drawer {
-  position: absolute;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  width: 400px;
-  max-width: calc(100vw - 48px);
-  z-index: 9;
-  display: flex;
-  flex-direction: column;
-  background: var(--surface);
-  border-left: 1px solid var(--line);
-  box-shadow: -16px 0 30px rgba(10, 14, 18, 0.18);
-  /* Mounted permanently and slid in and out, so the transition can play. */
-  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.atl-drawer-head {
-  flex: none;
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--line);
-}
-
-.atl-drawer-title {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.atl-drawer-title b {
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.atl-drawer-sub {
-  font-family: var(--atl-mono);
-  font-size: 10px;
-  letter-spacing: 0.04em;
-  color: var(--ink-3);
-}
-
-.atl-drawer-close {
-  border: 0;
-  background: transparent;
-  color: var(--ink-2);
-  width: 22px;
-  height: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-
-.atl-drawer-close:hover {
-  color: var(--ink);
-}
-
-.atl-spark {
-  font-family: var(--atl-mono);
-  font-size: 11px;
-  line-height: 1;
-}
-
-/* click-to-pick quarter FTE in the roster's allocation chips */
-
-.tw-fte {
-  position: relative;
-  display: inline-flex;
-}
-
-.tw-fte-btn {
-  font-family: var(--atl-mono);
-  font-size: 12px;
-  width: 44px;
-  padding: 4px 0;
-  text-align: center;
-  color: var(--ink);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--ctl-r);
-  cursor: pointer;
-}
-
-.tw-fte-btn:hover,
-.tw-fte-btn.is-on {
-  border-color: var(--accent-line);
-}
-
-.tw-fte-pop {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 30;
-  display: flex;
-  gap: 2px;
-  padding: 3px;
-  background: var(--surface);
-  border: 1px solid var(--line-strong);
-  border-radius: 5px;
-  box-shadow: var(--shadow);
-}
-
-.tw-fte-opt {
-  font-family: var(--atl-mono);
-  font-size: 12px;
-  min-width: 40px;
-  padding: 5px 6px;
-  color: var(--ink-2);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 3px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.tw-fte-opt:hover {
-  background: var(--row-hover);
-  color: var(--ink);
-}
-
-.tw-fte-opt.is-active {
-  color: var(--accent);
-  border-color: var(--accent-line);
-  background: var(--accent-wash);
-}
-
 /* ── Symulacje (Optymalizacja — podgląd) ────────────────────────────────── */
 
 /* Shared buttons */
 
-.sim-btn {
-  border: 1px solid var(--line-strong);
-  background: transparent;
-  color: var(--ink-2);
-  height: var(--ctl-h);
-  padding: 0 var(--ctl-px);
-  border-radius: var(--ctl-r);
-  font-size: 11.5px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.sim-btn:hover:not(:disabled) {
-  color: var(--ink);
-  border-color: var(--accent-line);
-}
-
-.sim-btn:disabled {
-  border-color: var(--line);
-  color: var(--ink-4);
-  cursor: default;
-}
-
-.sim-btn-accent {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  border: 1px solid var(--accent-line);
-  background: var(--accent-wash);
-  color: var(--accent);
-  height: var(--ctl-h);
-  padding: 0 var(--ctl-px);
-  border-radius: var(--ctl-r);
-  font-size: 11.5px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.sim-btn-accent:hover:not(:disabled) {
-  border-color: var(--accent);
-}
-
-.sim-btn-accent:disabled {
-  border-color: var(--line);
-  background: transparent;
-  color: var(--ink-4);
-  cursor: default;
-}
-
 /* Header */
-
-.sv-header {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  height: 46px;
-  padding: 0 14px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--line);
-  overflow-x: auto;
-  overflow-y: hidden;
-}
-
-.sv-title {
-  flex: none;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.sv-vr {
-  flex: none;
-  width: 1px;
-  height: 18px;
-  background: var(--line);
-}
-
-.sv-hdr-note {
-  flex: none;
-  font-family: var(--atl-mono);
-  font-size: 10.5px;
-  color: var(--ink-3);
-  white-space: nowrap;
-  max-width: 300px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.sv-opt-toggle {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  border: 1px solid var(--line-strong);
-  background: transparent;
-  color: var(--ink-2);
-  height: var(--ctl-h);
-  padding: 0 var(--ctl-px);
-  border-radius: var(--ctl-r);
-  font-size: 11.5px;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.sv-opt-toggle:hover:not(:disabled) {
-  color: var(--ink);
-  border-color: var(--accent-line);
-}
-
-.sv-opt-toggle.is-on {
-  border-color: var(--accent-line);
-  background: var(--accent-wash);
-  color: var(--accent);
-}
-
-.sv-opt-toggle:disabled {
-  border-color: var(--line);
-  color: var(--ink-4);
-  cursor: default;
-}
 
 /* Content: variants sidebar + chart column + slide-over drawer */
 
@@ -3123,35 +2149,6 @@
   background: var(--surface);
   border-color: var(--line);
   border-left-color: var(--accent);
-}
-
-.sv-card-top {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.sv-card-label {
-  flex: 1;
-  min-width: 0;
-  font-size: 11.5px;
-  color: var(--ink);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.sv-card-fte {
-  flex: none;
-  font-family: var(--atl-mono);
-  font-size: 10px;
-  color: var(--ink-3);
-  white-space: nowrap;
-}
-
-.sv-card-meta {
-  font-family: var(--atl-mono);
-  font-size: 10px;
 }
 
 .sv-side-foot {
@@ -3700,4 +2697,27 @@
   font-family: var(--atl-mono);
   font-size: 10px;
   color: var(--ink-4);
+}
+
+/* Zespół: the pool strip rides in the header's action slot, and adding a
+   person is the design's pill rather than a link at the end of the band. */
+.tw-add-row {
+  display: flex;
+  padding: 6px var(--ds-pad-x) 4px;
+}
+
+/* A variant card's two numbers: what the plan lands at, and what that buys
+   inside the budget year. The shell is .ds-card. */
+.sv-card-figure {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+}
+
+.sv-card-figure b {
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
 }

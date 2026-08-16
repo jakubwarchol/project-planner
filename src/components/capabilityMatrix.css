@@ -1,136 +1,16 @@
-/* Kompetencje v2 — the matrix as a sticky table: name column pinned left,
-   capability header pinned top, category bands pinned under it. Tokens are
-   scoped to the screen's own root so the design's palette never leaks into
-   the shells around it; the dark set is stated twice — once for the system
-   preference, once for the explicit toggle — because the toggle must win in
-   both directions. */
+/* Wyceny — the matrix as a heat map: name column pinned left, capability
+   header pinned top, category bands pinned under it. No gridlines — the 2px
+   gutter between cells and the wash behind each one do the separating, so a
+   heavy column reads as a bright stripe before any number is read. Palette
+   and chrome come from src/design. */
 
 .cm2 {
-  --bg: #e4e9ee;
-  --surface: #ffffff;
-  --surface-2: #eef2f6;
-  --band: #f7f9fb;
-  --line: #c6cfd8;
-  --line-soft: #d7dee5;
-  --line-strong: #8e9aa5;
-  --ink: #0a0e12;
-  --ink-2: #2c363e;
-  --ink-3: #3e4952;
-  --ink-4: #5a656e;
-  --accent: #4b3691;
-  --accent-line: #7c66cd;
-  --accent-wash: rgba(75, 54, 145, 0.12);
-  /* The build phase's pace colour — far enough from accent to read apart at
-     a 20px-wide segment, and not the warn orange already spoken for. */
-  --pace2: #0f6b78;
-  --pace2-wash: rgba(15, 107, 120, 0.14);
-  --warn: #8a3f10;
-  --warn-wash: rgba(138, 63, 16, 0.14);
-  --ok: #27603c;
-  --ok-wash: rgba(39, 96, 60, 0.14);
-  --track: #d5dde4;
-  --row-hover: #f1f5f9;
-  --off: #e7ebef;
-  --size-s: #3f8a55;
-  --size-m: #a98615;
-  --size-l: #c26f1c;
-  --size-xl: #c44a22;
-  --size-xxl: #bb2436;
-  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
-  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-  /* Whatever sits on an --accent fill takes this colour. */
-  --on-bar: #ffffff;
-  /* Control tokens — shared with the .atl/.bv shells; same values in both
-     themes, so no dark override. */
-  --ctl-h: 26px;
-  --ctl-r: 3px;
-  --ctl-px: 11px;
-  --field-r: 3px;
-  --focus-ring: 2px solid var(--accent-line);
-  --bar-scrim: rgba(12, 16, 20, 0.5);
-}
-
-/* One focus ring for everything keyboard-reachable; tight in-row controls pull
-   it inward with a negative offset rather than opting out. */
-.cm2 :where(:focus-visible) {
-  outline: var(--focus-ring);
-  outline-offset: 1px;
-}
-
-.cm2-seg button:focus-visible {
-  outline-offset: -2px;
-}
-
-@media (prefers-color-scheme: dark) {
-  .cm2:not([data-theme="light"]) {
-    --bg: #0b0f12;
-    --surface: #12171c;
-    --surface-2: #1a2128;
-    --band: #151b21;
-    --line: #333d47;
-    --line-soft: #28313a;
-    --line-strong: #5a6773;
-    --ink: #f4f8fb;
-    --ink-2: #c6d2dc;
-    --ink-3: #b0bec9;
-    --ink-4: #93a1ad;
-    --accent: #bcaaff;
-    --accent-line: #7a68cf;
-    --accent-wash: rgba(188, 170, 255, 0.16);
-    --pace2: #6fd3e0;
-    --pace2-wash: rgba(111, 211, 224, 0.16);
-    --warn: #f5ab74;
-    --warn-wash: rgba(245, 171, 116, 0.16);
-    --ok: #7fd0a1;
-    --ok-wash: rgba(127, 208, 161, 0.16);
-    --track: #242d35;
-    --row-hover: #1a232a;
-    --off: #1b2228;
-    --size-s: #6cc186;
-    --size-m: #e6c64c;
-    --size-l: #f0a453;
-    --size-xl: #f47b52;
-    --size-xxl: #f56576;
-    --on-bar: #0b0f12;
-  }
-}
-
-.cm2[data-theme="dark"] {
-  --bg: #0b0f12;
-  --surface: #12171c;
-  --surface-2: #1a2128;
-  --band: #151b21;
-  --line: #333d47;
-  --line-soft: #28313a;
-  --line-strong: #5a6773;
-  --ink: #f4f8fb;
-  --ink-2: #c6d2dc;
-  --ink-3: #b0bec9;
-  --ink-4: #93a1ad;
-  --accent: #bcaaff;
-  --accent-line: #7a68cf;
-  --accent-wash: rgba(188, 170, 255, 0.16);
-  --pace2: #6fd3e0;
-  --pace2-wash: rgba(111, 211, 224, 0.16);
-  --warn: #f5ab74;
-  --warn-wash: rgba(245, 171, 116, 0.16);
-  --ok: #7fd0a1;
-  --ok-wash: rgba(127, 208, 161, 0.16);
-  --track: #242d35;
-  --row-hover: #1a232a;
-  --off: #1b2228;
-  --size-s: #6cc186;
-  --size-m: #e6c64c;
-  --size-l: #f0a453;
-  --size-xl: #f47b52;
-  --size-xxl: #f56576;
-  --on-bar: #0b0f12;
-}
-
-.cm2 {
+  /* The wash channel behind every cell. v5 is authored dark — lightness is
+     the weight — so light theme swaps the channel to ink. */
+  --heat-ch: 255, 255, 255;
   position: fixed;
-  /* Below the nav rail — the one piece of chrome every screen shares. */
-  inset: 26px 0 0 0;
+  /* Right of the nav rail — the one piece of chrome every screen shares. */
+  inset: 0 0 0 var(--ds-rail-w);
   z-index: 100;
   display: flex;
   flex-direction: column;
@@ -151,191 +31,23 @@
   line-height: normal;
 }
 
+.cm2[data-theme="light"] {
+  --heat-ch: 10, 13, 16;
+}
+
 .cm2 input[type="text"] {
   -moz-appearance: textfield;
   appearance: textfield;
 }
 
-/* ── header ─────────────────────────────────────────────────────────────── */
+/* The screen's header and its controls now come from src/design; what
+   follows is the grid itself. */
 
-.cm2-header {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 0 14px;
-  height: 56px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--line);
-}
-
-.cm2-title {
-  flex: none;
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  white-space: nowrap;
-}
-
-.cm2-title b {
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-
-.cm2-chip {
-  font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--accent);
-  border: 1px solid var(--accent-line);
-  border-radius: 2px;
-  padding: 1px 4px;
-}
-
-.cm2-chip.is-muted {
-  color: var(--ink-3);
-  border-color: var(--line);
-}
-
-.cm2-spacer {
-  flex: 1;
-  min-width: 8px;
-}
-
-.cm2-tools {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-/* The crew toggle is a labelled switch, not a button that looks pressed —
-   showing the model's answer is a reading mode, not an action. */
-.cm2-crew-toggle {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  height: 26px;
-  padding: 0 4px 0 2px;
-  border: 0;
-  background: transparent;
-  color: var(--ink-2);
-  font-size: 11.5px;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.cm2-crew-toggle.is-on {
-  color: var(--ink);
-}
-
-.cm2-switch {
-  position: relative;
-  flex: none;
-  width: 26px;
-  height: 15px;
-  border-radius: 8px;
-  background: var(--track);
-  border: 1px solid var(--line-strong);
-  transition: background 0.12s;
-}
-
-.cm2-crew-toggle.is-on .cm2-switch {
-  background: var(--accent);
-  border-color: var(--accent);
-}
-
-.cm2-switch-knob {
-  position: absolute;
-  top: 1px;
-  left: 1px;
-  width: 11px;
-  height: 11px;
-  border-radius: 50%;
-  background: var(--ink-4);
-  transition: left 0.12s;
-}
-
-.cm2-crew-toggle.is-on .cm2-switch-knob {
-  left: 13px;
-  background: var(--on-bar);
-}
-
-.cm2-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: var(--ctl-h);
-  padding: 0 var(--ctl-px);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--ctl-r);
-  background: transparent;
-  color: var(--ink-2);
-  font-size: 11.5px;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.cm2-btn.is-on {
-  border-color: var(--accent-line);
-  background: var(--accent-wash);
-  color: var(--accent);
-}
-
+/* The sparkle that marks a suggestion — the one glyph the matrix speaks. */
 .cm2-spark {
   font-family: var(--mono);
   font-size: 11px;
   line-height: 1;
-}
-
-.cm2-seg {
-  display: flex;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--ctl-r);
-  overflow: hidden;
-}
-
-.cm2-seg button {
-  border: 0;
-  border-left: 1px solid var(--line-strong);
-  padding: 0 12px;
-  height: var(--ctl-h);
-  font-size: 11.5px;
-  background: transparent;
-  color: var(--ink-2);
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.cm2-seg button:first-child {
-  border-left: 0;
-}
-
-.cm2-seg button.is-active {
-  background: var(--accent);
-  color: var(--on-bar);
-  font-weight: 600;
-}
-
-.cm2-icon-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--ctl-h);
-  height: var(--ctl-h);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--ctl-r);
-  background: transparent;
-  color: var(--ink-2);
-  cursor: pointer;
-}
-
-.cm2-icon-btn.is-on {
-  border-color: var(--accent-line);
-  background: var(--accent-wash);
-  color: var(--accent);
 }
 
 /* ── the grid ───────────────────────────────────────────────────────────── */
@@ -344,7 +56,7 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
-  background: var(--surface);
+  background: var(--bg);
 }
 
 .cm2-canvas {
@@ -360,8 +72,7 @@
   display: flex;
   align-items: stretch;
   height: 44px;
-  background: var(--surface-2);
-  border-bottom: 1px solid var(--line);
+  background: var(--bg);
 }
 
 .cm2-cols-name {
@@ -371,12 +82,13 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  /* The one elastic column: every other width in the row is fixed, so any
-     spare viewport goes to project names, never to the suma/ref tail. */
-  flex: 1 0 340px;
-  padding: 0 14px 0 34px;
-  background: var(--surface-2);
-  border-right: 1px solid var(--line);
+  /* Fixed, as in the design: the cells always start at the same x no matter
+     how long a title runs — names truncate, the tooltip carries the rest.
+     Spare viewport goes to the suma tail, never to the name column. */
+  flex: none;
+  width: 340px;
+  padding: 0 14px 0 var(--ds-pad-x);
+  background: var(--bg);
   font-family: var(--mono);
   font-size: 9.5px;
   letter-spacing: 0.07em;
@@ -385,15 +97,15 @@
 }
 
 .cm2-col {
-  width: 118px;
+  width: 112px;
+  margin-right: 2px;
   flex: none;
   display: flex;
   flex-direction: column;
   align-items: stretch;
   justify-content: center;
-  gap: 4px;
-  padding: 0 9px;
-  border-left: 1px solid var(--line-soft);
+  gap: 6px;
+  padding: 0 10px;
 }
 
 .cm2-col-top {
@@ -406,16 +118,15 @@
 .cm2-col-cap {
   font-family: var(--mono);
   font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  color: var(--ink);
+  letter-spacing: 0.1em;
+  color: var(--ink-2);
 }
 
 .cm2-col-months {
   font-family: var(--mono);
   font-size: 10px;
   letter-spacing: 0.03em;
-  color: var(--ink-3);
+  color: var(--ink-4);
 }
 
 .cm2-col-months.is-wall {
@@ -427,8 +138,7 @@
    what the ceilings say, which is why the bar wears warn when it is the one. */
 .cm2-pressure {
   height: 2px;
-  background: var(--track);
-  border-radius: 1px;
+  background: var(--line);
   overflow: hidden;
 }
 
@@ -442,13 +152,12 @@
 }
 
 .cm2-cols-ref {
-  width: 104px;
-  flex: none;
+  flex: 1 0 104px;
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   padding: 0 14px;
-  border-left: 1px solid var(--line);
   font-family: var(--mono);
   font-size: 9.5px;
   letter-spacing: 0.07em;
@@ -464,10 +173,8 @@
   align-items: center;
   gap: 10px;
   height: 30px;
-  padding: 0 14px;
-  background: var(--band);
-  border-bottom: 1px solid var(--line-soft);
-  border-top: 1px solid var(--line-soft);
+  padding: 0 var(--ds-pad-x);
+  background: var(--bg);
 }
 
 .cm2-band b {
@@ -489,7 +196,7 @@
 .cm2-row {
   display: flex;
   align-items: stretch;
-  border-bottom: 1px solid var(--line);
+  min-height: var(--ds-row-h);
   border-top: 2px solid transparent;
 }
 
@@ -516,10 +223,10 @@
   display: flex;
   align-items: center;
   gap: 9px;
-  flex: 1 0 340px;
-  padding: 0 14px 0 4px;
-  background: var(--surface);
-  border-right: 1px solid var(--line);
+  flex: none;
+  width: 340px;
+  padding: 0 14px 0 12px;
+  background: var(--bg);
 }
 
 .cm2-grip {
@@ -555,36 +262,22 @@
   color: var(--ink-4);
 }
 
-/* The pill's colour comes in per row as `--pill`, so one rule serves the
-   whole S–XXL ramp. */
+/* The size is a bare colored token, not a pill — v5 keeps hue on data and
+   nothing else, and the letterform alone carries it. The colour comes in per
+   row as `--pill`, so one rule serves the whole S–XXL ramp. */
 .cm2-size {
   flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  width: 48px;
-  height: 19px;
-  border-radius: 10px;
-  background: color-mix(in oklab, var(--pill) 15%, transparent);
-  color: var(--pill);
+  width: 30px;
   font-family: var(--mono);
-  font-size: 9.5px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-}
-
-.cm2-size-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--pill);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--pill);
 }
 
 .cm2-name-text {
   flex: 1;
   min-width: 0;
-  font-size: 12.5px;
+  font-size: var(--ds-row-name-size);
   color: var(--ink);
   white-space: nowrap;
   overflow: hidden;
@@ -593,14 +286,21 @@
 
 /* ── cells ──────────────────────────────────────────────────────────────── */
 
+/* The cell's wash comes in per cell as `--heat`: the weight of the estimate
+   as lightness, so a heavy column is a bright stripe. The 2px gutter between
+   cells is the whole separation — no gridline. */
 .cm2-cell {
-  width: 118px;
+  width: 112px;
+  margin-right: 2px;
   flex: none;
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  justify-content: flex-start;
-  border-left: 1px solid var(--line-soft);
+  justify-content: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: var(--ds-r-bar);
+  background: var(--heat, transparent);
 }
 
 .cm2-cell.is-flagged {
@@ -615,7 +315,6 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 24px;
   font-family: var(--mono);
   font-size: 11px;
   letter-spacing: 0.1em;
@@ -627,17 +326,17 @@
 .cm2-days {
   display: flex;
   align-items: baseline;
-  height: 28px;
+  height: 20px;
 }
 
 .cm2-days .cm2-input {
   padding-right: 4px;
-  font-size: 17px;
+  font-size: 15px;
+  font-weight: 300;
 }
 
 .cm2-days-unit {
   flex: none;
-  padding-right: 8px;
   font-family: var(--mono);
   font-size: 9px;
   letter-spacing: 0.05em;
@@ -652,7 +351,7 @@
   min-width: 0;
   height: 100%;
   font-size: 13px;
-  padding: 0 8px 0 6px;
+  padding: 0 4px 0 0;
 }
 
 .cm2-input::placeholder {
@@ -660,22 +359,25 @@
   opacity: 1;
 }
 
-/* Every cell with effort carries the ceiling strip on its bottom edge: six
-   half-FTE stops (0,5–3,0) drawn as one continuous bar — the filled length is
-   the ceiling, one segment is half a person. Whole-FTE labels surface only on
-   hover, so a resting cell shows just days and fill. The pace cell is the
-   only one whose ceiling constrains the plan today, so it alone fills in
-   accent — the rest stay ink, but stay writable, because lowering a slack
-   ceiling is a real edit even when raising it would change nothing. */
+/* Every cell with effort carries the ceiling strip under its number: six
+   half-FTE stops (0,5–3,0) drawn as one thin bar — the filled length is the
+   ceiling, one segment is half a person. At rest each slot draws only a 4px
+   band mid-height, the v5 strip; under the cursor (or keyboard focus) the
+   band grows to the full hit area and the whole-FTE labels surface. The pace
+   cell is the only one whose ceiling constrains the plan today, so it alone
+   fills in accent — the rest stay ink, but stay writable, because lowering a
+   slack ceiling is a real edit even when raising it would change nothing. */
 .cm2-ceil {
   display: flex;
   align-items: stretch;
-  height: 18px;
-  margin-top: auto;
-  border-top: 1px solid var(--line-soft);
+  gap: 1px;
+  height: 12px;
+  border-radius: 2px;
+  overflow: hidden;
 }
 
 .cm2-slot {
+  --seg: var(--surface-2);
   flex: 1;
   min-width: 0;
   display: flex;
@@ -683,8 +385,13 @@
   justify-content: center;
   padding: 0;
   border: 0;
-  border-right: 1px solid var(--line-soft);
-  background: var(--surface-2);
+  background: linear-gradient(
+    to bottom,
+    transparent 4px,
+    var(--seg) 4px,
+    var(--seg) 8px,
+    transparent 8px
+  );
   font-family: var(--mono);
   font-size: 9px;
   font-weight: 600;
@@ -693,40 +400,42 @@
   cursor: pointer;
 }
 
-.cm2-slot:last-child {
-  border-right: 0;
-}
-
 .cm2-slot.is-on {
-  background: var(--ink-2);
-  border-right-color: color-mix(in oklab, var(--surface) 35%, transparent);
+  --seg: var(--ink-2);
 }
 
 /* Two phases, two pace-setters, two colours: accent for inicjacja, teal for
-   budowa. A capability that paces both (PM and TL straddle the split) gets a
-   strip split between them rather than an arbitrary winner. */
-.cm2-ceil.is-pace1 .cm2-slot.is-on {
-  background: var(--accent);
+   budowa. A capability that paces both (PM and TL straddle the split) blends
+   the two rather than picking an arbitrary winner. */
+.cm2-ceil.is-pace1 .cm2-slot {
+  --seg: var(--accent-wash);
 }
 
-.cm2-ceil.is-pace1 .cm2-slot:not(.is-on) {
-  background: var(--accent-wash);
+.cm2-ceil.is-pace1 .cm2-slot.is-on {
+  --seg: var(--accent);
+}
+
+.cm2-ceil.is-pace2 .cm2-slot {
+  --seg: var(--pace2-wash);
 }
 
 .cm2-ceil.is-pace2 .cm2-slot.is-on {
-  background: var(--pace2);
+  --seg: var(--pace2);
 }
 
-.cm2-ceil.is-pace2 .cm2-slot:not(.is-on) {
-  background: var(--pace2-wash);
+.cm2-ceil.is-pace1.is-pace2 .cm2-slot {
+  --seg: color-mix(in oklab, var(--accent-wash) 50%, var(--pace2-wash));
 }
 
 .cm2-ceil.is-pace1.is-pace2 .cm2-slot.is-on {
-  background: linear-gradient(160deg, var(--accent) 48%, var(--pace2) 52%);
+  --seg: color-mix(in oklab, var(--accent) 50%, var(--pace2));
 }
 
-.cm2-ceil.is-pace1.is-pace2 .cm2-slot:not(.is-on) {
-  background: linear-gradient(160deg, var(--accent-wash) 48%, var(--pace2-wash) 52%);
+/* The expanded state: the band fills the hit area so the labels have ground
+   to sit on. */
+.cm2-ceil:hover .cm2-slot,
+.cm2-ceil:focus-within .cm2-slot {
+  background: var(--seg);
 }
 
 /* The stop under the cursor announces itself — a ring names the exact
@@ -735,14 +444,15 @@
   box-shadow: inset 0 0 0 1.5px var(--accent-line);
 }
 
-.cm2-slot:not(.is-on):hover {
-  background: var(--line-soft);
-}
-
 /* A flagged strip is all-empty; letting the cell's warn wash bleed through
    reads as "nothing set here yet" better than six neutral stubs would. */
 .cm2-ceil.is-flagged .cm2-slot {
-  background: transparent;
+  --seg: transparent;
+}
+
+.cm2-ceil.is-flagged:hover .cm2-slot,
+.cm2-ceil.is-flagged:focus-within .cm2-slot {
+  background: var(--ghost-soft);
 }
 
 .cm2-ceil:hover .cm2-slot,
@@ -752,12 +462,6 @@
 
 .cm2-ceil:hover .cm2-slot.is-on,
 .cm2-ceil:focus-within .cm2-slot.is-on {
-  color: var(--surface);
-}
-
-/* The chosen stop carries its value at rest — the strip answers "how much"
-   without a hover, and half values get a name they never had as labels. */
-.cm2-slot.is-current {
   color: var(--surface);
 }
 
@@ -771,14 +475,11 @@
   align-items: center;
   justify-content: space-between;
   gap: 4px;
-  height: 24px;
-  padding-right: 8px;
-  border-top: 1px solid var(--line-soft);
+  height: 16px;
 }
 
 .cm2-crew-k {
   flex: none;
-  padding-left: 7px;
   font-family: var(--mono);
   font-size: 9px;
   letter-spacing: 0.05em;
@@ -797,51 +498,47 @@
   color: var(--ink);
 }
 
-/* ── suma / ref ─────────────────────────────────────────────────────────── */
+/* ── suma ───────────────────────────────────────────────────────────────── */
 
+/* One number over a 2px reference bar: the bar's fill is the sum against
+   what the T-shirt size suggested, so "way over the guess" reads as a full
+   bar without a second number in the row. */
 .cm2-ref {
-  width: 104px;
-  flex: none;
+  flex: 1 0 104px;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 4px;
+  gap: 5px;
   padding: 0 14px;
-  border-left: 1px solid var(--line);
 }
 
 .cm2-ref-nums {
   display: flex;
   align-items: baseline;
   justify-content: flex-end;
-  gap: 3px;
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .cm2-ref-nums b {
-  font-weight: 600;
-  color: var(--ink);
+  font-weight: 400;
+  color: var(--ink-2);
 }
 
 .cm2-ref-nums b.is-warn {
   color: var(--warn);
 }
 
-.cm2-ref-of {
-  color: var(--ink-3);
-}
-
 .cm2-ref-track {
-  height: 3px;
-  background: var(--track);
-  border-radius: 2px;
+  height: 2px;
+  background: var(--line);
   overflow: hidden;
 }
 
 .cm2-ref-fill {
   height: 100%;
-  background: var(--accent);
+  background: var(--ink-3);
 }
 
 /* ── settings ───────────────────────────────────────────────────────────── */
@@ -939,28 +636,6 @@
 
 /* ── footer ─────────────────────────────────────────────────────────────── */
 
-.cm2-footer {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  height: 34px;
-  padding: 0 16px;
-  background: var(--surface);
-  border-top: 1px solid var(--line);
-  font-family: var(--mono);
-  font-size: 10.5px;
-  letter-spacing: 0.04em;
-  color: var(--ink-2);
-}
-
-.cm2-foot-group {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  min-width: 0;
-}
-
 .cm2-eyebrow {
   font-size: 9.5px;
   letter-spacing: 0.07em;
@@ -995,12 +670,6 @@
   background: var(--warn-wash);
 }
 
-.cm2-foot-rule {
-  width: 1px;
-  height: 14px;
-  background: var(--line);
-}
-
 .cm2-tally {
   display: flex;
   align-items: center;
@@ -1022,44 +691,13 @@
   color: var(--ink-3);
 }
 
-/* Reads the strip's colours back: a swatch per phase plus the slack grey,
-   so "why are two cells lit" is answered without opening the help. */
-.cm2-legend {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.cm2-legend-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--ink-3);
-}
-
-.cm2-legend-chip {
-  width: 12px;
-  height: 8px;
-  flex: none;
-  border-radius: 1px;
-  background: var(--ink-2);
-}
-
-.cm2-legend-chip.is-pace1 {
-  background: var(--accent);
-}
-
-.cm2-legend-chip.is-pace2 {
-  background: var(--pace2);
-}
-
 /* ── drawers: help and proposals ────────────────────────────────────────── */
 
 .cm2-drawer {
   position: absolute;
   top: 56px;
   right: 0;
-  bottom: 34px;
+  bottom: 0;
   z-index: 5;
   display: flex;
   flex-direction: column;

@@ -4,8 +4,6 @@ import {
   ChevronDown,
   ChevronsUp,
   ChevronUp,
-  Eye,
-  EyeOff,
   GripVertical,
   Pencil,
   X,
@@ -14,14 +12,18 @@ import type { Project } from "../types";
 import { ESTIMATE_ORDER, CATEGORY_ORDER, referenceEffortDays } from "../lib/estimation";
 import { useProjectCrud, type ProjectDraft } from "../hooks/useProjectCrud";
 import { usePlanner } from "../state/plannerContext";
-import { solid } from "./timelineChrome";
+import { plCount, solid } from "./timelineChrome";
+import { SectionRule } from "../design";
 
 interface ProjectListProps {
   projects: Project[];
   onReorder: (fromIndex: number, toIndex: number) => void;
   showEstimates: boolean;
-  onToggleEstimates: () => void;
   hueById: Record<string, number>;
+  /** The "new project" form is opened from the screen header's pill, so the
+   *  flag that shows it lives up there with the button. */
+  adding: boolean;
+  onAddingChange: (adding: boolean) => void;
 }
 
 // Dependency arrows live in a left gutter whose width grows with however many
@@ -270,7 +272,14 @@ function ProjectForm({ draft, title, onChange, onSave, onCancel }: ProjectFormPr
   );
 }
 
-export function ProjectList({ projects, onReorder, showEstimates, onToggleEstimates, hueById }: ProjectListProps) {
+export function ProjectList({
+  projects,
+  onReorder,
+  showEstimates,
+  hueById,
+  adding,
+  onAddingChange,
+}: ProjectListProps) {
   const { addProject, updateProject, removeProject, setBlockedBy } = useProjectCrud();
   const { settings } = usePlanner();
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
@@ -278,7 +287,6 @@ export function ProjectList({ projects, onReorder, showEstimates, onToggleEstima
   const [hover, setHover] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<ProjectDraft | null>(null);
-  const [isAdding, setIsAdding] = useState(false);
   const [addDraft, setAddDraft] = useState<ProjectDraft>(emptyDraft);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [linkingFromId, setLinkingFromId] = useState<string | null>(null);
@@ -326,7 +334,7 @@ export function ProjectList({ projects, onReorder, showEstimates, onToggleEstima
       });
     }
     setLinks(next);
-  }, [linkPlans, editingId, isAdding]);
+  }, [linkPlans, editingId, adding]);
 
   function handleDragOver(event: React.DragEvent, index: number) {
     event.preventDefault();
@@ -339,9 +347,19 @@ export function ProjectList({ projects, onReorder, showEstimates, onToggleEstima
     setDragOverIndex(null);
   }
 
+  // Opening the form is the header's job; clearing whatever else was open
+  // and starting from a blank draft is still this component's.
+  useEffect(() => {
+    if (!adding) return;
+    setConfirmDeleteId(null);
+    setEditingId(null);
+    setLinkingFromId(null);
+    setAddDraft(emptyDraft());
+  }, [adding]);
+
   function startEdit(project: Project) {
     setConfirmDeleteId(null);
-    setIsAdding(false);
+    onAddingChange(false);
     setLinkingFromId(null);
     setEditingId(project.id);
     setEditDraft(draftOf(project));
@@ -359,18 +377,10 @@ export function ProjectList({ projects, onReorder, showEstimates, onToggleEstima
     setEditDraft(null);
   }
 
-  function startAdd() {
-    setConfirmDeleteId(null);
-    setEditingId(null);
-    setLinkingFromId(null);
-    setAddDraft(emptyDraft());
-    setIsAdding(true);
-  }
-
   function saveAdd() {
     if (addDraft.name.trim() === "") return;
     addProject(trimmedDraft(addDraft));
-    setIsAdding(false);
+    onAddingChange(false);
   }
 
   function handleDelete(id: string) {
@@ -401,42 +411,18 @@ export function ProjectList({ projects, onReorder, showEstimates, onToggleEstima
 
   return (
     <section className="bv-card">
-      <div className="bv-card-head">
-        <div className="bv-card-title">
-          <b>Kolejność backlogu</b>
-          <span className="bv-card-sub">
-            {linkingFromId
-              ? "kliknij wiersz, który ma być zablokowany · esc anuluje"
-              : "pierwszy w kolejce zajmuje zasoby jako pierwszy"}
-          </span>
-        </div>
-        <span className="bv-card-hint">przeciągnij uchwyt lub użyj strzałek</span>
-      </div>
-
-      <div className="bv-colhead">
-        <span style={{ width: gutterWidth }} />
-        <span style={{ width: 22, textAlign: "right" }}>#</span>
-        <span style={{ width: 14 }} />
-        <span style={{ width: 3 }} />
-        <span style={{ flex: 1 }}>projekt</span>
-        <button
-          type="button"
-          className={`bv-colhead-size ${showEstimates ? "is-on" : ""}`}
-          onClick={onToggleEstimates}
-          aria-pressed={showEstimates}
-          title={showEstimates ? "Ukryj rozmiary" : "Pokaż rozmiary"}
-        >
-          {showEstimates ? <Eye size={11} /> : <EyeOff size={11} />}
-          rozmiar
-        </button>
-        <span style={{ width: 148 }}>kategoria</span>
-        <span style={{ width: 72 }} />
-        <span style={{ width: 88 }} />
-      </div>
+      <SectionRule
+        label="Kolejność backlogu"
+        meta={
+          linkingFromId
+            ? "kliknij wiersz, który ma być zablokowany · esc anuluje"
+            : plCount(projects.length, "projekt", "projekty", "projektów")
+        }
+        tone={linkingFromId ? "ok" : "muted"}
+      />
 
       <div className={`bv-rows ${linkingFromId ? "is-linking" : ""}`} ref={rowsRef}>
         {projects.map((project, index) => {
-          const rank = ESTIMATE_ORDER.indexOf(project.estimate) + 1;
           const hovered = hover === project.id;
           const isLinkingSource = linkingFromId === project.id;
           const isLinkingTarget = linkingFromId != null && !isLinkingSource;
@@ -493,20 +479,12 @@ export function ProjectList({ projects, onReorder, showEstimates, onToggleEstima
                 }
               >
                 {showEstimates && (
-                  <>
-                    <span className="bv-size-ticks">
-                      {ESTIMATE_ORDER.map((_, k) => (
-                        <i
-                          key={k}
-                          style={{
-                            height: 4 + k * 2,
-                            background: k < rank ? "var(--ink-3)" : "var(--line-strong)",
-                          }}
-                        />
-                      ))}
-                    </span>
-                    <span className="bv-size-label">{project.estimate}</span>
-                  </>
+                  <span
+                    className="bv-size-label"
+                    style={{ color: `var(--size-${project.estimate.toLowerCase()})` }}
+                  >
+                    {project.estimate}
+                  </span>
                 )}
               </span>
               <span className="bv-row-cat">{project.category}</span>
@@ -624,10 +602,6 @@ export function ProjectList({ projects, onReorder, showEstimates, onToggleEstima
         </svg>
       </div>
 
-      <button type="button" className="bv-add-project" onClick={startAdd}>
-        + Dodaj projekt
-      </button>
-
       {editingId && editDraft && (
         <ProjectForm
           key={editingId}
@@ -639,14 +613,14 @@ export function ProjectList({ projects, onReorder, showEstimates, onToggleEstima
         />
       )}
 
-      {isAdding && (
+      {adding && (
         <ProjectForm
           key="add"
           draft={addDraft}
           title="Nowy projekt"
           onChange={setAddDraft}
           onSave={saveAdd}
-          onCancel={() => setIsAdding(false)}
+          onCancel={() => onAddingChange(false)}
         />
       )}
     </section>

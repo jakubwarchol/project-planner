@@ -48,10 +48,10 @@ interface Key {
   minCrewFte: number;
 }
 
-// Simulating is expensive, and four components ask for the same answer: App
-// and CategoryTimeline are both mounted on the backlog screen, and each
-// full-screen view adds another. `useMemo` is per component instance, so it
-// cannot help across them — every caller re-ran the identical simulation.
+// Simulating is expensive, and several components ask for the same answer —
+// the backlog screen's header and every full-screen view. `useMemo` is per
+// component instance, so it cannot help across them: every caller re-ran the
+// identical simulation.
 //
 // The cache is keyed on argument identity, which is already stable: `projects`
 // and `cells` come from the reducer, and `pools` is a variant's own object.

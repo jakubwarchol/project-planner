@@ -4,7 +4,14 @@
 import { CAPABILITY_LABELS, CAPABILITY_ORDER } from "../lib/estimation";
 import type { LadderRung } from "../lib/hirePlusCeilings";
 
-export type Screen = "backlog" | "team" | "matrix" | "advanced" | "obsada" | "compare";
+export type Screen =
+  | "backlog"
+  | "team"
+  | "matrix"
+  | "advanced"
+  | "obsada"
+  | "load"
+  | "compare";
 
 /** "TL, FE×2, SEC" — a ladder rung's hires as the option cards and variant
  *  labels spell them. */
@@ -34,15 +41,18 @@ export function groupArrowNav(event: { key: string; currentTarget: HTMLElement; 
   next.click();
 }
 
-/** Ordered from data to results — dane wejściowe | wyniki | hipotezy. The
- *  hairlines in the nav rail sit on the group boundaries, and ⌘1…⌘6 follow
- *  this order, so it is the one place the sequence is defined. */
+/** Ordered from data to results — dane wejściowe | wyniki | hipotezy. ⌘1…⌘7
+ *  follow this order, so it is the one place the sequence is defined. */
 export const SCREENS: { id: Screen; label: string; hint: string; group: number }[] = [
   { id: "backlog", label: "Projekty", hint: "backlog i kolejność", group: 0 },
   { id: "team", label: "Zespół", hint: "ludzie i produktywność", group: 0 },
   { id: "matrix", label: "Wyceny", hint: "nakład w dniach i maksymalne obłożenie", group: 0 },
   { id: "advanced", label: "Plan", hint: "wyliczony harmonogram", group: 1 },
   { id: "obsada", label: "Obsada", hint: "kto konkretnie i kiedy", group: 1 },
+  // "Wykorzystanie" is the honest word for it, but the rail's label is 8px
+  // mono in a 64px gutter — "Obłożenie" is the same idea at a width that fits,
+  // and it is already what the matrix and obsada call this number.
+  { id: "load", label: "Obłożenie", hint: "wynik obsady dzień po dniu", group: 1 },
   { id: "compare", label: "Symulacje", hint: "co, gdyby zespół był inny", group: 2 },
 ];
 

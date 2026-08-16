@@ -1,0 +1,790 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   v5 primitives — the chrome every screen shares.
+
+   The six screens in the canvas are the same handful of parts rearranged: a
+   rail, a header with one big number, rules that open sections, rows, a
+   footer legend, and three kinds of overlay. Each of those is defined once
+   here and nowhere else, so a screen's own stylesheet only ever describes
+   what is genuinely particular to it — its data.
+
+   Every value resolves through tokens.css. No literal colours below.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─────────────────────────────── nav rail ─────────────────────────────── */
+
+.ds-rail {
+  flex: none;
+  width: var(--ds-rail-w);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 18px 0;
+  gap: 2px;
+  background: var(--v5-panel);
+  font-family: var(--sans);
+}
+
+.ds-rail-tab {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 11px 0 9px;
+  border: 0;
+  background: transparent;
+  color: var(--v5-ink4);
+  cursor: pointer;
+}
+
+.ds-rail-tab:hover {
+  color: var(--v5-ink2);
+}
+
+.ds-rail-tab.is-active {
+  color: var(--v5-ink);
+}
+
+/* The active marker is a bar in the gutter, not a fill — the rail stays as
+   quiet as the rest of the chrome. */
+.ds-rail-tab.is-active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  background: var(--v5-ink);
+}
+
+.ds-rail-tab svg {
+  display: block;
+  flex: none;
+}
+
+.ds-rail-label {
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ds-rail-spacer {
+  flex: 1;
+}
+
+.ds-rail-tab:focus-visible {
+  outline-offset: -2px;
+}
+
+/* ──────────────────────────── screen scaffold ─────────────────────────── */
+
+.ds-column {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+/* The scrolling middle of a screen, between header and footer. */
+.ds-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─────────────────────────────── header ───────────────────────────────── */
+
+.ds-header {
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  gap: 24px;
+  padding: var(--ds-header-pt) var(--ds-pad-x) var(--ds-header-pb);
+}
+
+.ds-header-metric {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+/* The eyebrow — mono, wide-tracked, uppercase. It labels the header's number
+   and opens every section rule, which is what ties the screens together. */
+.ds-eyebrow {
+  font-family: var(--mono);
+  font-size: var(--ds-eyebrow-size);
+  letter-spacing: var(--ds-eyebrow-track);
+  text-transform: uppercase;
+  color: var(--v5-ink4);
+  white-space: nowrap;
+}
+
+.ds-metric {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+}
+
+/* One number per screen, big and light. Mono so digits hold their column
+   while it animates between values. */
+.ds-metric b {
+  font-family: var(--mono);
+  font-size: var(--ds-metric-size);
+  font-weight: var(--ds-metric-weight);
+  letter-spacing: -0.03em;
+  line-height: 0.9;
+  color: var(--v5-ink);
+}
+
+.ds-metric-unit {
+  font-size: 14px;
+  color: var(--v5-ink3);
+}
+
+.ds-prose {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--ds-prose-size);
+  line-height: 1.4;
+  color: var(--v5-ink3);
+  padding-bottom: 3px;
+  text-wrap: pretty;
+}
+
+.ds-header-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding-bottom: 3px;
+}
+
+/* ──────────────────────────── underline tabs ──────────────────────────── */
+
+.ds-tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+}
+
+/* Standalone above a screen's header rather than inside it — Obsada's three
+   modes sit here, so they run slightly larger and looser. */
+.ds-tabs.is-lead {
+  gap: 22px;
+  padding: 20px var(--ds-pad-x) 0;
+}
+
+.ds-tab {
+  position: relative;
+  border: 0;
+  background: transparent;
+  padding: 0 0 6px;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--v5-ink4);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ds-tabs.is-lead .ds-tab {
+  font-size: 12.5px;
+}
+
+.ds-tab:hover {
+  color: var(--v5-ink2);
+}
+
+.ds-tab.is-active {
+  color: var(--v5-ink);
+}
+
+.ds-tab.is-active::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--v5-ink);
+}
+
+.ds-tab:focus-visible {
+  outline-offset: -2px;
+}
+
+/* ─────────────────────────────── buttons ──────────────────────────────── */
+
+/* The pill — a screen's one affordance, in the header's right corner. */
+.ds-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: var(--ctl-h);
+  padding: 0 var(--ctl-px);
+  border: 0;
+  border-radius: var(--ctl-r);
+  background: var(--v5-lift);
+  color: var(--v5-ink2);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ds-pill:hover {
+  color: var(--v5-ink);
+}
+
+.ds-pill.is-on {
+  background: var(--v5-ink);
+  color: var(--v5-bg);
+}
+
+.ds-pill svg {
+  display: block;
+  flex: none;
+}
+
+.ds-pill[disabled] {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Overlay footers speak a taller pill: confirm, dismiss, destroy. */
+.ds-btn {
+  height: var(--ds-ctl-h-lg);
+  padding: 0 14px;
+  border: 0;
+  border-radius: calc(var(--ds-ctl-h-lg) / 2);
+  background: var(--ghost);
+  color: var(--v5-ink2);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ds-btn:hover {
+  color: var(--v5-ink);
+}
+
+.ds-btn.is-primary {
+  padding: 0 16px;
+  background: var(--v5-ink);
+  color: var(--v5-bg);
+  font-weight: 600;
+}
+
+.ds-btn.is-primary:hover {
+  color: var(--v5-bg);
+  opacity: 0.9;
+}
+
+.ds-btn.is-danger {
+  padding: 0 12px;
+  background: transparent;
+  color: var(--v5-warn);
+}
+
+.ds-btn[disabled] {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Icon-only. Small is bare and sits in rows; large carries a lifted ground
+   and sits in headers and overlay corners. */
+.ds-icon-btn {
+  width: var(--ds-icon-btn);
+  height: var(--ds-icon-btn);
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--v5-ink4);
+  cursor: pointer;
+}
+
+.ds-icon-btn:hover {
+  color: var(--v5-ink2);
+}
+
+.ds-icon-btn.is-lg {
+  width: var(--ds-icon-btn-lg);
+  height: var(--ds-icon-btn-lg);
+  color: var(--v5-ink3);
+}
+
+.ds-icon-btn.is-filled {
+  background: var(--v5-lift);
+}
+
+.ds-icon-btn svg {
+  display: block;
+  flex: none;
+}
+
+.ds-icon-btn[disabled] {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.ds-icon-btn:focus-visible {
+  outline-offset: -2px;
+}
+
+/* ──────────────────────────────── toggle ──────────────────────────────── */
+
+.ds-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--v5-ink3);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ds-toggle:hover {
+  color: var(--v5-ink2);
+}
+
+.ds-toggle-track {
+  position: relative;
+  flex: none;
+  width: 28px;
+  height: 16px;
+  border-radius: 8px;
+  background: var(--v5-lift);
+}
+
+.ds-toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--v5-ink4);
+  transition: transform 120ms ease, background-color 120ms ease;
+}
+
+.ds-toggle[aria-pressed="true"] {
+  color: var(--v5-ink2);
+}
+
+.ds-toggle[aria-pressed="true"] .ds-toggle-knob {
+  transform: translateX(12px);
+  background: var(--v5-ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ds-toggle-knob {
+    transition: none;
+  }
+}
+
+/* ───────────────────────────── section rule ───────────────────────────── */
+
+/* Opens a band of rows: eyebrow, a hairline spanning the gap, and the
+   section's own summary on the right. The hairline is the only rule v5
+   allows, and it is there to carry the eye across, not to divide. */
+.ds-rule {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: var(--ds-section-pt) var(--ds-pad-x) var(--ds-section-pb);
+}
+
+.ds-rule.is-tight {
+  padding-top: 20px;
+  padding-bottom: 8px;
+}
+
+.ds-rule-line {
+  flex: 1;
+  height: 1px;
+  background: var(--v5-hair);
+}
+
+.ds-rule-meta {
+  font-family: var(--mono);
+  font-size: var(--ds-meta-size);
+  letter-spacing: 0.06em;
+  color: var(--v5-ink4);
+  white-space: nowrap;
+}
+
+.ds-rule-meta.is-warn {
+  color: var(--v5-warn);
+}
+
+.ds-rule-meta.is-ok {
+  color: var(--v5-ok);
+}
+
+.ds-rule-meta.is-loud {
+  color: var(--v5-ink3);
+}
+
+/* ──────────────────────────────── footer ──────────────────────────────── */
+
+.ds-foot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: var(--ds-foot-pt) var(--ds-pad-x) var(--ds-foot-pb);
+  font-family: var(--mono);
+  font-size: var(--ds-meta-size);
+  letter-spacing: var(--ds-meta-track);
+  color: var(--v5-ink4);
+}
+
+.ds-foot-gap {
+  flex: 1;
+}
+
+.ds-foot .is-warn {
+  color: var(--v5-warn);
+}
+
+.ds-foot .is-ok {
+  color: var(--v5-ok);
+}
+
+.ds-legend {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+/* A legend swatch is a bar at bar-radius, not a dot — it reads as a sample of
+   the thing it labels. */
+.ds-legend i {
+  display: block;
+  flex: none;
+  width: 16px;
+  height: 6px;
+  border-radius: var(--ds-r-bar);
+}
+
+/* ───────────────────────────────── card ──────────────────────────────── */
+
+/* Pickable summary — a staffing variant, a rung of the hiring ladder. Flat by
+   default; the chosen one lifts. */
+.ds-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+  text-align: left;
+  padding: 13px 15px;
+  border: 0;
+  border-radius: var(--ds-r-card);
+  background: var(--ghost-soft);
+  font-family: inherit;
+  color: var(--v5-ink2);
+  cursor: pointer;
+}
+
+.ds-card:hover {
+  background: var(--ghost);
+}
+
+.ds-card.is-active {
+  background: var(--v5-lift);
+}
+
+.ds-card-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+}
+
+.ds-card-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  color: var(--v5-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ds-card.is-active .ds-card-label {
+  font-weight: 600;
+}
+
+.ds-card-meta {
+  flex: none;
+  font-family: var(--mono);
+  font-size: var(--ds-meta-size);
+  color: var(--v5-ink4);
+}
+
+.ds-card-figure {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+/* The card's own number — the header metric one step down. */
+.ds-card-figure b {
+  font-family: var(--mono);
+  font-size: 17px;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  color: var(--v5-ink);
+}
+
+.ds-card-figure b.is-ok {
+  color: var(--v5-ok);
+}
+
+.ds-card-figure b.is-warn {
+  color: var(--v5-warn);
+}
+
+.ds-card-figure span {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--v5-ink4);
+}
+
+/* ──────────────────────────────── field ──────────────────────────────── */
+
+.ds-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+
+/* Fields are a filled well with no border — the "bez linii" rule applied to
+   input. Focus brightens the well instead of drawing an outline around it. */
+.ds-field-input,
+.ds-field-input:focus {
+  background: var(--ghost);
+  outline-offset: -2px;
+}
+
+.ds-field-input[aria-invalid="true"] {
+  background: var(--warn-wash);
+  color: var(--v5-warn);
+}
+
+/* ─────────────────────────────── overlays ─────────────────────────────── */
+
+.ds-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 15;
+  background: var(--ds-scrim);
+  border: 0;
+  padding: 0;
+}
+
+/* A drawer's scrim fades with it rather than appearing under a panel that has
+   not arrived yet. */
+.ds-drawer + .ds-scrim,
+.ds-scrim:has(+ .ds-drawer) {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ds-scrim.is-open:has(+ .ds-drawer) {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.ds-scrim.is-strong {
+  background: var(--ds-scrim-strong);
+}
+
+.ds-popover {
+  position: absolute;
+  z-index: 20;
+  border-radius: var(--ds-r-popover);
+  background: var(--v5-over);
+  box-shadow: var(--ds-shadow-popover);
+  padding: 15px 16px 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-family: var(--sans);
+  color: var(--ink);
+}
+
+/* A popover that is a menu of choices rather than a panel of prose. Two
+   classes deep so it beats .ds-popover's own layout no matter which
+   stylesheet the bundler emits first — the trap that catches every
+   single-class override in this codebase. */
+.ds-popover.is-menu {
+  flex-direction: row;
+  gap: 2px;
+  padding: 6px;
+}
+
+/* A list rather than a row — for choices with names rather than numbers. */
+.ds-popover.is-menu.is-stack {
+  flex-direction: column;
+  min-width: 140px;
+}
+
+.ds-menu-opt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 40px;
+  height: 26px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: var(--ds-r-bar);
+  background: transparent;
+  color: var(--v5-ink2);
+  font-family: var(--mono);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ds-menu-opt:hover {
+  background: var(--ghost);
+  color: var(--v5-ink);
+}
+
+/* The chosen one inverts, the way every "on" control in v5 does. */
+.ds-menu-opt.is-active {
+  background: var(--v5-ink);
+  color: var(--v5-bg);
+}
+
+/* The option that takes something away, rather than choosing something. */
+.ds-menu-opt.is-danger {
+  color: var(--v5-warn);
+}
+
+.ds-menu-opt.is-danger:hover {
+  background: var(--warn-wash);
+  color: var(--v5-warn);
+}
+
+.ds-menu-opt:focus-visible {
+  outline-offset: -2px;
+}
+
+.ds-drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 428px;
+  max-width: 100%;
+  z-index: 16;
+  display: flex;
+  flex-direction: column;
+  background: var(--v5-panel);
+  box-shadow: var(--ds-shadow-drawer);
+  font-family: var(--sans);
+  color: var(--ink);
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ds-drawer {
+    transition: none;
+  }
+}
+
+.ds-modal {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 392px;
+  max-width: calc(100% - 32px);
+  z-index: 16;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 22px;
+  border-radius: var(--ds-r-modal);
+  background: var(--v5-over);
+  box-shadow: var(--ds-shadow-modal);
+  font-family: var(--sans);
+  color: var(--ink);
+}
+
+/* Shared overlay furniture — the drawer and the modal open the same way. */
+.ds-overlay-head {
+  flex: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.ds-drawer .ds-overlay-head {
+  padding: 24px 22px 18px;
+}
+
+.ds-overlay-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.ds-overlay-title b {
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--v5-ink);
+}
+
+.ds-overlay-title span {
+  font-size: 11.5px;
+  color: var(--v5-ink4);
+}
+
+.ds-drawer-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 22px;
+}
+
+.ds-overlay-foot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ds-drawer .ds-overlay-foot {
+  padding: 16px 22px 22px;
+}
+
+.ds-overlay-gap {
+  flex: 1;
+}
+
+/* ──────────────────────────────── rows ───────────────────────────────── */
+

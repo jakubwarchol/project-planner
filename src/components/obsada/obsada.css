@@ -1,47 +1,22 @@
-/* Obsada — the three staffing screens. Tokens come from `.atl` in
-   timeline.css; only the hatches and the two status colours are local, because
-   nothing outside obsada has an "unmet demand" state to paint. */
-
-.obs {
-  --meter: #8794a0;
-  --free-hatch: repeating-linear-gradient(135deg, rgba(143, 68, 19, 0.2) 0 6px, transparent 6px 12px);
-  --gap-hatch: repeating-linear-gradient(135deg, rgba(143, 68, 19, 0.28) 0 6px, transparent 6px 12px);
-  --leave-hatch: repeating-linear-gradient(135deg, rgba(120, 130, 140, 0.3) 0 4px, transparent 4px 8px);
-}
-
-@media (prefers-color-scheme: dark) {
-  .obs:not([data-theme="light"]) {
-    --meter: #7d8b98;
-    --free-hatch: repeating-linear-gradient(135deg, rgba(240, 160, 104, 0.24) 0 6px, transparent 6px 12px);
-    --gap-hatch: repeating-linear-gradient(135deg, rgba(240, 160, 104, 0.32) 0 6px, transparent 6px 12px);
-    --leave-hatch: repeating-linear-gradient(135deg, rgba(154, 168, 181, 0.28) 0 4px, transparent 4px 8px);
-  }
-}
-
-.obs[data-theme="dark"] {
-  --meter: #7d8b98;
-  --free-hatch: repeating-linear-gradient(135deg, rgba(240, 160, 104, 0.24) 0 6px, transparent 6px 12px);
-  --gap-hatch: repeating-linear-gradient(135deg, rgba(240, 160, 104, 0.32) 0 6px, transparent 6px 12px);
-  --leave-hatch: repeating-linear-gradient(135deg, rgba(154, 168, 181, 0.28) 0 4px, transparent 4px 8px);
-}
+/* Obsada — the three staffing screens. Palette, geometry and shared chrome
+   come from src/design; this file describes only the staffing grid itself. */
 
 /* ── top strip: identity + the three screens ─────────────────────────── */
 
 .obs-strip {
   flex: none;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 12px;
-  height: 42px;
-  padding: 0 12px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--line);
+  padding: 0 var(--ds-pad-x) 0 0;
 }
 .obs-strip-sum {
-  font-family: var(--atl-mono);
-  font-size: 10.5px;
-  color: var(--ink-3);
+  font-family: var(--mono);
+  font-size: var(--ds-meta-size);
+  letter-spacing: var(--ds-meta-track);
+  color: var(--ink-4);
   white-space: nowrap;
+  padding-bottom: 6px;
 }
 
 /* ── per-view toolbar ────────────────────────────────────────────────── */
@@ -53,9 +28,7 @@
   align-items: center;
   gap: 8px 14px;
   min-height: 46px;
-  padding: 7px 12px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--line);
+  padding: 16px var(--ds-pad-x) 20px;
 }
 .obs-nav {
   display: flex;
@@ -63,17 +36,16 @@
   gap: 7px;
 }
 .obs-nav-btn {
-  width: 24px;
-  height: 24px;
-  border: 1px solid var(--line);
+  width: var(--ds-icon-btn-lg);
+  height: var(--ds-icon-btn-lg);
+  border: 0;
   background: var(--surface-2);
-  color: var(--ink-2);
-  border-radius: 3px;
+  color: var(--ink-3);
+  border-radius: 50%;
   font-size: 9px;
   cursor: pointer;
 }
 .obs-nav-btn:hover {
-  border-color: var(--line-strong);
   color: var(--ink);
 }
 .obs-nav-label {
@@ -87,8 +59,8 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  font-family: var(--atl-mono);
-  font-size: 10.5px;
+  font-family: var(--mono);
+  font-size: 11px;
   white-space: nowrap;
   color: var(--ink-3);
 }
@@ -99,9 +71,8 @@
   color: var(--ok);
 }
 .obs .atl-btn.is-on {
-  border-color: var(--accent-line);
-  background: var(--accent-wash);
-  color: var(--accent);
+  background: var(--ink);
+  color: var(--bg);
 }
 
 /* ── the scrolling day grid ──────────────────────────────────────────── */
@@ -111,7 +82,7 @@
   min-height: 0;
   overflow: auto;
   position: relative;
-  background: var(--surface);
+  background: var(--bg);
 }
 .obs-canvas {
   display: flex;
@@ -123,8 +94,7 @@
   left: 0;
   z-index: 6;
   flex: none;
-  background: var(--surface);
-  border-right: 1px solid var(--line);
+  background: var(--bg);
 }
 .obs-left-head {
   position: sticky;
@@ -132,16 +102,14 @@
   z-index: 2;
   display: flex;
   align-items: flex-end;
-  padding: 0 12px 7px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--line);
+  padding: 0 12px 7px var(--ds-pad-x);
+  background: var(--bg);
 }
 .obs-group {
   display: flex;
   align-items: center;
-  padding: 0 12px;
-  background: var(--band);
-  border-bottom: 1px solid var(--line-soft);
+  padding: 0 12px 0 var(--ds-pad-x);
+  background: var(--bg);
 }
 /* The label must never wrap: this row's height is mirrored pixel-for-pixel by
    a spacer in the scrolling column, and a second line here would slide the two
@@ -156,13 +124,11 @@
   text-overflow: ellipsis;
 }
 .obs-group-strip {
-  background: var(--band);
-  opacity: 0.6;
-  border-bottom: 1px solid var(--line-soft);
+  background: var(--bg);
 }
 
 .obs-name {
-  border-bottom: 1px solid var(--line);
+  border-bottom: 0;
 }
 .obs-name:hover {
   background: var(--row-hover);
@@ -171,7 +137,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 10px 0 12px;
+  padding: 0 10px 0 var(--ds-pad-x);
 }
 .obs-hue {
   flex: none;
@@ -209,13 +175,13 @@
 }
 .obs-name-add {
   flex: none;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--line);
-  border-radius: 3px;
+  border: 0;
+  border-radius: 50%;
   background: var(--surface-2);
   color: var(--ink-3);
   cursor: pointer;
@@ -226,8 +192,7 @@
   opacity: 1;
 }
 .obs-name-add:hover {
-  border-color: var(--accent-line);
-  color: var(--accent);
+  color: var(--ink);
 }
 
 .obs-grid {
@@ -238,8 +203,7 @@
   position: sticky;
   top: 0;
   z-index: 4;
-  background: var(--surface);
-  border-bottom: 1px solid var(--line);
+  background: var(--bg);
 }
 .obs-axis-band {
   position: absolute;
@@ -333,7 +297,6 @@
 }
 .obs-track {
   position: relative;
-  border-bottom: 1px solid var(--line);
 }
 
 /* ── Ludzie: share-of-availability bands ─────────────────────────────── */
@@ -1093,55 +1056,25 @@
   font-size: 13px;
   font-weight: 400;
 }
+.obs-primary,
+.obs-ghost,
 .obs-primary {
-  height: var(--ctl-h);
-  padding: 0 var(--ctl-px);
-  border: 1px solid var(--accent);
-  border-radius: var(--ctl-r);
-  background: var(--accent);
-  color: var(--on-bar);
-  font-size: 11.5px;
-  cursor: pointer;
+  padding: 0 16px;
+  background: var(--ink);
+  color: var(--bg);
+  font-weight: 600;
 }
 .obs-primary:hover:not(:disabled) {
-  filter: brightness(1.08);
+  opacity: 0.9;
 }
-/* Disabled keeps its outline and dims the label — never opacity. */
 .obs-primary:disabled,
 .obs-wand:disabled,
 .obs-assign:disabled {
-  border: 1px solid var(--line);
-  background: transparent;
-  color: var(--ink-4);
-  filter: none;
+  opacity: 0.45;
   cursor: default;
 }
-.obs-ghost {
-  height: var(--ctl-h);
-  padding: 0 var(--ctl-px);
-  border: 1px solid var(--line);
-  border-radius: var(--ctl-r);
-  background: transparent;
-  color: var(--ink-3);
-  font-size: 11.5px;
-  cursor: pointer;
-}
 .obs-ghost:hover {
-  border-color: var(--warn);
-  color: var(--warn);
-}
-.obs-danger {
-  height: var(--ctl-h);
-  padding: 0 var(--ctl-px);
-  border: 1px solid var(--line);
-  border-radius: var(--ctl-r);
-  background: transparent;
-  color: var(--warn);
-  font-size: 11.5px;
-  cursor: pointer;
-}
-.obs-danger:hover {
-  border-color: var(--warn);
+  color: var(--ink);
 }
 .obs-assign {
   flex: none;
@@ -1272,15 +1205,6 @@
 
 /* ── nieobecność editor ──────────────────────────────────────────────── */
 
-.obs-modal-back {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(4, 7, 10, 0.42);
-}
 .obs-modal {
   width: 300px;
   display: flex;
@@ -1317,9 +1241,19 @@
   color: var(--ink);
   font-size: 11.5px;
 }
-.obs-modal-actions {
+/* The leave editor's fields — the modal shell itself is .ds-modal. */
+.obs-modal-fields {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 4px;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.obs-modal-cols {
+  display: flex;
+  gap: 12px;
+}
+
+.obs-modal-cols > * {
+  flex: 1;
+  min-width: 0;
 }

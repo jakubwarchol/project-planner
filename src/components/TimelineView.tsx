@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { WandSparkles } from "lucide-react";
 import { useTeamVariants } from "../hooks/useTeamVariants";
 import { useHiringLadder } from "../hooks/useHiringLadder";
 import type { LadderRung } from "../lib/hirePlusCeilings";
@@ -24,6 +25,7 @@ import { HiringPlanDrawer } from "./HiringPlanDrawer";
 import { VariantEditor } from "./VariantEditor";
 import { MON, fmt, groupArrowNav, monthLabel, optimizedLabel, plCount, rungRoles, signed, weeksOf } from "./timelineChrome";
 import "./timeline.css";
+import { Card, PillButton, ScreenHeader, type ResolvedTheme } from "../design";
 
 const CAPS_KEY = "planner-capability-caps";
 
@@ -58,7 +60,7 @@ function savedCaps(): CapabilityCaps {
 
 interface TimelineViewProps {
   projects: Project[];
-  theme: "auto" | "light" | "dark";
+  theme: ResolvedTheme;
   /** Arrive with the optimizer drawer already open — the cross-screen link
    *  from the autopilot's "nobody to add" blocks in Wyceny. */
   initialOptimizerOpen?: boolean;
@@ -511,47 +513,40 @@ export function TimelineView({ projects, theme, initialOptimizerOpen }: Timeline
     const projColor = isRef ? (active ? "var(--ink-2)" : "var(--ink-4)") : gainColor(projDiff);
 
     return (
-      <button
+      <Card
         key={v.id}
-        type="button"
-        className={`sv-card ${active ? "is-active" : ""}`}
+        active={active}
         onClick={() => setVariantId(v.id)}
         title={v.label}
+        label={v.label}
+        meta={`${fmt(s.totalFte)} etatów`}
       >
-        <span className="sv-card-top">
-          <span className="sv-card-label" style={{ fontWeight: active ? 600 : 450 }}>
-            {v.label}
-          </span>
-          <span className="sv-card-fte">{fmt(s.totalFte)} etatów</span>
+        <span className="sv-card-figure">
+          <b style={{ color: planColor }}>{metaPlan}</b>
+          <span style={{ color: projColor }}>{metaProj}</span>
         </span>
-        <span className="sv-card-meta" style={{ color: planColor }}>
-          {metaPlan}
-        </span>
-        <span className="sv-card-meta" style={{ color: projColor }}>
-          {metaProj}
-        </span>
-      </button>
+      </Card>
     );
   }
 
   const stripHeadline = `${selSummary.within} projektów w ${YEAR_LINE} mies. · ${selected.label}`;
+  // The screen's one number: what the chosen variant buys against today's
+  // team, in the weeks a sprint is made of.
+  const selIsRef = selected.id === reference.id;
+  const deltaWeeks = Math.round(weeksOf(selSummary.horizon - refSummary.horizon));
   const stripSecondary =
     selSummary.impossible > 0
       ? `plan nie domyka się — ${plCount(selSummary.impossible, "projekt bez końca", "projekty bez końca", "projektów bez końca")} · ${fmt(selSummary.totalFte)} etatów · ${plannedProjects.length} projektów w portfelu`
       : `koniec planu ${fmt(selSummary.horizon)} mies. · ${fmt(selSummary.totalFte)} etatów · ${plannedProjects.length} projektów w portfelu`;
 
   return (
-    <div className="atl" data-theme={theme === "auto" ? undefined : theme}>
-      <header className="sv-header">
-        <b className="sv-title">Symulacje</b>
-        <span className="atl-chip">
-          {plCount(variants.length, "wariant", "warianty", "wariantów")}
-        </span>
-        <span className="sv-vr" />
-        <span className="sv-hdr-note" title={selected.label}>
-          wybrany wariant · {selected.label}
-        </span>
-        <span className="sv-vr" />
+    <div className="atl" data-theme={theme}>
+      <ScreenHeader
+        eyebrow="Symulacje"
+        value={selIsRef ? "±0" : signed(deltaWeeks)}
+        unit="tyg. wobec obecnego zespołu"
+        actions={
+          <>
         <span className="atl-eyebrow">porównanie</span>
         <div className="atl-seg" role="tablist" aria-label="Sposób porównania" onKeyDown={groupArrowNav}>
           {(
@@ -574,18 +569,22 @@ export function TimelineView({ projects, theme, initialOptimizerOpen }: Timeline
             </button>
           ))}
         </div>
-        <span className="atl-spacer" />
-        <button
-          type="button"
-          className={`sv-opt-toggle ${drawerOpen ? "is-on" : ""}`}
+        <PillButton
+          icon={<WandSparkles size={13} strokeWidth={1.75} />}
+          active={drawerOpen}
           onClick={() => setDrawerOpen((v) => !v)}
           disabled={plannedProjects.length === 0}
           aria-expanded={drawerOpen}
           title={plannedProjects.length === 0 ? "Brak projektów w planie" : undefined}
         >
-          <span className="atl-spark">✦</span> Optymalizuj…
-        </button>
-      </header>
+          Optymalizuj
+        </PillButton>
+          </>
+        }
+      >
+        Pasek wariantu to jego plan, szary za nim to dzisiejszy zespół. Różnica na starcie
+        mówi, ile czekania znika. Wybrany wariant: {selected.label}.
+      </ScreenHeader>
 
       <div className="sv-content">
         <aside className="sv-side" aria-label="Warianty zespołu" style={{ width: variantsW }}>

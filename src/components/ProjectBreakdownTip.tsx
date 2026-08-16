@@ -266,7 +266,7 @@ export function ProjectBreakdownTip({
   return (
     <div
       ref={ref}
-      className="atl-tip"
+      className="ds-popover atl-tip"
       role="tooltip"
       style={{ left: anchor.left, top: anchor.bottom + 8 }}
     >

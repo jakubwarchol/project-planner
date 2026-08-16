@@ -1,0 +1,271 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   v5 design tokens — the one place the app's look is defined.
+
+   Two layers, deliberately separate:
+
+     1. THE RAMP (--v5-*)  the only literal colours in the codebase. Ten of
+        them. Swap these and every screen follows.
+     2. SEMANTIC ALIASES   the names the ~6500 lines of screen CSS already
+        speak (--ink, --line, --surface…). They resolve to the ramp, so the
+        existing stylesheets inherit v5 without being rewritten.
+
+   v5's three rules, and how they land here:
+     · "bez linii"          — no borders. --line is a hairline barely above
+                              the background, not a stroke; separation is
+                              carried by space and by a lifted surface.
+     · "kolor tylko na danych" — chrome is greyscale. Hue is reserved for
+                              bars, heat and the two states (warn / ok).
+     · one vertical rail    — geometry below, so the shell and the screens
+                              cannot drift apart.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* The four shells every screen mounts inside. Listed once here so the palette
+   has a single definition instead of one copy per stylesheet. */
+.bv,
+.atl,
+.cm2,
+.obs {
+  /* ── 1. the ramp ────────────────────────────────────────────────────── */
+  --v5-bg: #08090a;
+  --v5-panel: #0d0f11;
+  --v5-lift: #16191c;
+  --v5-ink: #ffffff;
+  --v5-ink2: #aab2ba;
+  --v5-ink3: #6d767e;
+  --v5-ink4: #454c53;
+  --v5-hair: #1b1f23;
+  --v5-warn: #f0a068;
+  --v5-ok: #7bc4a0;
+  /* Overlays sit above the page, so they get their own slightly warmer
+     surface — the one shade not on the ramp proper. */
+  --v5-over: #14181b;
+
+  /* ── 2. semantic aliases ────────────────────────────────────────────── */
+  --bg: var(--v5-bg);
+  --surface: var(--v5-panel);
+  --surface-2: var(--v5-lift);
+  --band: var(--v5-panel);
+  --band-alt: var(--v5-lift);
+  /* Hairlines, not borders: visible when a rule genuinely separates two
+     things, invisible when it was only ever decoration. */
+  --line: var(--v5-hair);
+  --line-soft: #14171a;
+  --line-strong: #2a3036;
+  --ink: var(--v5-ink);
+  --ink-2: var(--v5-ink2);
+  --ink-3: var(--v5-ink3);
+  --ink-4: var(--v5-ink4);
+
+  /* Data colour. Purple is the plan's own hue — light for initiation, full
+     for build — and the only chrome that borrows it is a focus ring. */
+  --accent: #b09bff;
+  --accent-2: #c9bcff;
+  --accent-soft: #3a2f6b;
+  --accent-line: #6f5ec0;
+  --accent-wash: rgba(176, 155, 255, 0.14);
+  --pace2: #6fd3e0;
+  --pace2-wash: rgba(111, 211, 224, 0.16);
+
+  /* Bar ramps for the oklch hue helpers in timelineChrome.ts. */
+  --bar-l: 72%;
+  --bar-c: 0.11;
+  --bar-soft-l: 45%;
+  --bar-soft-c: 0.06;
+  --bar-env-l: 58%;
+  --bar-env-c: 0.07;
+  --on-bar: var(--v5-bg);
+
+  --warn: var(--v5-warn);
+  --warn-wash: rgba(240, 160, 104, 0.15);
+  --ok: var(--v5-ok);
+  --ok-wash: rgba(123, 196, 160, 0.14);
+  --win: var(--v5-ok);
+  --win-line: #3f6b53;
+  --win-edge: oklch(62% 0.09 158);
+
+  /* Neutral fills. v5 draws "nothing here" as a wash of white over the
+     background rather than a grey of its own, so it holds up on both the
+     page and the lifted panel. */
+  --ghost: rgba(255, 255, 255, 0.07);
+  --ghost-soft: rgba(255, 255, 255, 0.04);
+  --track: var(--v5-lift);
+  --idle: var(--v5-ink3);
+  --idle-wash: rgba(255, 255, 255, 0.06);
+  --off: #101315;
+  --row-hover: var(--v5-lift);
+  --name-hover: #1c2024;
+  --free-hatch: repeating-linear-gradient(
+    135deg,
+    rgba(240, 160, 104, 0.13) 0 6px,
+    transparent 6px 12px
+  );
+  /* Unmet demand is the same warn hatch, pitched louder — obsada is the only
+     screen with a "should be covered and isn't" state. */
+  --gap-hatch: repeating-linear-gradient(
+    135deg,
+    rgba(240, 160, 104, 0.24) 0 6px,
+    transparent 6px 12px
+  );
+  --leave-hatch: repeating-linear-gradient(
+    135deg,
+    rgba(154, 168, 181, 0.18) 0 4px,
+    transparent 4px 8px
+  );
+  /* The neutral a capacity meter is drawn in. */
+  --meter: var(--v5-ink3);
+  /* The scrim behind a label riding a coloured bar. */
+  --bar-scrim: rgba(8, 9, 10, 0.55);
+
+  /* Project size badges — data, so they keep their hue, pitched for the
+     darker ground. */
+  --size-s: #7bc4a0;
+  --size-m: #d3b45f;
+  --size-l: #f0a068;
+  --size-xl: #ef8a5e;
+  --size-xxl: #e2707a;
+
+  /* ── 3. type ────────────────────────────────────────────────────────── */
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --atl-sans: var(--sans);
+  --atl-mono: var(--mono);
+
+  /* Every recurring text role in the design, so a screen never re-specifies
+     one. The eyebrow in particular appears on all six. */
+  --ds-eyebrow-size: 9.5px;
+  --ds-eyebrow-track: 0.16em;
+  --ds-metric-size: 44px;
+  --ds-metric-weight: 300;
+  --ds-prose-size: 12.5px;
+  --ds-row-name-size: 13.5px;
+  --ds-meta-size: 10px;
+  --ds-meta-track: 0.05em;
+
+  /* ── 4. geometry ────────────────────────────────────────────────────── */
+  --ds-rail-w: 64px;
+  /* The gutter every screen's content aligns to — header, rows and footer
+     all share it, which is what makes the flat layout read as columns. */
+  --ds-pad-x: 36px;
+  --ds-header-pt: 30px;
+  --ds-header-pb: 22px;
+  --ds-section-pt: 26px;
+  --ds-section-pb: 10px;
+  --ds-foot-pt: 14px;
+  --ds-foot-pb: 22px;
+
+  --ds-row-h: 48px;
+  --ds-bar-h: 24px;
+  --ds-name-col: 264px;
+
+  /* Radii climb with elevation: bars sit on the page, cards lift off it,
+     overlays float. */
+  --ds-r-bar: 3px;
+  --ds-r-card: 5px;
+  --ds-r-popover: 6px;
+  --ds-r-modal: 7px;
+
+  /* Controls. A pill is a capsule — its radius is half its height, so the
+     two move together when the height is retuned. */
+  --ctl-h: 28px;
+  --ctl-r: calc(var(--ctl-h) / 2);
+  --ctl-px: 13px;
+  --ds-ctl-h-lg: 30px;
+  --ds-icon-btn: 24px;
+  --ds-icon-btn-lg: 26px;
+  --field-r: 4px;
+  --focus-ring: 2px solid var(--accent-line);
+
+  /* ── 5. elevation ───────────────────────────────────────────────────── */
+  --ds-scrim: rgba(8, 9, 10, 0.5);
+  --ds-scrim-strong: rgba(8, 9, 10, 0.68);
+  --ds-shadow-popover: 0 20px 52px rgba(0, 0, 0, 0.62);
+  --ds-shadow-modal: 0 28px 72px rgba(0, 0, 0, 0.6);
+  --ds-shadow-drawer: -26px 0 64px rgba(0, 0, 0, 0.55);
+  --shadow: var(--ds-shadow-popover);
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Light — the same structure at inverted lightness.
+
+   v5 is authored dark and ships dark; this exists so the theme control keeps
+   working. Only the ramp and the handful of washes that assume a dark ground
+   are restated — every alias above still resolves through them.
+
+   There is no `prefers-color-scheme` block: "auto" is resolved in React
+   (useResolvedTheme) and stamped as an explicit data-theme, so the light
+   palette is written once here instead of once per selector context.
+   ─────────────────────────────────────────────────────────────────────────── */
+:is(.bv, .atl, .cm2, .obs)[data-theme="light"] {
+  --v5-bg: #eef1f4;
+  --v5-panel: #ffffff;
+  --v5-lift: #e3e8ed;
+  --v5-ink: #0a0d10;
+  --v5-ink2: #3d474f;
+  --v5-ink3: #626d76;
+  --v5-ink4: #8d979f;
+  --v5-hair: #dfe4e9;
+  --v5-warn: #9a4a15;
+  --v5-ok: #276b4b;
+  --v5-over: #ffffff;
+
+  --line-soft: #e7ebef;
+  --line-strong: #b9c1c9;
+  --accent: #56409e;
+  --accent-2: #43317f;
+  --accent-soft: #c6bbe8;
+  --accent-line: #8a76d4;
+  --accent-wash: rgba(86, 64, 158, 0.1);
+  --pace2: #0f6b78;
+  --pace2-wash: rgba(15, 107, 120, 0.14);
+  --bar-l: 44%;
+  --bar-c: 0.095;
+  --bar-soft-l: 74%;
+  --bar-soft-c: 0.05;
+  --bar-env-l: 58%;
+  --bar-env-c: 0.06;
+  --on-bar: #ffffff;
+  --warn-wash: rgba(154, 74, 21, 0.12);
+  --ok-wash: rgba(39, 107, 75, 0.12);
+  --win: #1f6b4d;
+  --win-line: #6faa8f;
+  --win-edge: oklch(38% 0.075 158);
+  --ghost: rgba(10, 13, 16, 0.09);
+  --ghost-soft: rgba(10, 13, 16, 0.05);
+  --idle-wash: rgba(10, 13, 16, 0.07);
+  --off: #e7ebef;
+  --name-hover: #dae0e6;
+  --free-hatch: repeating-linear-gradient(
+    135deg,
+    rgba(154, 74, 21, 0.2) 0 6px,
+    transparent 6px 12px
+  );
+  --gap-hatch: repeating-linear-gradient(
+    135deg,
+    rgba(154, 74, 21, 0.28) 0 6px,
+    transparent 6px 12px
+  );
+  --leave-hatch: repeating-linear-gradient(
+    135deg,
+    rgba(120, 130, 140, 0.3) 0 4px,
+    transparent 4px 8px
+  );
+  --bar-scrim: rgba(255, 255, 255, 0.62);
+  --size-s: #3f8a55;
+  --size-m: #a98615;
+  --size-l: #c26f1c;
+  --size-xl: #c44a22;
+  --size-xxl: #bb2436;
+  --ds-scrim: rgba(10, 13, 16, 0.32);
+  --ds-scrim-strong: rgba(10, 13, 16, 0.46);
+  --ds-shadow-popover: 0 20px 52px rgba(10, 13, 16, 0.22);
+  --ds-shadow-modal: 0 28px 72px rgba(10, 13, 16, 0.24);
+  --ds-shadow-drawer: -26px 0 64px rgba(10, 13, 16, 0.2);
+}
+
+/* One focus ring for everything keyboard-reachable; never removed without a
+   replacement. :where keeps it at (0,1,0) so a control's own override wins
+   regardless of stylesheet order. */
+:is(.bv, .atl, .cm2, .obs) :where(:focus-visible) {
+  outline: var(--focus-ring);
+  outline-offset: 1px;
+}

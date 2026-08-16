@@ -23,6 +23,7 @@ import type { StaffingApi } from "../../hooks/useStaffing";
 import { fmt, fmt2, groupArrowNav, plCount, solid } from "../timelineChrome";
 import { AxisBackdrop, AxisHeader, ObsadaToolbar } from "./ObsadaGrid";
 import { AXIS_H, useTimelineScroll } from "./timelineScroll";
+import { ActionButton, Field, FieldInput, Modal, OverlayGap } from "../../design";
 import { buildObsadaAxis, focusLabel, shortDay, stepTo } from "./axis";
 import type { ObsadaContext } from "./ObsadaWorkspace";
 
@@ -477,6 +478,7 @@ export function PeopleLoadView({ ctx, people, teams, staffing }: PeopleLoadViewP
       {leaveDraft && (
         <LeaveEditor
           personId={leaveDraft.personId}
+          personName={people.find((p) => p.id === leaveDraft.personId)?.name ?? ""}
           leave={leaveDraft.leave}
           originIso={ctx.window.originIso}
           todayIndex={ctx.window.todayIndex}
@@ -490,6 +492,7 @@ export function PeopleLoadView({ ctx, people, teams, staffing }: PeopleLoadViewP
 
 interface LeaveEditorProps {
   personId: string;
+  personName: string;
   leave?: Leave;
   originIso: string;
   todayIndex: number;
@@ -499,7 +502,15 @@ interface LeaveEditorProps {
 
 const LEAVE_KINDS = ["urlop", "L4", "szkolenie", "delegacja"];
 
-function LeaveEditor({ personId, leave, originIso, todayIndex, staffing, onClose }: LeaveEditorProps) {
+function LeaveEditor({
+  personId,
+  personName,
+  leave,
+  originIso,
+  todayIndex,
+  staffing,
+  onClose,
+}: LeaveEditorProps) {
   const [kind, setKind] = useState(leave?.kind ?? "urlop");
   const [start, setStart] = useState(leave?.startDate ?? isoOfIndex(originIso, todayIndex));
   const [end, setEnd] = useState(leave?.endDate ?? addDays(isoOfIndex(originIso, todayIndex), 7));
@@ -516,53 +527,53 @@ function LeaveEditor({ personId, leave, originIso, todayIndex, staffing, onClose
   };
 
   return (
-    <div className="obs-modal-back" role="presentation" onClick={onClose}>
-      <div
-        className="obs-modal"
-        role="dialog"
-        aria-label={leave ? "Edytuj nieobecność" : "Dodaj nieobecność"}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <b>{leave ? "Nieobecność" : "Nowa nieobecność"}</b>
-        <label>
-          <span>rodzaj</span>
-          <input list="obs-leave-kinds" value={kind} onChange={(e) => setKind(e.target.value)} />
-          <datalist id="obs-leave-kinds">
-            {LEAVE_KINDS.map((k) => (
-              <option key={k} value={k} />
-            ))}
-          </datalist>
-        </label>
-        <label>
-          <span>od</span>
-          <input type="date" value={start} onChange={(e) => setStart(e.target.value)} />
-        </label>
-        <label>
-          <span>do (wyłącznie)</span>
-          <input type="date" value={end} onChange={(e) => setEnd(e.target.value)} />
-        </label>
-        <div className="obs-modal-actions">
+    <Modal
+      onClose={onClose}
+      title={leave ? "Nieobecność" : "Nowa nieobecność"}
+      subtitle={personName}
+      footer={
+        <>
           {leave && (
-            <button
-              type="button"
-              className="obs-danger"
+            <ActionButton
+              variant="danger"
               onClick={() => {
                 staffing.removeLeave(leave.id);
                 onClose();
               }}
             >
               Usuń
-            </button>
+            </ActionButton>
           )}
-          <span className="atl-spacer" />
-          <button type="button" className="atl-btn" onClick={onClose}>
-            Anuluj
-          </button>
-          <button type="button" className="obs-primary" onClick={save}>
+          <OverlayGap />
+          <ActionButton onClick={onClose}>Anuluj</ActionButton>
+          <ActionButton variant="primary" onClick={save}>
             Zapisz
-          </button>
+          </ActionButton>
+        </>
+      }
+    >
+      <div className="obs-modal-fields">
+        <Field label="rodzaj">
+          <FieldInput
+            list="obs-leave-kinds"
+            value={kind}
+            onChange={(e) => setKind(e.target.value)}
+          />
+        </Field>
+        <datalist id="obs-leave-kinds">
+          {LEAVE_KINDS.map((k) => (
+            <option key={k} value={k} />
+          ))}
+        </datalist>
+        <div className="obs-modal-cols">
+          <Field label="od">
+            <FieldInput type="date" value={start} onChange={(e) => setStart(e.target.value)} />
+          </Field>
+          <Field label="do (wyłącznie)">
+            <FieldInput type="date" value={end} onChange={(e) => setEnd(e.target.value)} />
+          </Field>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

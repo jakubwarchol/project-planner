@@ -32,13 +32,21 @@ import {
   solid,
 } from "./timelineChrome";
 import "./timeline.css";
+import {
+  Gap,
+  Legend,
+  PillButton,
+  ScreenFooter,
+  ScreenHeader,
+  type ResolvedTheme,
+} from "../design";
 
 interface AdvancedTimelineProps {
   projects: Project[];
   /** Live roster pools — hypothetical variants live only in the projections view. */
   pools: CapabilityVector;
   onOpenMatrix: () => void;
-  theme: "auto" | "light" | "dark";
+  theme: ResolvedTheme;
 }
 
 const EPS = 1e-6;
@@ -367,7 +375,7 @@ export function AdvancedTimeline({ projects, pools, onOpenMatrix, theme }: Advan
 
           {popover === project.id && (
             <div
-              className="atl-pop"
+              className="ds-popover atl-pop"
               style={{ left: Math.max(0, left + 8), top: barTop + D.bar + 6 }}
               onClick={(e) => e.stopPropagation()}
             >
@@ -590,16 +598,13 @@ export function AdvancedTimeline({ projects, pools, onOpenMatrix, theme }: Advan
       : null;
 
   return (
-    <div className="atl" data-theme={theme === "auto" ? undefined : theme}>
-      <header className="atl-header" style={{ height: D.hdr }}>
-        <div className="atl-title">
-          <b>Plan</b>
-          <span className="atl-chip">obecny zespół</span>
-        </div>
-
-        <div className="atl-spacer" />
-
-        <div className="atl-group">
+    <div className="atl" data-theme={theme}>
+      <ScreenHeader
+        eyebrow="Plan"
+        value={landLabel}
+        unit="koniec całej pracy"
+        actions={
+          <div className="atl-group">
           <span className="atl-eyebrow">gęstość</span>
           <div className="atl-seg" role="tablist" aria-label="Gęstość wierszy" onKeyDown={groupArrowNav}>
             {DENSITIES.map((d) => (
@@ -636,16 +641,19 @@ export function AdvancedTimeline({ projects, pools, onOpenMatrix, theme }: Advan
               </button>
             ))}
           </div>
-          <button
-            type="button"
-            className={`atl-btn ${keyOpen ? "is-on" : ""}`}
-            onClick={() => setKeyOpen((v) => !v)}
-            aria-expanded={keyOpen}
-          >
-            Legenda
-          </button>
-        </div>
-      </header>
+            <PillButton
+              active={keyOpen}
+              onClick={() => setKeyOpen((v) => !v)}
+              aria-expanded={keyOpen}
+            >
+              Legenda
+            </PillButton>
+          </div>
+        }
+      >
+        Jasny odcień to inicjacja, pełny to wytwarzanie. Pas na dole pokazuje, ile mocy każdej
+        kompetencji zostaje niewykorzystane.
+      </ScreenHeader>
 
       {keyOpen && (
         <div className="atl-key">
@@ -718,22 +726,22 @@ export function AdvancedTimeline({ projects, pools, onOpenMatrix, theme }: Advan
         </div>
       </div>
 
-      <footer className="atl-footer" style={{ height: D.foot }}>
-        <span>obecny zespół</span>
+      <ScreenFooter>
+        <Legend color="var(--accent-soft)">inicjacja</Legend>
+        <Legend color="var(--accent)">wytwarzanie</Legend>
+        <Legend color="var(--idle-wash)">bezczynne</Legend>
+        <span>{fmt(totalIdle)} FTE-mies. bezczynnych</span>
+        <Gap />
+        {overPoolCount > 0 && <span className="is-warn">{overPoolCount} przeciążonych</span>}
+        {impossibleCount > 0 && (
+          <span className="is-warn">{impossibleCount} nigdy się nie kończy</span>
+        )}
+        {schedule.truncated && <span className="is-warn">symulacja przerwana — zgłoś błąd</span>}
         <span>
           {plCount(projectCount, "projekt", "projekty", "projektów")} ·{" "}
           {plCount(CATEGORY_ORDER.length, "kategoria", "kategorie", "kategorii")}
         </span>
-        <span>cała praca kończy się {landLabel}</span>
-        <span style={{ color: "var(--idle)" }}>{fmt(totalIdle)} FTE-mies. bezczynnych</span>
-        {overPoolCount > 0 && <span style={{ color: "var(--warn)" }}>{overPoolCount} przeciążonych</span>}
-        {impossibleCount > 0 && (
-          <span style={{ color: "var(--warn)" }}>{impossibleCount} nigdy się nie kończy</span>
-        )}
-        {schedule.truncated && <span style={{ color: "var(--warn)" }}>symulacja przerwana — zgłoś błąd</span>}
-        <span style={{ flex: 1 }} />
-        <span>esc zamyka okno projektu</span>
-      </footer>
+      </ScreenFooter>
 
       {tipTarget && (
         <ProjectBreakdownTip

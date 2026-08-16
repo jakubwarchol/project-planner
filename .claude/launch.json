@@ -3,9 +3,21 @@
   "configurations": [
     {
       "name": "project-planner",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      // `env -u PORT` because the API reads PORT for its own port (5174) and
+      // the Vite proxy reads it to find the API. A launcher that exports
+      // PORT=5173 makes the API bind Vite's port and the proxy point at
+      // itself; unsetting it keeps both on their defaults.
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["-u", "PORT", "npm", "run", "dev"],
       "port": 5173
+    },
+    {
+      // Vite only, on a spare port — for a second session while another
+      // holds 5173. Leaves PORT unset so the proxy finds the API on 5174.
+      "name": "web-alt",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["-u", "PORT", "npx", "vite", "--port", "5273", "--strictPort"],
+      "port": 5273
     }
   ]
 }

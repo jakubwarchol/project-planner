@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { Drawer } from "../design";
 import type { HiringLadderApi } from "../hooks/useHiringLadder";
 import { CAPABILITY_HUES, fmt, fmt2, groupArrowNav, plCount, rungRoles, signed, solid, weeksOf } from "./timelineChrome";
 import { CAPABILITY_LABELS, CAPABILITY_ORDER } from "../lib/estimation";
@@ -75,27 +75,13 @@ export function HiringPlanDrawer({
   onClose,
 }: HiringPlanDrawerProps) {
   return (
-    <aside
-      className="atl-drawer"
-      style={{ width, transform: open ? "translateX(0)" : "translateX(101%)" }}
-      aria-label="Plan zatrudnienia"
-      inert={!open}
+    <Drawer
+      open={open}
+      onClose={onClose}
+      width={width}
+      title="Plan zatrudnienia"
+      subtitle={`co kupi każdy kolejny etat · ${referenceLabel}`}
     >
-      <header className="atl-drawer-head">
-        <div className="atl-drawer-title">
-          <b>Plan zatrudnienia</b>
-          <span className="atl-drawer-sub">co kupi każdy kolejny etat · {referenceLabel}</span>
-        </div>
-        <button
-          type="button"
-          className="atl-drawer-close"
-          onClick={onClose}
-          aria-label="Zamknij plan zatrudnienia"
-        >
-          <X size={15} />
-        </button>
-      </header>
-
       <div className="sv-opt-body">
         {ladder.status === "idle" && (
           <>
@@ -176,7 +162,7 @@ export function HiringPlanDrawer({
 
         <CapsSection caps={caps} referenceFte={referenceFte} onCapsChange={onCapsChange} />
       </div>
-    </aside>
+    </Drawer>
   );
 }
 

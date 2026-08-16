@@ -1,0 +1,177 @@
+/* Obłożenie — a heat grid, one cell per person per bucket.
+
+   Only the grid is described here: the header, footer, legend and tabs are the
+   shared v5 chrome from src/design. The cells carry no border and no gridline;
+   the 2px gutter between them is the whole separation, which is what lets a
+   run of busy days read as one block. */
+
+/* The wash channel behind every cell. v5 is authored dark — lightness is the
+   load — so light theme swaps the channel to ink and keeps the ramp. */
+.util {
+  --heat-ch: 255, 255, 255;
+  --heat-on: #ffffff;
+  --heat-over-on: #ffffff;
+}
+
+.util[data-theme="light"] {
+  --heat-ch: 10, 13, 16;
+  --heat-on: #f5f7f9;
+  --heat-over-on: #4a2408;
+}
+
+.util-name {
+  flex: none;
+  width: 200px;
+  padding-right: 16px;
+  font-size: 13px;
+  color: var(--ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.util-track {
+  flex: 1;
+  min-width: 0;
+}
+
+.util-avg {
+  flex: none;
+  width: 84px;
+  text-align: right;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.util-avg.is-warn {
+  color: var(--warn);
+}
+
+/* An average safely under seventy is the one number nobody needs to read. */
+.util-avg.is-dim {
+  color: var(--ink-4);
+}
+
+.util-avg.is-loud {
+  color: var(--ink);
+}
+
+/* The page stepper: a month of days, or a quarter of weeks, at a time. */
+.util-range {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.util-range-label {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+/* ── the axis: week starts over day names, months over week numbers ────── */
+
+.util-axis {
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  padding: 0 var(--ds-pad-x) 8px;
+}
+
+.util-bands {
+  display: flex;
+  gap: 2px;
+  height: 15px;
+}
+
+/* Each band is as wide as the columns it covers, so a month label sits over
+   its own days rather than over the whole strip. */
+.util-bands > span {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+}
+
+.util-dow {
+  flex: 1;
+  min-width: 0;
+  height: 17px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  color: var(--ink-4);
+}
+
+/* A holiday keeps its column; only the label says why the cell is blank. */
+.util-dow.is-holiday {
+  color: var(--warn);
+}
+
+/* Week numbers are the reading tier in the weeks grain, so they sit a step
+   brighter than the day letters do. */
+.util-dow.is-week {
+  color: var(--ink-3);
+}
+
+.util-axis .util-avg {
+  padding-bottom: 2px;
+  font-size: 9px;
+}
+
+/* ── rows ──────────────────────────────────────────────────────────────── */
+
+.util-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.util-row {
+  flex: none;
+  display: flex;
+  align-items: center;
+  height: 38px;
+  padding: 0 var(--ds-pad-x);
+}
+
+.util-row:hover {
+  background: var(--row-hover);
+}
+
+/* The team line is a summary, not another person — space above it does the
+   separating that a rule would otherwise have to. */
+.util-row.is-total {
+  height: 44px;
+  margin-top: 6px;
+}
+
+.util-cells {
+  display: flex;
+  gap: 2px;
+}
+
+.util-cell {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 2px;
+  font-family: var(--mono);
+  font-size: 10px;
+}
+
+.util-row.is-total .util-cell {
+  height: 26px;
+}

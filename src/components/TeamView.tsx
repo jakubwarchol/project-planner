@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Plus, X } from "lucide-react";
 import { useRoster } from "../hooks/useRoster";
 import {
@@ -11,11 +11,19 @@ import {
 } from "../lib/estimation";
 import type { Capability, Person, TeamCode } from "../types";
 import { NumberField } from "./NumberField";
-import { CAPABILITY_HUES, MOD, fmt, fmt2, groupArrowNav, plCount, solid } from "./timelineChrome";
+import { CAPABILITY_HUES, fmt, fmt2, groupArrowNav, plCount, solid } from "./timelineChrome";
 import "./timeline.css";
+import {
+  Gap,
+  PillButton,
+  ScreenFooter,
+  ScreenHeader,
+  SectionRule,
+  type ResolvedTheme,
+} from "../design";
 
 interface TeamViewProps {
-  theme: "auto" | "light" | "dark";
+  theme: ResolvedTheme;
 }
 
 const TEAM_ORDER: TeamCode[] = ["ZWO", "ZP", "Inni"];
@@ -43,17 +51,43 @@ function emptyDraft(teamId: TeamCode): Omit<Person, "id"> {
  *  is picked, not typed, so nothing finer can even be entered. */
 const FTE_OPTIONS = [0.25, 0.5, 0.75, 1];
 
-/** Click-to-pick FTE: the value is a button, the choices are a small popover
- *  of quarters. Removal stays on the chip's own X, so the picker never needs
- *  a zero option. */
-function FtePicker({
-  value,
+interface PickerOption {
+  key: string;
+  content: ReactNode;
+  active?: boolean;
+  /** The one option that takes something away. */
+  danger?: boolean;
+  onPick: () => void;
+}
+
+/** One anchored menu, two jobs: picking a capability's share of an etat, and
+ *  picking which capability to add. Both open the same way and dismiss the
+ *  same way, so the row has a single interaction to learn.
+ *
+ *  The trigger carries no border — the whole thing lights up on hover, which
+ *  is how v5 says "this is clickable" without drawing a box around it. */
+function Picker({
   label,
-  onPick,
+  title,
+  className,
+  style,
+  triggerClass,
+  triggerStyle,
+  trigger,
+  options,
+  stack,
 }: {
-  value: number;
   label: string;
-  onPick: (fte: number) => void;
+  title: string;
+  /** Wrapper class and style — a bar segment carries its own width here. */
+  className?: string;
+  style?: CSSProperties;
+  triggerClass?: string;
+  triggerStyle?: CSSProperties;
+  trigger: ReactNode;
+  options: PickerOption[];
+  /** A list rather than a row — for choices with names rather than numbers. */
+  stack?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLSpanElement | null>(null);
@@ -74,40 +108,48 @@ function FtePicker({
     };
   }, [open]);
 
+  // Roving tabindex needs exactly one stop; when nothing is picked yet the
+  // first option takes it.
+  const activeIndex = options.findIndex((o) => o.active);
+
   return (
-    <span className="tw-fte" ref={ref}>
+    <span className={`tw-picker ${className ?? ""}`} style={style} ref={ref}>
       <button
         type="button"
-        className={`tw-fte-btn ${open ? "is-on" : ""}`}
+        className={`tw-picker-btn ${triggerClass ?? ""} ${open ? "is-on" : ""}`}
+        style={triggerStyle}
         aria-label={label}
         aria-expanded={open}
-        title="Kliknij, aby wybrać część etatu"
+        title={title}
         onClick={() => setOpen((v) => !v)}
       >
-        {fmt2(value)}
+        {trigger}
       </button>
       {open && (
-        <span className="tw-fte-pop" role="radiogroup" aria-label={label} onKeyDown={groupArrowNav}>
-          {FTE_OPTIONS.map((option) => {
-            const current = Math.abs(option - value) < 0.005;
-            const hasCurrent = FTE_OPTIONS.some((o) => Math.abs(o - value) < 0.005);
-            return (
-              <button
-                key={option}
-                type="button"
-                role="radio"
-                aria-checked={current}
-                tabIndex={current || (!hasCurrent && option === FTE_OPTIONS[0]) ? 0 : -1}
-                className={`tw-fte-opt ${current ? "is-active" : ""}`}
-                onClick={() => {
-                  onPick(option);
-                  setOpen(false);
-                }}
-              >
-                {fmt2(option)}
-              </button>
-            );
-          })}
+        <span
+          className={`ds-popover is-menu tw-picker-pop ${stack ? "is-stack" : ""}`}
+          role="radiogroup"
+          aria-label={label}
+          onKeyDown={groupArrowNav}
+        >
+          {options.map((option, i) => (
+            <button
+              key={option.key}
+              type="button"
+              role="radio"
+              aria-checked={Boolean(option.active)}
+              tabIndex={i === (activeIndex === -1 ? 0 : activeIndex) ? 0 : -1}
+              className={`ds-menu-opt ${option.active ? "is-active" : ""} ${
+                option.danger ? "is-danger" : ""
+              }`}
+              onClick={() => {
+                option.onPick();
+                setOpen(false);
+              }}
+            >
+              {option.content}
+            </button>
+          ))}
         </span>
       )}
     </span>
@@ -123,25 +165,59 @@ function FtePicker({
  * shows up as the bar running full with a warning envelope, which is the
  * honest picture: there is no more person to give.
  */
-function SplitBar({ person, over }: { person: Person; over: boolean }) {
-  const scale = Math.max(1, personAvailability(person));
+function SplitBar({
+  person,
+  over,
+  onSet,
+}: {
+  person: Person;
+  over: boolean;
+  onSet: (capability: Capability, fte: number) => void;
+}) {
+  const total = personAvailability(person);
+  const scale = Math.max(1, total);
+  // Segments reach the bar's right edge only once the person is fully
+  // committed; below that the track shows, and the last segment keeps its
+  // square edge to say so.
+  const full = total >= scale - 0.0001;
   return (
-    <span className={`tw-split ${over ? "is-over" : ""}`}>
+    <span className={`tw-split ${over ? "is-over" : ""} ${full ? "is-full" : ""}`}>
       {person.allocations.map((allocation) => {
         const share = allocation.fte / scale;
+        const name = CAPABILITY_LABELS[allocation.capability];
         return (
-          <span
+          <Picker
             key={allocation.capability}
-            className="tw-split-seg"
-            style={{ width: `${share * 100}%`, background: capColor(allocation.capability) }}
-            title={`${CAPABILITY_LABELS[allocation.capability]} · ${fmt2(allocation.fte)} FTE`}
-          >
-            {share >= SEGMENT_LABEL_MIN
-              ? `${CAPABILITY_LABELS[allocation.capability]} ${fmt2(allocation.fte)}`
-              : share >= SEGMENT_CODE_MIN
-                ? CAPABILITY_LABELS[allocation.capability]
-                : ""}
-          </span>
+            className="tw-split-slot"
+            style={{ width: `${share * 100}%` }}
+            label={`${name} — FTE dla ${person.name}`}
+            title={`${name} · ${fmt2(allocation.fte)} FTE — kliknij, aby zmienić`}
+            triggerClass="tw-split-seg"
+            triggerStyle={{ background: capColor(allocation.capability) }}
+            trigger={
+              share >= SEGMENT_LABEL_MIN
+                ? `${name} ${fmt2(allocation.fte)}`
+                : share >= SEGMENT_CODE_MIN
+                  ? name
+                  : ""
+            }
+            options={[
+              ...FTE_OPTIONS.map((option) => ({
+                key: String(option),
+                content: fmt2(option),
+                active: Math.abs(option - allocation.fte) < 0.005,
+                onPick: () => onSet(allocation.capability, option),
+              })),
+              // With the chips gone this is the only way back out, so the
+              // picker finally needs its zero.
+              {
+                key: "drop",
+                content: "usuń",
+                danger: true,
+                onPick: () => onSet(allocation.capability, 0),
+              },
+            ]}
+          />
         );
       })}
     </span>
@@ -193,37 +269,41 @@ export function TeamView({ theme }: TeamViewProps) {
   const maxPool = Math.max(1, ...CAPABILITY_ORDER.map((capability) => pools[capability]));
 
   return (
-    <div className="atl" data-theme={theme === "auto" ? undefined : theme}>
-      <header className="atl-header" style={{ height: 56 }}>
-        <div className="atl-title">
-          <b>Zespół</b>
-          <span className="atl-chip">{plCount(people.length, "osoba", "osoby", "osób")}</span>
-        </div>
-        <div className="atl-spacer" />
-        <div className="tw-pools">
-          {CAPABILITY_ORDER.map((capability) => (
-            <span
-              key={capability}
-              className="tw-pool"
-              title={`${CAPABILITY_LABELS[capability]} — ${fmt2(pools[capability])} FTE w puli`}
-            >
-              <span className="tw-pool-head">
-                <span className="tw-pool-label">{CAPABILITY_LABELS[capability]}</span>
-                <b>{fmt2(pools[capability])}</b>
+    <div className="atl" data-theme={theme}>
+      <ScreenHeader
+        eyebrow="Zespół"
+        value={fmt2(effectiveFte)}
+        unit="FTE realnej mocy"
+        actions={
+          <div className="tw-pools">
+            {CAPABILITY_ORDER.map((capability) => (
+              <span
+                key={capability}
+                className="tw-pool"
+                title={`${CAPABILITY_LABELS[capability]} — ${fmt2(pools[capability])} FTE w puli`}
+              >
+                <span className="tw-pool-head">
+                  <span className="tw-pool-label">{CAPABILITY_LABELS[capability]}</span>
+                  <b>{fmt2(pools[capability])}</b>
+                </span>
+                <span className="tw-pool-track">
+                  <span
+                    className="tw-pool-fill"
+                    style={{
+                      width: `${(pools[capability] / maxPool) * 100}%`,
+                      background: capColor(capability),
+                    }}
+                  />
+                </span>
               </span>
-              <span className="tw-pool-track">
-                <span
-                  className="tw-pool-fill"
-                  style={{
-                    width: `${(pools[capability] / maxPool) * 100}%`,
-                    background: capColor(capability),
-                  }}
-                />
-              </span>
-            </span>
-          ))}
-        </div>
-      </header>
+            ))}
+          </div>
+        }
+      >
+        {plCount(people.length, "etat", "etaty", "etatów")} daje {fmt2(effectiveFte)} FTE po
+        uwzględnieniu produktywności. Pasek pokazuje podział etatu każdej osoby między
+        kompetencje.
+      </ScreenHeader>
 
       <div className="atl-scroll tw-scroll">
         {TEAM_ORDER.map((teamId) => {
@@ -232,20 +312,19 @@ export function TeamView({ theme }: TeamViewProps) {
           const bandFte = members.reduce((sum, person) => sum + personAvailability(person), 0);
           return (
             <section className="tw-band" key={teamId}>
-              <div className="tw-band-head">
-                <b>{team?.label ?? teamId}</b>
-                <span className="tw-band-count">
-                  {plCount(members.length, "osoba", "osoby", "osób")}
-                </span>
-                <span style={{ flex: 1 }} />
-                <span className="tw-band-fte">{fmt2(bandFte)} FTE</span>
-              </div>
+              <SectionRule
+                label={team?.label ?? teamId}
+                meta={`${plCount(members.length, "osoba", "osoby", "osób")} · ${fmt2(bandFte)} FTE`}
+              />
 
+              {/* Named columns: the bar is a fixed width now, so the numbers
+                  to its right line up down the whole band and are worth
+                  labelling. */}
               <div className="tw-colhead">
-                <span className="tw-c-name">osoba</span>
-                <span className="tw-c-split">podział etatu</span>
-                <span className="tw-c-prod">produktywność</span>
-                <span className="tw-c-total">razem</span>
+                <span className="tw-c-name" />
+                <span className="tw-c-split ds-eyebrow">podział etatu</span>
+                <span className="tw-c-prod ds-eyebrow">produkt.</span>
+                <span className="tw-c-total ds-eyebrow">etat</span>
                 <span className="tw-c-act" />
               </div>
 
@@ -266,59 +345,42 @@ export function TeamView({ theme }: TeamViewProps) {
                     />
 
                     <span className="tw-c-split tw-split-cell">
-                      <SplitBar person={person} over={over} />
+                      <SplitBar
+                        person={person}
+                        over={over}
+                        onSet={(capability, fte) => setAllocation(person.id, capability, fte)}
+                      />
 
-                      <span className="tw-allocs">
-                        {person.allocations.map((allocation) => (
-                          <span className="tw-alloc" key={allocation.capability}>
-                            <i
-                              className="tw-alloc-dot"
-                              style={{ background: capColor(allocation.capability) }}
-                            />
-                            <b>{CAPABILITY_LABELS[allocation.capability]}</b>
-                            <FtePicker
-                              key={`${person.id}-${allocation.capability}`}
-                              value={allocation.fte}
-                              label={`${CAPABILITY_LABELS[allocation.capability]} — FTE dla ${person.name}`}
-                              onPick={(value) =>
-                                setAllocation(person.id, allocation.capability, value)
-                              }
-                            />
-                            <button
-                              type="button"
-                              className="tw-alloc-drop"
-                              aria-label={`Usuń ${CAPABILITY_LABELS[allocation.capability]} z ${person.name}`}
-                              title="Usuń kompetencję"
-                              onClick={() => setAllocation(person.id, allocation.capability, 0)}
-                            >
-                              <X size={10} />
-                            </button>
-                          </span>
-                        ))}
-
-                        {unused.length > 0 && (
-                          <select
-                            className="bv-select tw-alloc-add"
-                            value=""
-                            aria-label={`Dodaj kompetencję dla ${person.name}`}
-                            onChange={(e) => {
-                              if (!e.target.value) return;
-                              // Whatever is left of them, in quarters, so the
-                              // common "split the rest onto a second
-                              // capability" needs no maths.
-                              const rest = Math.max(0.25, Math.round((1 - total) * 4) / 4);
-                              setAllocation(person.id, e.target.value as Capability, rest);
-                            }}
-                          >
-                            <option value="">+ kompetencja</option>
-                            {unused.map((capability) => (
-                              <option key={capability} value={capability}>
+                      {unused.length > 0 && (
+                        <Picker
+                          stack
+                          label={`Dodaj kompetencję dla ${person.name}`}
+                          title="Dodaj kompetencję"
+                          triggerClass="tw-alloc-add"
+                          trigger={<Plus size={13} strokeWidth={1.75} />}
+                          options={unused.map((capability) => ({
+                            key: capability,
+                            content: (
+                              <>
+                                <i
+                                  className="tw-alloc-dot"
+                                  style={{ background: capColor(capability) }}
+                                />
                                 {CAPABILITY_LABELS[capability]}
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                      </span>
+                              </>
+                            ),
+                            // Whatever is left of them, in quarters, so the
+                            // common "split the rest onto a second
+                            // capability" needs no maths.
+                            onPick: () =>
+                              setAllocation(
+                                person.id,
+                                capability,
+                                Math.max(0.25, Math.round((1 - total) * 4) / 4),
+                              ),
+                          }))}
+                        />
+                      )}
                     </span>
 
                     <span
@@ -415,30 +477,32 @@ export function TeamView({ theme }: TeamViewProps) {
                   </button>
                 </div>
               ) : (
-                <button type="button" className="tw-add" onClick={() => startAdd(teamId)}>
-                  <Plus size={13} /> Dodaj osobę
-                </button>
+                <div className="tw-add-row">
+                  <PillButton
+                    icon={<Plus size={13} strokeWidth={1.75} />}
+                    onClick={() => startAdd(teamId)}
+                  >
+                    Osoba
+                  </PillButton>
+                </div>
               )}
             </section>
           );
         })}
       </div>
 
-      <footer className="atl-footer" style={{ height: 32 }}>
-        <span>{plCount(people.length, "osoba", "osoby", "osób")} w zespole</span>
+      <ScreenFooter>
+        <span>produktywność · suma etatów</span>
         <span>
           {fmt2(totalFte)} FTE łącznie · {fmt2(effectiveFte)} FTE po produktywności
         </span>
+        <Gap />
         {overCount > 0 && (
-          <span style={{ color: "var(--warn)" }}>
-            {plCount(overCount, "przeciążona osoba", "przeciążone osoby", "przeciążonych osób")}
+          <span className="is-warn">
+            {plCount(overCount, "osoba", "osoby", "osób")} ponad 100%
           </span>
         )}
-        <span style={{ flex: 1 }} />
-        <span>
-          {MOD}1…{MOD}6 przeskakuje między widokami
-        </span>
-      </footer>
+      </ScreenFooter>
     </div>
   );
 }

@@ -28,12 +28,13 @@ import {
   type StaffingWindow,
 } from "../../lib/staffing";
 import type { Capability, Leave, Person, Project, StaffingAssignment } from "../../types";
-import { buildHueMap, groupArrowNav } from "../timelineChrome";
+import { buildHueMap } from "../timelineChrome";
 import { PeopleLoadView } from "./PeopleLoadView";
 import { ProjectStaffingView } from "./ProjectStaffingView";
 import { StaffingPanelView } from "./StaffingPanelView";
 import type { ObsadaUnit } from "./axis";
 import "./obsada.css";
+import { UnderlineTabs, type ResolvedTheme } from "../../design";
 
 export type ObsadaTab = "people" | "projects" | "assign";
 
@@ -52,7 +53,7 @@ const TABS: { id: ObsadaTab; label: string; chip: string }[] = [
 
 interface ObsadaWorkspaceProps {
   projects: Project[];
-  theme: "auto" | "light" | "dark";
+  theme: ResolvedTheme;
 }
 
 /** Everything the three views read, computed once at the top so they cannot
@@ -140,32 +141,18 @@ export function ObsadaWorkspace({ projects, theme }: ObsadaWorkspaceProps) {
       ? `${people.length} osób · ${assignments.length} przypisań`
       : `${openCount} z ${items.length} pozycji z luką`;
 
-  const chip = TABS.find((t) => t.id === tab)!.chip;
-
   return (
-    <div className="atl obs" data-theme={theme === "auto" ? undefined : theme}>
+    <div className="atl obs" data-theme={theme}>
+      {/* v5 leads this screen with its three modes rather than a title —
+          the header below belongs to whichever one is open. */}
       <div className="obs-strip">
-        <div className="atl-title">
-          <b>Obsada</b>
-          <span className="atl-chip">{chip}</span>
-        </div>
-
-        <div className="atl-seg obs-tabs" role="tablist" aria-label="Widoki obsady" onKeyDown={groupArrowNav}>
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              role="tab"
-              aria-selected={t.id === tab}
-              tabIndex={t.id === tab ? 0 : -1}
-              className={t.id === tab ? "is-active" : undefined}
-              onClick={() => setTab(t.id)}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-
+        <UnderlineTabs
+          lead
+          label="Widoki obsady"
+          value={tab}
+          onChange={setTab}
+          items={TABS.map((t) => ({ id: t.id, label: t.label, hint: t.chip }))}
+        />
         <div className="atl-spacer" />
         <span className="obs-strip-sum">{summary}</span>
       </div>
