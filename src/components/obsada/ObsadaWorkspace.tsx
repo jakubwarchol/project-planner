@@ -133,14 +133,6 @@ export function ObsadaWorkspace({ projects, theme }: ObsadaWorkspaceProps) {
     openItem,
   };
 
-  // One headline per tab, so the strip always answers "how bad is it" without
-  // opening the view that would tell you.
-  const openCount = items.filter((i) => (coverage.get(i.id)?.peakGap ?? 0) > 1e-6).length;
-  const summary =
-    tab === "people"
-      ? `${people.length} osób · ${assignments.length} przypisań`
-      : `${openCount} z ${items.length} pozycji z luką`;
-
   return (
     <div className="atl obs" data-theme={theme}>
       {/* v5 leads this screen with its three modes rather than a title —
@@ -153,8 +145,6 @@ export function ObsadaWorkspace({ projects, theme }: ObsadaWorkspaceProps) {
           onChange={setTab}
           items={TABS.map((t) => ({ id: t.id, label: t.label, hint: t.chip }))}
         />
-        <div className="atl-spacer" />
-        <span className="obs-strip-sum">{summary}</span>
       </div>
 
       {tab === "people" && (

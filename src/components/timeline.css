@@ -197,49 +197,6 @@
 
 /* Key */
 
-.atl-key {
-  flex: none;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px 28px;
-  padding: 11px 18px;
-  background: var(--surface-2);
-  border-bottom: 1px solid var(--line);
-  font-size: 11px;
-  line-height: 1.25;
-  color: var(--ink-2);
-}
-
-.atl-key-item {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  white-space: nowrap;
-}
-
-.atl-key-bar {
-  position: relative;
-  width: 34px;
-  height: 15px;
-  border: 1px dashed var(--accent-line);
-  border-radius: 2px;
-}
-
-.atl-key-bar i {
-  position: absolute;
-  bottom: 0;
-  display: block;
-}
-
-.atl-key-warn {
-  width: 34px;
-  height: 15px;
-  border: 1px solid var(--warn);
-  border-top-width: 2px;
-  border-radius: 2px;
-  background: var(--warn-wash);
-}
 
 /* Scroll body */
 
@@ -251,13 +208,14 @@
   position: relative;
 }
 
+/* v5's axis is a bare strip of month labels in the gutter light — no ticks,
+   no surface, no rule. It stays sticky so the calendar never scrolls away. */
 .atl-axis {
   position: sticky;
   top: 0;
   z-index: 6;
   display: flex;
-  background: var(--surface);
-  border-bottom: 1px solid var(--line-strong);
+  background: var(--bg);
 }
 
 .atl-axis-corner {
@@ -265,31 +223,7 @@
   left: 0;
   z-index: 7;
   flex: none;
-  background: var(--surface);
-  border-right: 1px solid var(--line-strong);
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  padding: 0 10px 6px 14px;
-}
-
-.atl-collapse {
-  border: 1px solid var(--line);
-  background: transparent;
-  color: var(--ink-3);
-  border-radius: 2px;
-  width: 18px;
-  height: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  padding: 0;
-}
-
-.atl-collapse:hover {
-  color: var(--ink);
-  border-color: var(--accent-line);
+  background: var(--bg);
 }
 
 .atl-track {
@@ -305,86 +239,68 @@
 
 .atl-tick-label {
   position: absolute;
-  top: 8px;
+  bottom: 4px;
   font-family: var(--atl-mono);
   font-size: 9.5px;
-  letter-spacing: 0.04em;
+  line-height: 1;
+  letter-spacing: 0.06em;
   white-space: nowrap;
-  padding-left: 5px;
+  padding-left: 6px;
 }
 
-/* Category band */
+/* Category header — a label in the light: eyebrow, count, a hairline
+   claiming the rest of the line, figures at its end. Sticky-left with a
+   measured width, so it faces the viewport while the track scrolls under. */
 
+/* The band spans the whole scrollable width, so the sticky rule inside it
+   has room to hold the viewport while the track scrolls underneath. */
 .atl-band {
-  border-bottom: 1px solid var(--line-strong);
+  width: max-content;
+  min-width: 100%;
 }
 
-.atl-band-head {
-  display: flex;
-  background: var(--band-alt);
-}
-
-.atl-band-name {
+.atl-rule {
   position: sticky;
   left: 0;
-  z-index: 5;
-  flex: none;
-  background: var(--band-alt);
-  border-right: 1px solid var(--line-strong);
   display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 0 10px 0 14px;
-  overflow: hidden;
+  align-items: baseline;
+  gap: 12px;
+  padding: 20px var(--ds-pad-x) 8px;
 }
 
-.atl-band-name b {
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.atl-rule-line {
+  flex: 1;
+  min-width: 24px;
+  height: 1px;
+  align-self: center;
+  background: var(--line);
 }
 
-.atl-band-people {
+.atl-rule-meta {
   flex: none;
-  white-space: nowrap;
   font-family: var(--atl-mono);
-  font-size: 11px;
-  color: var(--ink-2);
-}
-
-.atl-band-track {
-  position: relative;
-  flex: none;
-  display: flex;
-  align-items: center;
-}
-
-.atl-band-chips {
-  position: absolute;
-  top: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding-left: 11px;
+  font-size: 10px;
+  color: var(--ink-4);
   white-space: nowrap;
-  font-family: var(--atl-mono);
-  font-size: 10.5px;
+}
+
+.atl-rule-meta.is-loud {
+  color: var(--ink-3);
+}
+
+.atl-rule-meta.is-warn {
+  color: var(--warn);
 }
 
 /* Rows */
 
 .atl-rows {
   position: relative;
-  background: var(--band);
 }
 
 .atl-row {
   position: relative;
   display: flex;
-  border-top: 1px solid var(--line-soft);
 }
 
 .atl-row-name {
@@ -392,24 +308,25 @@
   left: 0;
   z-index: 4;
   flex: none;
-  border-right: 1px solid var(--line-strong);
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 10px 0 0;
+  padding: 0 16px 0 var(--ds-pad-x);
   overflow: hidden;
   cursor: default;
 }
 
 .atl-hue {
   flex: none;
-  width: 3px;
-  margin-right: 1px;
+  width: 4px;
+  height: var(--ds-bar-h);
+  border-radius: 2px;
 }
 
 .atl-row-id {
   flex: none;
   font-family: var(--atl-mono);
+  font-size: 10px;
   color: var(--ink-3);
   letter-spacing: 0.01em;
 }
@@ -417,35 +334,11 @@
 .atl-row-title {
   flex: 1;
   min-width: 0;
+  font-size: var(--ds-row-name-size);
   color: var(--ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.atl-size {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.atl-size-ticks {
-  display: flex;
-  gap: 1.5px;
-  align-items: flex-end;
-}
-
-.atl-size-ticks i {
-  display: block;
-  width: 2px;
-}
-
-.atl-size-label {
-  font-family: var(--atl-mono);
-  font-size: 9.5px;
-  color: var(--ink-3);
-  width: 22px;
 }
 
 .atl-row-track {
@@ -457,18 +350,20 @@
   position: absolute;
   top: 0;
   width: 1px;
+  background: var(--line);
 }
 
 .atl-bar {
   position: absolute;
-  border-radius: 2px;
+  border-radius: var(--ds-r-bar);
+  overflow: hidden;
   cursor: pointer;
 }
 
 .atl-seg-fill {
   position: absolute;
+  top: 0;
   bottom: 0;
-  border-radius: 1px;
 }
 
 .atl-out-label {
@@ -856,22 +751,35 @@
   z-index: 2;
 }
 
-/* Global capability utilisation band at the foot of the advanced timeline. */
-.atl-util-band {
-  border-top: 2px solid var(--line-strong);
+/* Global capability utilisation band at the foot of the advanced timeline:
+   the used bar runs to the horizon, and idle capacity sits over it as a flat
+   wash — where and for how long, not a second data axis. */
+.atl-util-cap {
+  flex: none;
+  font-family: var(--atl-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--ink-2);
+}
+
+.atl-util-pool {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--atl-mono);
+  font-size: 11px;
+  color: var(--ink-4);
+  white-space: nowrap;
 }
 
 .atl-util-used {
   position: absolute;
-  border-radius: 2px;
+  border-radius: var(--ds-r-bar);
 }
 
 .atl-util-idle {
   position: absolute;
-  bottom: 0;
-  background: repeating-linear-gradient(45deg, var(--idle) 0 1px, transparent 1px 5px);
-  border: 1px solid var(--idle);
-  border-radius: 2px;
+  background: var(--idle-wash);
+  border-radius: var(--ds-r-bar);
 }
 
 
@@ -2085,155 +1993,120 @@
   flex: 1;
   min-height: 0;
   display: flex;
+  flex-direction: column;
   overflow: hidden;
 }
 
-.sv-side {
+/* Variant cards — a row across the top, each card one hypothesis: label and
+   team size up top, what it buys underneath. The active one lifts. */
+
+.sv-vars {
   flex: none;
   display: flex;
-  flex-direction: column;
-  background: var(--surface-2);
-  border-right: 1px solid var(--line);
+  gap: 8px;
+  padding: 0 var(--ds-pad-x) 20px;
 }
 
-.sv-side-head {
+.sv-vcard {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+  text-align: left;
+  padding: 13px 15px;
+  border: 0;
+  border-radius: var(--ds-r-card);
+  background: var(--ghost-soft);
+  cursor: pointer;
+}
+
+.sv-vcard:hover {
+  background: var(--ghost);
+}
+
+.sv-vcard.is-active {
+  background: var(--surface-2);
+}
+
+.sv-vcard.is-add {
   flex: none;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  color: var(--ink-3);
+  font-size: 11.5px;
+  padding: 13px 14px;
+}
+
+.sv-vcard.is-add:hover {
+  color: var(--ink);
+}
+
+.sv-vcard-top {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  padding: 14px 14px 11px;
-  border-bottom: 1px solid var(--line);
+  width: 100%;
 }
 
-.sv-side-head b {
+.sv-vcard-label {
   flex: 1;
-  font-size: 12px;
+  min-width: 0;
+  font-size: 12.5px;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sv-vcard.is-active .sv-vcard-label {
   font-weight: 600;
 }
 
-.sv-side-head span {
+.sv-vcard-fte {
+  flex: none;
   font-family: var(--atl-mono);
   font-size: 10px;
   color: var(--ink-4);
-}
-
-.sv-side-list {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.sv-card {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 4px;
-  text-align: left;
-  padding: 9px 11px;
-  background: transparent;
-  border: 1px solid transparent;
-  border-left: 3px solid transparent;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.sv-card:hover {
-  border-color: var(--line);
-}
-
-.sv-card.is-active {
-  background: var(--surface);
-  border-color: var(--line);
-  border-left-color: var(--accent);
-}
-
-.sv-side-foot {
-  flex: none;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 11px;
-  border-top: 1px solid var(--line);
-}
-
-.sv-side-foot .sim-btn {
-  background: var(--surface);
-  border-color: var(--line-strong);
-}
-
-.sv-btn-dashed {
-  border: 1px dashed var(--line-strong);
-  background: transparent;
-  color: var(--ink-3);
-  height: var(--ctl-h);
-  padding: 0 var(--ctl-px);
-  border-radius: var(--ctl-r);
-  font-size: 11.5px;
-  cursor: pointer;
-}
-
-.sv-btn-dashed:hover {
-  color: var(--ink);
-  border-color: var(--accent-line);
-}
-
-/* Chart column */
-
-.sv-main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  background: var(--surface);
-}
-
-.sv-strip {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  padding: 0 20px;
-  height: 52px;
-  background: var(--surface-2);
-  border-bottom: 1px solid var(--line);
-}
-
-.sv-strip-text {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  overflow: hidden;
-}
-
-.sv-strip-text b {
-  font-size: 13.5px;
-  font-weight: 600;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-.sv-strip-text span {
+.sv-vcard-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.sv-vcard-big {
+  font-family: var(--atl-mono);
+  font-size: 17px;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.sv-vcard-proj {
   font-family: var(--atl-mono);
   font-size: 10.5px;
-  color: var(--ink-3);
+  color: var(--ink-4);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* Scroll body */
+/* Scroll body — the axis is a bare label strip, and the only vertical line
+   anywhere is the budget-year window. */
 
 .sv-scroll {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  padding: 0 var(--ds-pad-x);
 }
 
 .sv-axis {
@@ -2241,49 +2114,21 @@
   top: 0;
   z-index: 6;
   display: flex;
-  background: var(--surface);
-  border-bottom: 1px solid var(--line);
+  background: var(--bg);
 }
 
 .sv-axis-corner {
-  position: sticky;
-  left: 0;
-  z-index: 7;
   flex: none;
-  background: var(--surface);
-  border-right: 1px solid var(--line);
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 0 14px 6px;
 }
-
-.sv-axis-corner .atl-eyebrow {
-  color: var(--ink-4);
-  letter-spacing: 0.09em;
-}
-
-.sv-tick-label {
-  position: absolute;
-  top: 23px;
-  font-family: var(--atl-mono);
-  font-size: 9.5px;
-  color: var(--ink-3);
-  white-space: nowrap;
-  padding-left: 5px;
-}
-
-/* The budget-year line: this year's wins land left of it. */
 
 .sv-year-label {
   position: absolute;
   left: 0;
-  top: 3px;
-  padding-right: 5px;
+  top: 2px;
   text-align: right;
   font-family: var(--atl-mono);
-  font-size: 10px;
+  font-size: 9.5px;
+  line-height: 1;
   color: var(--win);
   white-space: nowrap;
 }
@@ -2291,35 +2136,35 @@
 .sv-year-line {
   position: absolute;
   top: 0;
-  width: 0;
-  border-left: 1px dashed var(--win-line);
+  bottom: 0;
+  width: 1px;
+  background: color-mix(in oklab, var(--win) 28%, transparent);
 }
 
 /* Rows */
 
 .sv-row {
   display: flex;
-  border-bottom: 1px solid var(--line-soft);
+  align-items: center;
+}
+
+.sv-row:hover {
+  background: var(--row-hover);
 }
 
 .sv-row-name {
-  position: sticky;
-  left: 0;
-  z-index: 4;
   flex: none;
-  background: var(--surface);
-  border-right: 1px solid var(--line);
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 12px 0 14px;
+  align-items: baseline;
+  gap: 10px;
+  padding-right: 16px;
   overflow: hidden;
 }
 
 .sv-row-title {
   flex: 1;
   min-width: 0;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--ink-2);
   white-space: nowrap;
   overflow: hidden;
@@ -2329,91 +2174,40 @@
 .sv-row-end {
   flex: none;
   font-family: var(--atl-mono);
-  font-size: 10px;
+  font-size: 10.5px;
   white-space: nowrap;
 }
 
 .sv-row-track {
   position: relative;
   flex: none;
+  align-self: stretch;
+}
+
+/* The reference plan behind the bar: a flat band with a post at each end. */
+
+.sv-refband {
+  position: absolute;
+  top: 4px;
+  height: 26px;
+  border-radius: var(--ds-r-bar);
+  background: var(--ghost);
+}
+
+.sv-post {
+  position: absolute;
+  top: 4px;
+  width: 2px;
+  height: 26px;
+  background: var(--ink-4);
 }
 
 .sv-bar {
   position: absolute;
   top: 10px;
-  height: 12px;
-  border: 1px solid transparent;
-  border-radius: 2px;
-}
-
-/* kreska startu: the reference plan as a ghost outline behind the bar. */
-
-.sv-outline {
-  position: absolute;
-  top: 10px;
-  height: 12px;
-  background: var(--ghost-soft);
-  border: 1px solid var(--ghost);
-  border-radius: 2px;
-}
-
-.sv-hair {
-  position: absolute;
-  top: 6px;
-  width: 2px;
-  height: 20px;
-  background: var(--ink-2);
-}
-
-/* serify: the reference span as a hatched band with start/end serifs. */
-
-.sv-refband {
-  position: absolute;
-  top: 5px;
-  height: 21px;
-  background: var(--surface-2);
-  border-radius: 2px;
-}
-
-.sv-refband-hatch {
-  position: absolute;
-  top: 5px;
-  height: 21px;
-  background: repeating-linear-gradient(45deg, var(--line-strong) 0 1px, transparent 1px 6px);
-  opacity: 0.45;
-  border-radius: 2px;
-}
-
-.sv-serif {
-  position: absolute;
-  top: 5px;
-  width: 2px;
-  height: 21px;
-  background: var(--ink-4);
-}
-
-/* Legend — sticky-left so it stays readable when the track scrolls. */
-
-.sv-legend {
-  position: sticky;
-  left: 0;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px 22px;
-  min-height: 40px;
-  padding: 6px 16px;
-  background: var(--band);
-  border-top: 1px solid var(--line);
-  font-size: 11px;
-  color: var(--ink-3);
-}
-
-.sv-legend-item {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  white-space: nowrap;
+  height: 14px;
+  border-radius: var(--ds-r-bar);
+  background: var(--win);
 }
 
 /* Optimizer drawer body */

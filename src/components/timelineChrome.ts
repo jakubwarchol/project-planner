@@ -64,33 +64,15 @@ export const MOD =
 
 export const MON = ["Sty", "Lut", "Mar", "Kwi", "Maj", "Cze", "Lip", "Sie", "Wrz", "Paź", "Lis", "Gru"];
 
-export interface Density {
-  id: string;
-  label: string;
-  row: number;
-  bar: number;
-  name: number;
-  nameCol: number;
-  band: number;
-  lane: number;
-  hdr: number;
-  axis: number;
-  foot: number;
-  fsName: number;
-  fsMono: number;
-}
-
-export const DENSITIES: Density[] = [
-  { id: "s", label: "S", row: 30, bar: 19, name: 250, nameCol: 112, band: 28, lane: 32, hdr: 48, axis: 32, foot: 26, fsName: 11.5, fsMono: 10 },
-  { id: "m", label: "M", row: 42, bar: 26, name: 296, nameCol: 120, band: 38, lane: 40, hdr: 56, axis: 40, foot: 32, fsName: 12.5, fsMono: 11 },
-  { id: "l", label: "L", row: 56, bar: 36, name: 356, nameCol: 134, band: 50, lane: 52, hdr: 68, axis: 50, foot: 38, fsName: 14, fsMono: 12 },
-];
-
+/* v5 draws one timeline geometry, not three densities — the same row, bar and
+   name-column sizes the design tokens carry (--ds-row-h, --ds-bar-h,
+   --ds-name-col). Zoom is the one axis left to the user, named by the unit
+   the grid resolves at each step. */
 export const ZOOMS = [
-  { id: "s", label: "S", ppm: 26 },
-  { id: "m", label: "M", ppm: 46 },
-  { id: "l", label: "L", ppm: 80 },
-];
+  { id: "days", label: "Dni", ppm: 180 },
+  { id: "weeks", label: "Tygodnie", ppm: 92 },
+  { id: "months", label: "Miesiące", ppm: 46 },
+] as const;
 
 // Continuous zoom range for trackpad pinch — presets above are just waypoints in it.
 export const MIN_PPM = 10;

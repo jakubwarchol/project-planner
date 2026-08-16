@@ -1,70 +1,82 @@
 /**
- * The chrome both obsada timelines share: the period navigator, the unit
- * switch, the two-tier sticky axis and the backdrop behind the rows. Scroll
- * itself lives in `timelineScroll.ts`.
+ * The chrome both obsada timelines share: the v5 header (headline figure,
+ * period stepper and the unit tabs), the two-tier sticky axis and the
+ * backdrop behind the rows. Scroll itself lives in `timelineScroll.ts`.
  */
 import type { ReactNode } from "react";
-import { UNITS, UNIT_ORDER, type ObsadaAxis, type ObsadaUnit } from "./axis";
-import { groupArrowNav } from "../timelineChrome";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { UNITS, type ObsadaAxis, type ObsadaUnit } from "./axis";
+import { IconButton, ScreenHeader, UnderlineTabs } from "../../design";
 import { AXIS_H, BAND_H } from "./timelineScroll";
 
+/** Dni first — the order the design reads the grains in. */
+const UNIT_TABS: ObsadaUnit[] = ["days", "weeks", "months"];
+
 interface ToolbarProps {
+  /** The view's headline: eyebrow over one large figure and its unit. */
+  eyebrow: string;
+  value: string;
+  unit: string;
+  /** The sentence under the figure — what the drawing means. */
+  prose: ReactNode;
   focusLabel: string;
   onPrev: () => void;
   onNext: () => void;
   onToday: () => void;
-  unit: ObsadaUnit;
+  timeUnit: ObsadaUnit;
   onUnit: (unit: ObsadaUnit) => void;
+  /** Extra view-specific controls, placed before the stepper. */
   children?: ReactNode;
-  summary?: ReactNode;
 }
 
 export function ObsadaToolbar({
+  eyebrow,
+  value,
+  unit,
+  prose,
   focusLabel,
   onPrev,
   onNext,
   onToday,
-  unit,
+  timeUnit,
   onUnit,
   children,
-  summary,
 }: ToolbarProps) {
   return (
-    <header className="obs-bar">
-      <div className="obs-nav">
-        <button type="button" className="obs-nav-btn" onClick={onPrev} aria-label="Wstecz">
-          ◀
-        </button>
-        <span className="obs-nav-label">{focusLabel}</span>
-        <button type="button" className="obs-nav-btn" onClick={onNext} aria-label="Dalej">
-          ▶
-        </button>
-        <button type="button" className="atl-btn" onClick={onToday}>
-          Dziś
-        </button>
-      </div>
-
-      <div className="atl-seg" role="tablist" aria-label="Skala czasu" onKeyDown={groupArrowNav}>
-        {UNIT_ORDER.map((u) => (
-          <button
-            key={u}
-            type="button"
-            role="tab"
-            aria-selected={u === unit}
-            tabIndex={u === unit ? 0 : -1}
-            className={u === unit ? "is-active" : undefined}
-            onClick={() => onUnit(u)}
-          >
-            {UNITS[u].label}
-          </button>
-        ))}
-      </div>
-
-      {children}
-
-      <div className="atl-spacer" />
-      {summary}
-    </header>
+    <ScreenHeader
+      eyebrow={eyebrow}
+      value={value}
+      unit={unit}
+      actions={
+        <>
+          {children}
+          <span className="obs-range">
+            <IconButton label="Wcześniej" size="lg" filled onClick={onPrev}>
+              <ChevronLeft size={13} strokeWidth={1.75} />
+            </IconButton>
+            <button
+              type="button"
+              className="obs-range-label"
+              onClick={onToday}
+              title="Wróć do dziś"
+            >
+              {focusLabel}
+            </button>
+            <IconButton label="Później" size="lg" filled onClick={onNext}>
+              <ChevronRight size={13} strokeWidth={1.75} />
+            </IconButton>
+          </span>
+          <UnderlineTabs
+            label="Skala czasu"
+            value={timeUnit}
+            onChange={onUnit}
+            items={UNIT_TABS.map((u) => ({ id: u, label: UNITS[u].label }))}
+          />
+        </>
+      }
+    >
+      {prose}
+    </ScreenHeader>
   );
 }
 
@@ -84,9 +96,10 @@ export function AxisHeader({ axis }: { axis: ObsadaAxis }) {
       {axis.cells.map((c) => (
         <div
           key={c.key}
-          className={`obs-axis-cell${c.strongTick ? " is-strong" : ""}${c.isNow ? " is-now" : ""}`}
+          className={`obs-axis-cell${c.strongTick ? " is-strong" : ""}${c.isNow ? " is-now" : ""}${c.sub ? " is-day" : ""}${c.tone ? ` is-${c.tone}` : ""}`}
           style={{ left: c.left, width: c.width, top: BAND_H }}
         >
+          {c.sub && <i>{c.sub}</i>}
           <span>{c.text}</span>
         </div>
       ))}

@@ -10,7 +10,7 @@
  * visible rather than clipped, and the 100% line then sits *inside* the band.
  */
 import { useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, TriangleAlert } from "lucide-react";
 import { CAPABILITY_ORDER } from "../../lib/estimation";
 import { addDays, isoOfIndex } from "../../lib/days";
 import {
@@ -20,18 +20,31 @@ import {
 } from "../../lib/staffing";
 import type { Capability, Leave, Person, Team } from "../../types";
 import type { StaffingApi } from "../../hooks/useStaffing";
-import { fmt, fmt2, groupArrowNav, plCount, solid } from "../timelineChrome";
+import { fmt2, plCount, solid } from "../timelineChrome";
 import { AxisBackdrop, AxisHeader, ObsadaToolbar } from "./ObsadaGrid";
 import { AXIS_H, useTimelineScroll } from "./timelineScroll";
-import { ActionButton, Field, FieldInput, Modal, OverlayGap } from "../../design";
+import {
+  ActionButton,
+  Field,
+  FieldInput,
+  Gap,
+  Legend,
+  Modal,
+  OverlayGap,
+  ScreenFooter,
+  UnderlineTabs,
+} from "../../design";
 import { buildObsadaAxis, focusLabel, shortDay, stepTo } from "./axis";
 import type { ObsadaContext } from "./ObsadaWorkspace";
 
-const LEFT_W = 230;
-const HEAD_H = 22;
-const BAND_H = 52;
-const ROW_PAD = 6;
-const GROUP_H = 24;
+/* v5 geometry: a 200px name column beside a 60px band whose inner 52px is
+   the person's whole availability; 14px of air separates rows. */
+const LEFT_W = 200;
+const BAND_OUTER = 60;
+const BAND_INSET = 4;
+const BAND_H = BAND_OUTER - 2 * BAND_INSET;
+const ROW_PAD = 14;
+const GROUP_H = 30;
 const CHIP_H = 15;
 const EPS = 1e-6;
 
@@ -265,8 +278,7 @@ export function PeopleLoadView({ ctx, people, teams, staffing }: PeopleLoadViewP
     return built.filter((g) => g.rows.length);
   }, [grouping, teams, people, byId]);
 
-  const rowH = (row: PersonLoadRow) =>
-    HEAD_H + BAND_H + ROW_PAD + ((painted.get(row.person.id)?.overMark ? 2 : 0));
+  const rowH = () => BAND_OUTER + ROW_PAD;
 
   const overCount = rows.filter((r) => r.peak > r.capacity + EPS).length;
   const meanUtil =
@@ -277,41 +289,26 @@ export function PeopleLoadView({ ctx, people, teams, staffing }: PeopleLoadViewP
   return (
     <>
       <ObsadaToolbar
+        eyebrow="zaangażowanie osób"
+        value={String(Math.round(meanUtil * 100))}
+        unit="% średniego obłożenia"
+        prose="Wysokość pasma to udział w etacie osoby. Pełna wysokość znaczy sto procent, reszta wiersza zostaje pusta."
         focusLabel={focusLabel(ctx.window, ctx.unit, scroll.scrollLeft)}
         onPrev={() => scroll.goTo(stepTo(axis, scroll.scrollLeft, -1))}
         onNext={() => scroll.goTo(stepTo(axis, scroll.scrollLeft, 1))}
         onToday={scroll.goToday}
-        unit={ctx.unit}
+        timeUnit={ctx.unit}
         onUnit={ctx.setUnit}
-        summary={
-          <span className="obs-sum">
-            <span>średnie obłożenie {pct(meanUtil)}</span>
-            <span className={overCount ? "is-warn" : undefined}>{overCount} powyżej 100%</span>
-          </span>
-        }
       >
-        <div className="atl-seg" role="tablist" aria-label="Grupowanie osób" onKeyDown={groupArrowNav}>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={grouping === "team"}
-            tabIndex={grouping === "team" ? 0 : -1}
-            className={grouping === "team" ? "is-active" : undefined}
-            onClick={() => setGrouping("team")}
-          >
-            Zespoły
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={grouping === "capability"}
-            tabIndex={grouping === "capability" ? 0 : -1}
-            className={grouping === "capability" ? "is-active" : undefined}
-            onClick={() => setGrouping("capability")}
-          >
-            Kompetencje
-          </button>
-        </div>
+        <UnderlineTabs
+          label="Grupowanie osób"
+          value={grouping}
+          onChange={setGrouping}
+          items={[
+            { id: "team" as const, label: "Zespoły" },
+            { id: "capability" as const, label: "Kompetencje" },
+          ]}
+        />
       </ObsadaToolbar>
 
       <div className="obs-scroll" ref={scroll.ref} onScroll={scroll.onScroll}>
@@ -323,36 +320,32 @@ export function PeopleLoadView({ ctx, people, teams, staffing }: PeopleLoadViewP
             {groups.map((g) => (
               <div key={g.key}>
                 <div className="obs-group" style={{ height: GROUP_H }}>
-                  <b>{g.label}</b>
+                  <span className="ds-eyebrow">{g.label}</span>
                 </div>
                 {g.rows.map((row) => {
                   const p = painted.get(row.person.id);
                   const over = row.peak > row.capacity + EPS;
                   const crowded = row.maxProjects > MAX_PARALLEL_PROJECTS;
                   return (
-                    <div key={row.person.id} className="obs-name" style={{ height: rowH(row) }}>
-                      <div className="obs-name-head" style={{ height: HEAD_H }}>
-                        <span className="obs-name-title" title={row.person.name}>
+                    <div key={row.person.id} className="obs-name" style={{ height: rowH() }}>
+                      <div className="obs-name-head" style={{ height: BAND_OUTER }}>
+                        <span
+                          className="obs-name-title"
+                          title={`${row.person.name} · ${Math.min(MAX_PARALLEL_PROJECTS, row.maxProjects)}/${MAX_PARALLEL_PROJECTS} równoległych projektów w szczycie${crowded ? ` (+${row.maxProjects - MAX_PARALLEL_PROJECTS} ponad limit)` : ""}`}
+                        >
                           {row.person.name}
                         </span>
-                        <span
-                          className="obs-name-slots"
-                          title={`${row.maxProjects} równoległych projektów w szczycie · przyjęty limit ${MAX_PARALLEL_PROJECTS}`}
-                          style={crowded ? { color: "var(--warn)" } : undefined}
-                        >
-                          {Math.min(MAX_PARALLEL_PROJECTS, row.maxProjects)}/{MAX_PARALLEL_PROJECTS}
-                          {crowded ? ` +${row.maxProjects - MAX_PARALLEL_PROJECTS}` : ""}
-                        </span>
-                        <span
-                          className="obs-name-warn"
-                          title={
-                            over
-                              ? p?.overMark?.title ?? `szczyt ${pct(row.peak / Math.max(0.01, row.capacity))} etatu`
-                              : ""
-                          }
-                        >
-                          {over ? "!" : ""}
-                        </span>
+                        {over && (
+                          <span
+                            className="obs-name-warn"
+                            title={
+                              p?.overMark?.title ??
+                              `szczyt ${pct(row.peak / Math.max(0.01, row.capacity))} etatu`
+                            }
+                          >
+                            <TriangleAlert size={13} strokeWidth={1.75} />
+                          </span>
+                        )}
                         <button
                           type="button"
                           className="obs-name-add"
@@ -376,84 +369,91 @@ export function PeopleLoadView({ ctx, people, teams, staffing }: PeopleLoadViewP
             <div className="obs-rows">
               {groups.map((g) => (
                 <div key={g.key}>
-                  <div className="obs-group-strip" style={{ height: GROUP_H }} />
+                  <div className="obs-group-strip" style={{ height: GROUP_H }}>
+                    <div className="obs-group-rule">
+                      <span className="atl-rule-line" />
+                      <span className="atl-rule-meta">
+                        {plCount(g.rows.length, "osoba", "osoby", "osób")} ·{" "}
+                        {fmt2(g.rows.reduce((s, r) => s + r.capacity, 0))} FTE
+                      </span>
+                    </div>
+                  </div>
                   {g.rows.map((row) => {
                     const p = painted.get(row.person.id)!;
                     return (
-                      <div key={row.person.id} className="obs-track" style={{ height: rowH(row) }}>
-                        {row.leaveBands.map((band) => (
-                          <button
-                            key={band.leave.id}
-                            type="button"
-                            className="obs-leave"
-                            title={`${band.leave.kind} · ${shortDay(ctx.window.originIso, band.start)}–${shortDay(ctx.window.originIso, band.end - 1)}`}
-                            onClick={() => setLeaveDraft({ personId: row.person.id, leave: band.leave })}
-                            style={{
-                              left: X(band.start),
-                              width: Math.max(3, X(band.end) - X(band.start)),
-                              top: HEAD_H,
-                              height: BAND_H,
-                            }}
-                          />
-                        ))}
-                        {p.overMark && (
-                          <span
-                            className="obs-mark"
-                            title={p.overMark.title}
-                            style={{ left: Math.max(0, p.overMark.left - 7), top: Math.max(0, HEAD_H - 16) }}
-                          >
-                            !
-                          </span>
-                        )}
-                        <div className="obs-band" style={{ top: HEAD_H, height: BAND_H }}>
-                          {p.free.map((b) => (
-                            <div
-                              key={b.key}
-                              className="obs-free"
-                              title={b.title}
-                              style={{ left: b.left, width: b.width, bottom: b.bottom, height: b.height }}
-                            />
-                          ))}
-                          {p.boxes.map((b) => (
-                            <div
-                              key={b.key}
-                              className="obs-box"
-                              title={b.title}
+                      <div key={row.person.id} className="obs-track" style={{ height: rowH() }}>
+                        <div className="obs-band" style={{ top: 0, height: BAND_OUTER }}>
+                          {row.leaveBands.map((band) => (
+                            <button
+                              key={band.leave.id}
+                              type="button"
+                              className="obs-leave"
+                              title={`${band.leave.kind} · ${shortDay(ctx.window.originIso, band.start)}–${shortDay(ctx.window.originIso, band.end - 1)}`}
+                              onClick={() =>
+                                setLeaveDraft({ personId: row.person.id, leave: band.leave })
+                              }
                               style={{
-                                left: b.left,
-                                width: b.width,
-                                bottom: b.bottom,
-                                height: b.height,
-                                background: b.color,
+                                left: X(band.start),
+                                width: Math.max(3, X(band.end) - X(band.start)),
+                                top: BAND_INSET,
+                                height: BAND_H,
                               }}
                             />
                           ))}
-                          <div className="obs-hundred" style={{ bottom: p.unitPx }} />
-                          {p.chips.map((c) => (
-                            <button
-                              key={c.key}
-                              type="button"
-                              className="obs-chip"
-                              style={{ left: c.left, bottom: c.bottom, height: c.height }}
-                              onClick={() => ctx.openItem(c.projectId, c.capability)}
-                              title={`${c.name} · ${c.capability} — otwórz obsadzanie`}
-                            >
-                              <span>{c.name}</span>
-                              <em>{c.value}</em>
-                            </button>
-                          ))}
-                          {p.tags.map((c) => (
-                            <button
-                              key={c.key}
-                              type="button"
-                              className="obs-tag"
-                              style={{ left: c.left, bottom: c.bottom, height: c.height }}
-                              onClick={() => ctx.openItem(c.projectId, c.capability)}
-                              title={`${c.name} · ${c.capability} — otwórz obsadzanie`}
-                            >
-                              {c.name} {c.value}
-                            </button>
-                          ))}
+                          <div className="obs-band-stack">
+                            {p.free.map((b) => (
+                              <div
+                                key={b.key}
+                                className="obs-free"
+                                title={b.title}
+                                style={{ left: b.left, width: b.width, bottom: b.bottom, height: b.height }}
+                              />
+                            ))}
+                            {p.boxes.map((b) => (
+                              <div
+                                key={b.key}
+                                className="obs-box"
+                                title={b.title}
+                                style={{
+                                  left: b.left,
+                                  width: b.width,
+                                  bottom: b.bottom,
+                                  height: b.height,
+                                  background: b.color,
+                                }}
+                              />
+                            ))}
+                            {/* The 100% line only appears once a peak pushed it
+                                inside the band — at rest the band's top IS 100%. */}
+                            {p.unitPx < BAND_H - 1 && (
+                              <div className="obs-hundred" style={{ bottom: p.unitPx }} />
+                            )}
+                            {p.chips.map((c) => (
+                              <button
+                                key={c.key}
+                                type="button"
+                                className="obs-chip"
+                                style={{ left: c.left, bottom: c.bottom, height: c.height }}
+                                onClick={() => ctx.openItem(c.projectId, c.capability)}
+                                title={`${c.name} · ${c.capability} — otwórz obsadzanie`}
+                              >
+                                <span>{c.name}</span>
+                                <em>{c.value}</em>
+                              </button>
+                            ))}
+                            {p.tags.map((c) => (
+                              <button
+                                key={c.key}
+                                type="button"
+                                className="obs-tag"
+                                style={{ left: c.left, bottom: c.bottom, height: c.height }}
+                                onClick={() => ctx.openItem(c.projectId, c.capability)}
+                                title={`${c.name} · ${c.capability} — otwórz obsadzanie`}
+                              >
+                                {c.name} {c.value}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       </div>
                     );
@@ -465,15 +465,20 @@ export function PeopleLoadView({ ctx, people, teams, staffing }: PeopleLoadViewP
         </div>
       </div>
 
-      <footer className="obs-foot">
+      <ScreenFooter>
+        <Legend color="var(--leave-wash)">urlop</Legend>
+        <Legend color="var(--warn-wash)">święto</Legend>
+        <Gap />
+        {overCount > 0 && (
+          <span className="is-warn">
+            {plCount(overCount, "osoba ponad 100%", "osoby ponad 100%", "osób ponad 100%")}
+          </span>
+        )}
         <span>
           {plCount(people.length, "osoba", "osoby", "osób")} ·{" "}
           {plCount(staffing.assignments.length, "przypisanie", "przypisania", "przypisań")}
         </span>
-        <span>wolne łącznie {fmt(rows.reduce((s, r) => s + r.freeFte, 0))} FTE</span>
-        <span className="atl-spacer" />
-        <span>pasek = 100% dostępności osoby · kreskowane = wolne · ! = początek przeciążenia</span>
-      </footer>
+      </ScreenFooter>
 
       {leaveDraft && (
         <LeaveEditor

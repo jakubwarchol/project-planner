@@ -23,9 +23,16 @@ import { usePlanner } from "../state/plannerContext";
 import type { Project, VariantCeilings } from "../types";
 import { HiringPlanDrawer } from "./HiringPlanDrawer";
 import { VariantEditor } from "./VariantEditor";
-import { MON, fmt, groupArrowNav, monthLabel, optimizedLabel, plCount, rungRoles, signed, weeksOf } from "./timelineChrome";
+import { MON, fmt, monthLabel, optimizedLabel, plCount, rungRoles, signed, weeksOf } from "./timelineChrome";
 import "./timeline.css";
-import { Card, PillButton, ScreenHeader, type ResolvedTheme } from "../design";
+import {
+  Gap,
+  Legend,
+  PillButton,
+  ScreenFooter,
+  ScreenHeader,
+  type ResolvedTheme,
+} from "../design";
 
 const CAPS_KEY = "planner-capability-caps";
 
@@ -33,8 +40,8 @@ const CAPS_KEY = "planner-capability-caps";
  *  and the headline metric counts them. */
 const YEAR_LINE = 12;
 
-const ROW_H = 31;
-const AXIS_H = 52;
+const ROW_H = 34;
+const AXIS_H = 30;
 
 /** Caps live in localStorage rather than the database: they are a constraint on
  *  a question ("we only ever want one TL"), not a fact about the roster, and
@@ -65,8 +72,6 @@ interface TimelineViewProps {
    *  from the autopilot's "nobody to add" blocks in Wyceny. */
   initialOptimizerOpen?: boolean;
 }
-
-export type FillMode = "serify" | "kreska";
 
 interface VariantSummary {
   horizon: number;
@@ -120,7 +125,6 @@ export function TimelineView({ projects, theme, initialOptimizerOpen }: Timeline
     if (!variants.some((v) => v.id === variantId)) setVariantId(reference.id);
   }, [variants, variantId, reference.id]);
 
-  const [fillMode, setFillMode] = useState<FillMode>("serify");
   const [drawerOpen, setDrawerOpen] = useState(initialOptimizerOpen ?? false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [viewW, setViewW] = useState(0);
@@ -328,9 +332,8 @@ export function TimelineView({ projects, theme, initialOptimizerOpen }: Timeline
 
   // ── Chart geometry ──────────────────────────────────────────────────────
   const wide = (winW || 1280) >= 1180;
-  const nameW = wide ? 300 : 280;
+  const nameW = 280;
   const drawerW = wide ? 460 : 380;
-  const variantsW = wide ? 224 : 196;
 
   const maxEnd = useMemo(() => {
     let max = YEAR_LINE;
@@ -344,7 +347,7 @@ export function TimelineView({ projects, theme, initialOptimizerOpen }: Timeline
 
   const months = Math.ceil((maxEnd * 1.06) / 3) * 3 + 3;
   // The drawer slides over the canvas, so the chart keeps the full width.
-  const trackW = (viewW || 1100) - nameW - 6;
+  const trackW = (viewW || 1100) - nameW - 8;
   const ppm = Math.max(3, trackW / months);
   const totalW = Math.round(months * ppm);
   const yearX = Math.round(YEAR_LINE * ppm);
@@ -354,21 +357,17 @@ export function TimelineView({ projects, theme, initialOptimizerOpen }: Timeline
   const startYear = now.getFullYear();
   const startMonth = now.getMonth();
 
-  const { ticks, tickLabels, gridlines } = useMemo(() => {
-    const t: { x: number; h: number; color: string }[] = [];
+  // v5's axis is labels alone — no tick marks, no grid in the rows; the one
+  // vertical line anywhere is the budget-year window.
+  const tickLabels = useMemo(() => {
     const l: { x: number; label: string }[] = [];
-    const g: number[] = [];
-    for (let i = 0; i <= months; i++) {
+    for (let i = 0; i < months; i += labelStep) {
       const abs = startMonth + i;
       const m = abs % 12;
       const y = startYear + Math.floor(abs / 12);
-      const quarter = m % 3 === 0;
-      const x = Math.round(i * ppm);
-      t.push({ x, h: quarter ? 11 : 5, color: quarter ? "var(--line-strong)" : "var(--line-soft)" });
-      if (i % labelStep === 0 && i < months) l.push({ x, label: `${MON[m]} ${String(y).slice(2)}` });
-      if (quarter && i > 0) g.push(x);
+      l.push({ x: Math.round(i * ppm), label: `${MON[m]} ${String(y).slice(2)}` });
     }
-    return { ticks: t, tickLabels: l, gridlines: g };
+    return l;
   }, [months, ppm, startYear, startMonth, labelStep]);
 
   const compare = selected.id !== reference.id;
@@ -384,8 +383,16 @@ export function TimelineView({ projects, theme, initialOptimizerOpen }: Timeline
     const finite = !sp.isImpossible && Number.isFinite(sp.endMonths) && !sp.hasNoDemand;
     const refFinite = ref && !ref.isImpossible && Number.isFinite(ref.endMonths) && !ref.hasNoDemand;
 
-    const endLabel = sp.hasNoDemand ? "—" : finite ? monthLabel(startYear, startMonth, sp.endMonths) : "nigdy";
-    const endColor = sp.hasNoDemand ? "var(--ink-4)" : finite ? "var(--ink-3)" : "var(--warn)";
+    // The end figure is months into the plan, on the same scale as the axis
+    // and the budget-year window; green means it lands inside that window.
+    const endLabel = sp.hasNoDemand ? "—" : finite ? fmt(sp.endMonths) : "nigdy";
+    const endColor = sp.hasNoDemand
+      ? "var(--ink-4)"
+      : !finite
+        ? "var(--warn)"
+        : sp.endMonths <= YEAR_LINE + 1e-9
+          ? "var(--win)"
+          : "var(--ink-3)";
 
     const barX = finite ? Math.round(sp.startMonths * ppm) : 0;
     const barW = finite ? Math.max(3, Math.round((sp.endMonths - sp.startMonths) * ppm)) : 0;
@@ -393,32 +400,7 @@ export function TimelineView({ projects, theme, initialOptimizerOpen }: Timeline
     const refEndX = refFinite ? Math.round(ref.endMonths * ppm) : 0;
 
     const compareRow = compare && finite && refFinite;
-    // Start shifts are fractions of a month, so pixel rounding wipes them out
-    // — measure in months and give the marker a legible floor.
     const startDelta = compareRow ? ref.startMonths - sp.startMonths : 0;
-    const hasStartShift = startDelta > 0.05;
-    const leadW = hasStartShift ? Math.max(5, Math.round(startDelta * ppm)) : 0;
-    // The reference band hugs the bar's start when the shift is small — except
-    // for a variant that starts *later* than the reference, where the honest
-    // position is the reference's own.
-    const bandX = compareRow
-      ? sp.startMonths <= ref.startMonths + 1e-9
-        ? barX + leadW
-        : refStartX
-      : 0;
-    const bandW = compareRow ? Math.max(1, refEndX - bandX) : 0;
-
-    // kreska startu: the ghost is the reference plan. When the two spans
-    // overlap, its left edge merges with the bar's start so the pair reads as
-    // one nested shape; when they don't, that anchor would stretch the ghost
-    // across the gap (or collapse it to a sliver on a slower variant) — so a
-    // disjoint ghost sits on the reference's true span, hair included.
-    const spansOverlap =
-      compareRow && sp.startMonths < ref.endMonths && ref.startMonths < sp.endMonths;
-    const outlineX = spansOverlap ? Math.min(barX, refStartX) : refStartX;
-    const outlineW = Math.max(3, refEndX - outlineX);
-    const hairX = spansOverlap ? barX + leadW : refStartX;
-
     const endDiff = compareRow ? ref.endMonths - sp.endMonths : 0;
     const endTitle =
       endDiff > 0.05
@@ -426,16 +408,18 @@ export function TimelineView({ projects, theme, initialOptimizerOpen }: Timeline
         : endDiff < -0.05
           ? `koniec później o ${fmt(-endDiff)} mies.`
           : "koniec bez zmian";
-    const startTitle = hasStartShift
-      ? `start wcześniej o ${fmt(startDelta)} mies.`
-      : "start bez zmian";
+    const startTitle =
+      startDelta > 0.05
+        ? `start wcześniej o ${fmt(startDelta)} mies.`
+        : startDelta < -0.05
+          ? `start później o ${fmt(-startDelta)} mies.`
+          : "start bez zmian";
     const refTitle = refFinite
       ? `${reference.label} · ${fmt(ref.startMonths)}–${fmt(ref.endMonths)} mies.`
       : reference.label;
 
-    const serify = compareRow && fillMode === "serify";
-    const kreska = compareRow && fillMode === "kreska";
-
+    // The reference plan sits behind the variant's bar as a flat band with a
+    // post at its start and end — the design's one comparison drawing.
     return (
       <div key={p.id} className="sv-row" style={{ height: ROW_H }}>
         <div className="sv-row-name" title={`${p.name} · ${selected.label}`} style={{ width: nameW }}>
@@ -445,21 +429,17 @@ export function TimelineView({ projects, theme, initialOptimizerOpen }: Timeline
           </span>
         </div>
         <div className="sv-row-track" style={{ width: totalW, height: ROW_H }}>
-          {gridlines.map((x) => (
-            <div key={x} className="atl-grid" style={{ left: x, height: ROW_H, background: "var(--line-soft)" }} />
-          ))}
-          <div className="sv-year-line" style={{ left: yearX, height: ROW_H, opacity: 0.55 }} />
+          <div className="sv-year-line" style={{ left: yearX }} />
 
-          {kreska && (
-            <div className="sv-outline" title={refTitle} style={{ left: outlineX, width: outlineW }} />
-          )}
-
-          {serify && (
+          {compareRow && (
             <>
-              <div className="sv-refband" title={refTitle} style={{ left: bandX, width: bandW }} />
-              <div className="sv-refband-hatch" style={{ left: bandX, width: bandW }} />
-              <div className="sv-serif" title={startTitle} style={{ left: bandX }} />
-              <div className="sv-serif" title={endTitle} style={{ left: refEndX }} />
+              <div
+                className="sv-refband"
+                title={refTitle}
+                style={{ left: refStartX, width: Math.max(3, refEndX - refStartX) }}
+              />
+              <div className="sv-post" title={startTitle} style={{ left: refStartX }} />
+              <div className="sv-post" title={endTitle} style={{ left: refEndX }} />
             </>
           )}
 
@@ -467,24 +447,15 @@ export function TimelineView({ projects, theme, initialOptimizerOpen }: Timeline
             <div
               className="sv-bar"
               title={`${p.name} · ${fmt(sp.startMonths)}–${fmt(sp.endMonths)} mies. · kończy ${monthLabel(startYear, startMonth, sp.endMonths)}`}
-              style={{
-                left: barX,
-                width: barW,
-                background: serify ? "var(--win)" : "var(--accent)",
-                borderColor: serify ? "var(--win-edge)" : "transparent",
-              }}
+              style={{ left: barX, width: barW }}
             />
-          )}
-
-          {kreska && hasStartShift && (
-            <div className="sv-hair" title={startTitle} style={{ left: hairX }} />
           )}
         </div>
       </div>
     );
   }
 
-  // ── Sidebar cards ───────────────────────────────────────────────────────
+  // ── Variant cards — a row across the top, as the design draws them ──────
   function variantCard(v: TeamVariant) {
     const s = summaryByVariant[v.id];
     const active = v.id === selected.id;
@@ -492,52 +463,52 @@ export function TimelineView({ projects, theme, initialOptimizerOpen }: Timeline
     const broken = s.impossible > 0;
     const refBroken = refSummary.impossible > 0;
 
-    let metaPlan: string;
-    let planColor: string;
+    let big: string;
+    let bigColor: string;
     if (broken) {
-      metaPlan = `nie domyka się (${s.impossible})`;
-      planColor = "var(--warn)";
+      big = `nie domyka się (${s.impossible})`;
+      bigColor = "var(--warn)";
     } else if (isRef || refBroken) {
-      metaPlan = `plan ${fmt(s.horizon)} mies.`;
-      planColor = active ? "var(--ink-2)" : "var(--ink-4)";
+      big = `plan ${fmt(s.horizon)} mies.`;
+      bigColor = "var(--ink-3)";
     } else {
       const weeks = Math.round(weeksOf(s.horizon - refSummary.horizon));
-      metaPlan = `${signed(weeks)} tyg.`;
-      planColor = gainColor(-weeks);
+      big = `${signed(weeks)} tyg.`;
+      bigColor = gainColor(-weeks);
     }
 
     const projDiff = s.within - refSummary.within;
-    const metaProj = isRef
+    const proj = isRef
       ? `${s.within} proj. w ${YEAR_LINE} mies.`
       : `${signed(projDiff)} proj. w ${YEAR_LINE} mies.`;
-    const projColor = isRef ? (active ? "var(--ink-2)" : "var(--ink-4)") : gainColor(projDiff);
 
     return (
-      <Card
+      <button
         key={v.id}
-        active={active}
+        type="button"
+        className={`sv-vcard ${active ? "is-active" : ""}`}
         onClick={() => setVariantId(v.id)}
         title={v.label}
-        label={v.label}
-        meta={`${fmt(s.totalFte)} etatów`}
+        aria-pressed={active}
       >
-        <span className="sv-card-figure">
-          <b style={{ color: planColor }}>{metaPlan}</b>
-          <span style={{ color: projColor }}>{metaProj}</span>
+        <span className="sv-vcard-top">
+          <span className="sv-vcard-label">{v.label}</span>
+          <span className="sv-vcard-fte">{fmt(s.totalFte)} etatów</span>
         </span>
-      </Card>
+        <span className="sv-vcard-row">
+          <b className="sv-vcard-big" style={{ color: bigColor }}>
+            {big}
+          </b>
+          <span className="sv-vcard-proj">{proj}</span>
+        </span>
+      </button>
     );
   }
 
-  const stripHeadline = `${selSummary.within} projektów w ${YEAR_LINE} mies. · ${selected.label}`;
   // The screen's one number: what the chosen variant buys against today's
   // team, in the weeks a sprint is made of.
   const selIsRef = selected.id === reference.id;
   const deltaWeeks = Math.round(weeksOf(selSummary.horizon - refSummary.horizon));
-  const stripSecondary =
-    selSummary.impossible > 0
-      ? `plan nie domyka się — ${plCount(selSummary.impossible, "projekt bez końca", "projekty bez końca", "projektów bez końca")} · ${fmt(selSummary.totalFte)} etatów · ${plannedProjects.length} projektów w portfelu`
-      : `koniec planu ${fmt(selSummary.horizon)} mies. · ${fmt(selSummary.totalFte)} etatów · ${plannedProjects.length} projektów w portfelu`;
 
   return (
     <div className="atl" data-theme={theme}>
@@ -547,126 +518,60 @@ export function TimelineView({ projects, theme, initialOptimizerOpen }: Timeline
         unit="tyg. wobec obecnego zespołu"
         actions={
           <>
-        <span className="atl-eyebrow">porównanie</span>
-        <div className="atl-seg" role="tablist" aria-label="Sposób porównania" onKeyDown={groupArrowNav}>
-          {(
-            [
-              { id: "serify", label: "serify" },
-              { id: "kreska", label: "kreska startu" },
-            ] as { id: FillMode; label: string }[]
-          ).map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              role="tab"
-              aria-selected={fillMode === m.id}
-              tabIndex={fillMode === m.id ? 0 : -1}
-              title={m.label}
-              className={`atl-seg-text ${fillMode === m.id ? "is-active" : ""}`}
-              onClick={() => setFillMode(m.id)}
+            <PillButton onClick={() => setEditorOpen(true)}>Warianty…</PillButton>
+            <PillButton
+              icon={<WandSparkles size={13} strokeWidth={1.75} />}
+              active={drawerOpen}
+              onClick={() => setDrawerOpen((v) => !v)}
+              disabled={plannedProjects.length === 0}
+              aria-expanded={drawerOpen}
+              title={plannedProjects.length === 0 ? "Brak projektów w planie" : undefined}
             >
-              {m.label}
-            </button>
-          ))}
-        </div>
-        <PillButton
-          icon={<WandSparkles size={13} strokeWidth={1.75} />}
-          active={drawerOpen}
-          onClick={() => setDrawerOpen((v) => !v)}
-          disabled={plannedProjects.length === 0}
-          aria-expanded={drawerOpen}
-          title={plannedProjects.length === 0 ? "Brak projektów w planie" : undefined}
-        >
-          Optymalizuj
-        </PillButton>
+              Optymalizuj
+            </PillButton>
           </>
         }
       >
-        Pasek wariantu to jego plan, szary za nim to dzisiejszy zespół. Różnica na starcie
-        mówi, ile czekania znika. Wybrany wariant: {selected.label}.
+        Zielony pasek to plan wybranego wariantu, szary za nim to dzisiejszy zespół. Różnica
+        na starcie mówi, ile czekania znika.
       </ScreenHeader>
 
       <div className="sv-content">
-        <aside className="sv-side" aria-label="Warianty zespołu" style={{ width: variantsW }}>
-          <div className="sv-side-head">
-            <b>Warianty zespołu</b>
-            <span>{plCount(variants.length, "wariant", "warianty", "wariantów")}</span>
-          </div>
-          <div className="sv-side-list">{variants.map((v) => variantCard(v))}</div>
-          <div className="sv-side-foot">
-            <button type="button" className="sim-btn" onClick={() => setEditorOpen(true)}>
-              Edytuj warianty…
-            </button>
-            <button
-              type="button"
-              className="sv-btn-dashed"
-              onClick={() => {
-                setVariantId(variantsApi.createVariant(selected));
-                setEditorOpen(true);
-              }}
-            >
-              + Nowy wariant
-            </button>
-          </div>
-        </aside>
+        <div className="sv-vars" role="tablist" aria-label="Warianty zespołu">
+          {variants.map((v) => variantCard(v))}
+          <button
+            type="button"
+            className="sv-vcard is-add"
+            title="Nowy wariant na bazie wybranego"
+            onClick={() => {
+              setVariantId(variantsApi.createVariant(selected));
+              setEditorOpen(true);
+            }}
+          >
+            + Nowy wariant
+          </button>
+        </div>
 
-        <div className="sv-main">
-          <div className="sv-strip">
-            <div className="sv-strip-text">
-              <b>{stripHeadline}</b>
-              <span>{stripSecondary}</span>
-            </div>
-          </div>
-
-          <div className="sv-scroll" ref={scrollRef}>
-            <div className="sv-axis" style={{ height: AXIS_H }}>
-              <div className="sv-axis-corner" style={{ width: nameW }}>
-                <span className="atl-eyebrow">projekt</span>
-                <span className="atl-eyebrow">koniec</span>
-              </div>
-              <div className="atl-track" style={{ width: totalW, height: AXIS_H }}>
-                <div
-                  className="sv-year-label"
-                  title="koniec roku budżetowego"
-                  style={{ width: yearX }}
-                >
-                  {YEAR_LINE} mies.
+        <div className="sv-scroll" ref={scrollRef}>
+          <div className="sv-axis" style={{ height: AXIS_H }}>
+            <div className="sv-axis-corner" style={{ width: nameW }} />
+            <div className="atl-track" style={{ width: totalW, height: AXIS_H }}>
+              {tickLabels.map((t, i) => (
+                <div key={i} className="atl-tick-label" style={{ left: t.x }}>
+                  {t.label}
                 </div>
-                {ticks.map((t, i) => (
-                  <div key={i} className="atl-tick" style={{ left: t.x, height: t.h, background: t.color }} />
-                ))}
-                {tickLabels.map((t, i) => (
-                  <div key={i} className="sv-tick-label" style={{ left: t.x }}>
-                    {t.label}
-                  </div>
-                ))}
-                <div className="sv-year-line" style={{ left: yearX, top: 20, bottom: 0 }} />
+              ))}
+              <div
+                className="sv-year-label"
+                title="koniec roku budżetowego"
+                style={{ width: Math.max(0, yearX - 8) }}
+              >
+                okno {YEAR_LINE} mies.
               </div>
             </div>
-
-            {selSched.scheduled.map((sp) => renderRow(sp))}
-
-            <div className="sv-legend" style={{ width: viewW > 0 ? viewW : undefined }}>
-              <span className="sv-legend-item">
-                <span style={{ width: 22, height: 9, borderRadius: 2, background: "var(--accent)" }} />
-                plan wybranego wariantu
-              </span>
-              <span className="sv-legend-item">
-                <span
-                  style={{
-                    width: 22,
-                    height: 9,
-                    borderRadius: 2,
-                    background: "var(--ghost-soft)",
-                    border: "1px solid var(--ghost)",
-                  }}
-                />
-                {fillMode === "serify"
-                  ? `${reference.label} · pas i kreski = bazowy start i koniec`
-                  : `${reference.label} · obrys = plan bazowy, kreska = bazowy start`}
-              </span>
-            </div>
           </div>
+
+          {selSched.scheduled.map((sp) => renderRow(sp))}
         </div>
 
         <HiringPlanDrawer
@@ -689,6 +594,27 @@ export function TimelineView({ projects, theme, initialOptimizerOpen }: Timeline
           onClose={() => setDrawerOpen(false)}
         />
       </div>
+
+      <ScreenFooter>
+        <Legend color="var(--win)">wariant</Legend>
+        <Legend color="var(--ghost)">obecny zespół · kreski to bazowy start i koniec</Legend>
+        <Gap />
+        {selSummary.impossible > 0 ? (
+          <span className="is-warn">
+            plan nie domyka się —{" "}
+            {plCount(
+              selSummary.impossible,
+              "projekt bez końca",
+              "projekty bez końca",
+              "projektów bez końca",
+            )}
+          </span>
+        ) : (
+          <span>
+            koniec planu {fmt(selSummary.horizon)} mies. · {fmt(selSummary.totalFte)} etatów
+          </span>
+        )}
+      </ScreenFooter>
 
       {editorOpen && (
         <VariantEditor

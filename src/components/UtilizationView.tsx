@@ -16,7 +16,7 @@ import { useStaffing } from "../hooks/useStaffing";
 import { usePlanner } from "../state/plannerContext";
 import { addDays, dateOfIso, isWorkingDate, isoOfIndex } from "../lib/days";
 import { computeStaffingWindow, buildPersonLoadRows } from "../lib/staffing";
-import { MON_SHORT, isoWeek } from "./obsada/axis";
+import { MON_FULL, MON_SHORT, isoWeek } from "./obsada/axis";
 import { plCount } from "./timelineChrome";
 import {
   Gap,
@@ -39,20 +39,6 @@ type Grain = "days" | "weeks";
 const SPAN: Record<Grain, number> = { days: 6, weeks: 18 };
 
 const WD = ["pn", "wt", "śr", "cz", "pt"];
-const MON_FULL = [
-  "styczeń",
-  "luty",
-  "marzec",
-  "kwiecień",
-  "maj",
-  "czerwiec",
-  "lipiec",
-  "sierpień",
-  "wrzesień",
-  "październik",
-  "listopad",
-  "grudzień",
-];
 
 /** What one cell of the grid stands for. */
 interface Cell {

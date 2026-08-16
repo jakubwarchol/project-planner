@@ -12,11 +12,12 @@ import { useMemo, useState } from "react";
 import { CATEGORY_ORDER } from "../../lib/estimation";
 import { buildProjectStaffingRows, type ProjectStaffingRow } from "../../lib/staffing";
 import type { Project } from "../../types";
-import { CAPABILITY_HUES, fmt2, groupArrowNav, plCount, solid } from "../timelineChrome";
+import { CAPABILITY_HUES, fmt2, plCount, solid } from "../timelineChrome";
 import { AxisBackdrop, AxisHeader, ObsadaToolbar } from "./ObsadaGrid";
 import { AXIS_H, useTimelineScroll } from "./timelineScroll";
 import { buildObsadaAxis, focusLabel, shortDay, stepTo } from "./axis";
 import type { ObsadaContext } from "./ObsadaWorkspace";
+import { UnderlineTabs } from "../../design";
 
 const LEFT_W = 246;
 const HEAD_H = 24;
@@ -86,43 +87,32 @@ export function ProjectStaffingView({ ctx, projects }: ProjectStaffingViewProps)
   return (
     <>
       <ObsadaToolbar
+        eyebrow="kto i kiedy w projekcie"
+        value={String(coveredPct)}
+        unit="% zapotrzebowania obsadzone"
+        prose={
+          <>
+            Każda pozycja planu obok tego, kto ją realnie obsadza. Luka to zapotrzebowanie bez
+            człowieka — kliknij wiersz, aby ją domknąć.{" "}
+            {plCount(gapProjects, "projekt z luką", "projekty z luką", "projektów z luką")}.
+          </>
+        }
         focusLabel={focusLabel(ctx.window, ctx.unit, scroll.scrollLeft)}
         onPrev={() => scroll.goTo(stepTo(axis, scroll.scrollLeft, -1))}
         onNext={() => scroll.goTo(stepTo(axis, scroll.scrollLeft, 1))}
         onToday={scroll.goToday}
-        unit={ctx.unit}
+        timeUnit={ctx.unit}
         onUnit={ctx.setUnit}
-        summary={
-          <span className="obs-sum">
-            <span>{coveredPct}% zapotrzebowania obsadzone</span>
-            <span className={gapProjects ? "is-warn" : undefined}>
-              {plCount(gapProjects, "projekt z luką", "projekty z luką", "projektów z luką")}
-            </span>
-          </span>
-        }
       >
-        <div className="atl-seg" role="tablist" aria-label="Filtr projektów" onKeyDown={groupArrowNav}>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={!gapsOnly}
-            tabIndex={gapsOnly ? -1 : 0}
-            className={gapsOnly ? undefined : "is-active"}
-            onClick={() => setGapsOnly(false)}
-          >
-            Wszystkie
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={gapsOnly}
-            tabIndex={gapsOnly ? 0 : -1}
-            className={gapsOnly ? "is-active" : undefined}
-            onClick={() => setGapsOnly(true)}
-          >
-            Z lukami
-          </button>
-        </div>
+        <UnderlineTabs
+          label="Filtr projektów"
+          value={gapsOnly ? "gaps" : "all"}
+          onChange={(id) => setGapsOnly(id === "gaps")}
+          items={[
+            { id: "all" as const, label: "Wszystkie" },
+            { id: "gaps" as const, label: "Z lukami" },
+          ]}
+        />
       </ObsadaToolbar>
 
       <div className="obs-scroll" ref={scroll.ref} onScroll={scroll.onScroll}>

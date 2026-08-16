@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronsLeft, ChevronsRight, Clock, Flag, TriangleAlert } from "lucide-react";
+import { ChevronsLeft, ChevronsRight, Clock, Flag } from "lucide-react";
 import { formatDateKey, monthsFrom } from "../lib/calendar";
 import { computeStartDrift } from "../lib/planning";
 import { useCapabilityMatrix } from "../hooks/useCapabilityMatrix";
@@ -11,7 +11,6 @@ import {
   CATEGORY_ORDER,
   CEILING_FTE_EPS,
   CEILING_FTE_STEPS,
-  ESTIMATE_ORDER,
   focusByCapability,
 } from "../lib/estimation";
 import { assignOwnLanes, type ScheduledProject } from "../lib/scheduling";
@@ -19,7 +18,6 @@ import { usePlanner } from "../state/plannerContext";
 import type { CapabilityVector, Project } from "../types";
 import { ProjectBreakdownTip, type TipAnchor } from "./ProjectBreakdownTip";
 import {
-  DENSITIES,
   HUES,
   MON,
   ZOOMS,
@@ -38,6 +36,7 @@ import {
   PillButton,
   ScreenFooter,
   ScreenHeader,
+  UnderlineTabs,
   type ResolvedTheme,
 } from "../design";
 
@@ -50,6 +49,16 @@ interface AdvancedTimelineProps {
 }
 
 const EPS = 1e-6;
+
+/* One geometry, the design's: 44px rows carrying 24px bars, a 264px name
+   column (120px when collapsed to bare hue pills), and a bare label strip for
+   the axis. The v5 tokens carry the same numbers for CSS. */
+const ROW_H = 44;
+const BAR_H = 24;
+const NAME_W = 264;
+const NAME_COLLAPSED_W = 96;
+const AXIS_H = 26;
+const BAR_TOP = Math.round((ROW_H - BAR_H) / 2);
 
 interface RowModel {
   sp: ScheduledProject;
@@ -66,13 +75,14 @@ export function AdvancedTimeline({ projects, pools, onOpenMatrix, theme }: Advan
   const schedule = useCapabilitySchedule(projects, pools);
   const { people, settings } = usePlanner();
 
-  const { ppm, setPpm, scrollRef } = useZoomGesture(ZOOMS[1].ppm);
-  const [densityId, setDensityId] = useState("m");
-  const [keyOpen, setKeyOpen] = useState(true);
+  const { ppm, setPpm, scrollRef } = useZoomGesture(ZOOMS[2].ppm);
   const [nameCollapsed, setNameCollapsed] = useState(false);
   const [hover, setHover] = useState<string | null>(null);
   const [popover, setPopover] = useState<string | null>(null);
   const [tip, setTip] = useState<{ projectId: string; anchor: TipAnchor } | null>(null);
+  // The width the viewport actually shows — the category rules span it, so a
+  // label line never scrolls away with the track behind it.
+  const [viewW, setViewW] = useState(0);
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -81,6 +91,16 @@ export function AdvancedTimeline({ projects, pools, onOpenMatrix, theme }: Advan
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [popover]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const measure = () => setViewW(el.clientWidth);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [scrollRef]);
 
   const hueById = useMemo(() => buildHueMap(projects), [projects]);
   const focusByCap = useMemo(() => focusByCapability(people), [people]);
@@ -100,9 +120,7 @@ export function AdvancedTimeline({ projects, pools, onOpenMatrix, theme }: Advan
     }).filter((band) => band.rows.length > 0);
   }, [schedule]);
 
-  const D = DENSITIES.find((d) => d.id === densityId) ?? DENSITIES[1];
-  const nameW = nameCollapsed ? D.nameCol : D.name;
-  const barTop = Math.round((D.row - D.bar) / 2);
+  const nameW = nameCollapsed ? NAME_COLLAPSED_W : NAME_W;
   const showNames = !nameCollapsed;
 
   const months = Math.max(12, Math.ceil(schedule.horizonMonths / 6) * 6 + 6);
@@ -114,7 +132,7 @@ export function AdvancedTimeline({ projects, pools, onOpenMatrix, theme }: Advan
   // t=0 on this axis, so calendar constraints can be placed against it.
   const nowMonth = useMemo(() => ({ year: startYear, month: startMonth }), [startYear, startMonth]);
 
-  const { ticks, tickLabels, gridlines } = useMemo(
+  const { tickLabels, gridlines } = useMemo(
     () => buildAxis(months, ppm, startYear, startMonth),
     [months, ppm, startYear, startMonth],
   );
@@ -124,10 +142,6 @@ export function AdvancedTimeline({ projects, pools, onOpenMatrix, theme }: Advan
   const totalIdle = CAPABILITY_ORDER.reduce((sum, c) => sum + schedule.idleFteMonths[c], 0);
   const impossibleCount = schedule.scheduled.filter((sp) => sp.isImpossible).length;
   const overPoolCount = schedule.scheduled.filter((sp) => sp.isOverPool).length;
-
-  function sizeIndex(project: Project) {
-    return ESTIMATE_ORDER.indexOf(project.estimate) + 1;
-  }
 
   // A short "P01"-style label from backlog position — not `project.id`,
   // which is a long UUID for anything added by hand and would otherwise
@@ -240,52 +254,32 @@ export function AdvancedTimeline({ projects, pools, onOpenMatrix, theme }: Advan
       <div
         key={project.id}
         className="atl-row"
-        style={{ height: D.row, background: hovered ? "var(--row-hover)" : "transparent" }}
+        style={{ height: ROW_H, background: hovered ? "var(--row-hover)" : "transparent" }}
         onMouseEnter={() => setHover(project.id)}
         onMouseLeave={() => setHover((h) => (h === project.id ? null : h))}
       >
         <div
           className="atl-row-name"
-          style={{ width: nameW, background: hovered ? "var(--name-hover)" : "var(--band)" }}
-          title={project.description || project.name}
+          style={{ width: nameW, background: hovered ? "var(--row-hover)" : "var(--bg)" }}
+          title={`${positionLabel(project)} · rozmiar ${project.estimate} · ${fmt(sp.assignedEffortDays)} dni nakładu${project.description ? ` — ${project.description}` : ""}`}
         >
-          <span className="atl-hue" style={{ height: D.bar, background: solid(hue), opacity: 0.9 }} />
-          <span className="atl-row-id" style={{ fontSize: D.fsMono }}>
-            {positionLabel(project)}
-          </span>
-          {showNames && (
-            <span className="atl-row-title" style={{ fontSize: D.fsName }}>
-              {project.name}
-            </span>
+          <span className="atl-hue" style={{ background: solid(hue) }} />
+          {showNames ? (
+            <span className="atl-row-title">{project.name}</span>
+          ) : (
+            <span className="atl-row-id">{positionLabel(project)}</span>
           )}
-          <span
-            className="atl-size"
-            title={`rozmiar ${project.estimate} · ${fmt(sp.assignedEffortDays)} dni nakładu w macierzy`}
-          >
-            <span className="atl-size-ticks">
-              {ESTIMATE_ORDER.map((_, k) => (
-                <i
-                  key={k}
-                  style={{
-                    height: 4 + k * 2,
-                    background: k < sizeIndex(project) ? "var(--ink-3)" : "var(--line-strong)",
-                  }}
-                />
-              ))}
-            </span>
-            <span className="atl-size-label">{project.estimate}</span>
-          </span>
         </div>
 
-        <div className="atl-row-track" style={{ width: totalW, height: D.row }}>
+        <div className="atl-row-track" style={{ width: totalW, height: ROW_H }}>
           {gridlines.map((x) => (
-            <div key={x} className="atl-grid" style={{ left: x, height: D.row, background: "var(--line)" }} />
+            <div key={x} className="atl-grid" style={{ left: x, height: ROW_H }} />
           ))}
 
           {sp.earliestStartMonths > EPS && (
             <div
               className="atl-earliest"
-              style={{ left: Math.round(sp.earliestStartMonths * ppm), height: D.row }}
+              style={{ left: Math.round(sp.earliestStartMonths * ppm), height: ROW_H }}
               title={`nie może ruszyć przed ${formatDateKey(project.earliestStartDate)} — ograniczenie zewnętrzne, nie kolejka`}
             />
           )}
@@ -293,7 +287,7 @@ export function AdvancedTimeline({ projects, pools, onOpenMatrix, theme }: Advan
           {deadlineMonths != null && (
             <div
               className={`atl-deadline ${missesDeadline ? "is-missed" : ""}`}
-              style={{ left: Math.round(deadlineMonths * ppm), height: D.row }}
+              style={{ left: Math.round(deadlineMonths * ppm), height: ROW_H }}
               title={
                 missesDeadline
                   ? `termin ${formatDateKey(project.deadlineDate)} — projekt kończy się ${fmt(sp.endMonths - deadlineMonths)} mies. po nim`
@@ -307,7 +301,7 @@ export function AdvancedTimeline({ projects, pools, onOpenMatrix, theme }: Advan
           {plannedStartMonths != null && (
             <div
               className={`atl-planned-start ${isLateStart ? "is-late" : ""}`}
-              style={{ left: Math.round(plannedStartMonths * ppm), height: D.row }}
+              style={{ left: Math.round(plannedStartMonths * ppm), height: ROW_H }}
               title={
                 startDrift != null && startDrift > EPS
                   ? `plan startu ${formatDateKey(project.plannedStartDate)} — realny start jest o ${fmt(startDrift)} mies. późniejszy`
@@ -325,12 +319,12 @@ export function AdvancedTimeline({ projects, pools, onOpenMatrix, theme }: Advan
               className="atl-bar"
               style={{
                 left,
-                top: barTop,
+                top: BAR_TOP,
                 width,
-                height: D.bar,
-                border: `1px ${envStyle} ${envColor}`,
+                height: BAR_H,
+                border: envStyle === "none" ? "0" : `1px ${envStyle} ${envColor}`,
                 background: envFill,
-                boxShadow: hovered ? "0 0 0 2px var(--band), 0 0 0 3.5px var(--ink-2)" : "none",
+                boxShadow: hovered ? "0 0 0 2px var(--bg), 0 0 0 3.5px var(--ink-2)" : "none",
               }}
               onMouseEnter={(e) => {
                 const r = e.currentTarget.getBoundingClientRect();
@@ -345,13 +339,13 @@ export function AdvancedTimeline({ projects, pools, onOpenMatrix, theme }: Advan
               {phase1WidthPx > 0 && (
                 <div
                   className="atl-seg-fill"
-                  style={{ left: 0, width: phase1WidthPx, height: D.bar, background: soft(hue) }}
+                  style={{ left: 0, width: phase1WidthPx, height: "100%", background: soft(hue) }}
                 />
               )}
               {phase2WidthPx > 0 && (
                 <div
                   className="atl-seg-fill"
-                  style={{ left: phase1WidthPx, width: phase2WidthPx, height: D.bar, background: solid(hue) }}
+                  style={{ left: phase1WidthPx, width: phase2WidthPx, height: "100%", background: solid(hue) }}
                 />
               )}
               {phase1 && finite && phase1.endMonths > sp.startMonths + EPS && phase1.endMonths < sp.endMonths - EPS && (
@@ -367,7 +361,7 @@ export function AdvancedTimeline({ projects, pools, onOpenMatrix, theme }: Advan
           {hasOutLabel && (
             <div
               className="atl-out-label"
-              style={{ left: left + width, top: barTop, height: D.bar, color: outLabelColor }}
+              style={{ left: left + width, top: BAR_TOP, height: BAR_H, color: outLabelColor }}
             >
               {outLabel}
             </div>
@@ -376,7 +370,7 @@ export function AdvancedTimeline({ projects, pools, onOpenMatrix, theme }: Advan
           {popover === project.id && (
             <div
               className="ds-popover atl-pop"
-              style={{ left: Math.max(0, left + 8), top: barTop + D.bar + 6 }}
+              style={{ left: Math.max(0, left + 8), top: BAR_TOP + BAR_H + 6 }}
               onClick={(e) => e.stopPropagation()}
             >
               <div className="atl-pop-head">
@@ -470,41 +464,24 @@ export function AdvancedTimeline({ projects, pools, onOpenMatrix, theme }: Advan
     // project waits for someone at some point, so it flagged the whole band
     // and told you nothing you could act on.
     const overs = band.rows.filter((r) => r.sp.isOverPool || r.sp.isImpossible).length;
-    const warnBits: { icon: typeof TriangleAlert; text: string }[] = [];
-    if (overs) warnBits.push({ icon: TriangleAlert, text: `${overs} przeciążonych` });
-
     const spanEnd = band.rows.reduce(
       (max, r) => (Number.isFinite(r.sp.endMonths) ? Math.max(max, r.sp.endMonths) : max),
       0,
     );
 
+    // v5's category header is a label in the light: eyebrow, count, a
+    // hairline claiming the rest of the line, and the figures at its end. It
+    // spans the viewport, not the track, so it never scrolls away sideways.
     return (
       <section className="atl-band" key={band.category}>
-        <div className="atl-band-head" style={{ height: D.band }}>
-          <div className="atl-band-name" style={{ width: nameW }}>
-            <div style={{ flex: "none", width: 3, height: D.bar, background: "var(--ink-3)", opacity: 0.6 }} />
-            <b>{band.category}</b>
-            {showNames && (
-              <span className="atl-band-people">
-                {plCount(band.rows.length, "projekt", "projekty", "projektów")}
-              </span>
-            )}
-          </div>
-          <div className="atl-band-track" style={{ width: totalW }}>
-            <div className="atl-band-chips" style={{ left: Math.round(spanEnd * ppm), height: D.band }}>
-              <span style={{ color: "var(--ink-2)" }}>{spanEnd ? `${fmt(spanEnd)} mies.` : "—"}</span>
-              {warnBits.length > 0 && (
-                <span style={{ color: "var(--warn)", display: "inline-flex", alignItems: "center", gap: 10 }}>
-                  {warnBits.map(({ icon: Icon, text }, i) => (
-                    <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                      <Icon size={11} />
-                      {text}
-                    </span>
-                  ))}
-                </span>
-              )}
-            </div>
-          </div>
+        <div className="atl-rule" style={{ width: viewW || undefined }}>
+          <span className="ds-eyebrow">{band.category}</span>
+          <span className="atl-rule-meta">
+            {plCount(band.rows.length, "projekt", "projekty", "projektów")}
+          </span>
+          <span className="atl-rule-line" />
+          {overs > 0 && <span className="atl-rule-meta is-warn">{overs} przeciążonych</span>}
+          <span className="atl-rule-meta is-loud">{spanEnd ? `${fmt(spanEnd)} mies.` : "—"}</span>
         </div>
 
         <div className="atl-rows">{band.rows.map((row) => renderRow(row))}</div>
@@ -514,71 +491,53 @@ export function AdvancedTimeline({ projects, pools, onOpenMatrix, theme }: Advan
 
   function renderUtilizationBand() {
     return (
-      <section className="atl-band atl-util-band" key="__util">
-        <div className="atl-band-head" style={{ height: D.band }}>
-          <div className="atl-band-name" style={{ width: nameW }}>
-            <div style={{ flex: "none", width: 3, height: D.bar, background: "var(--accent)", opacity: 0.7 }} />
-            <b>wykorzystanie zdolności</b>
-          </div>
-          <div className="atl-band-track" style={{ width: totalW }} />
+      <section className="atl-band" key="__util">
+        <div className="atl-rule" style={{ width: viewW || undefined }}>
+          <span className="ds-eyebrow">Wykorzystanie zdolności</span>
+          <span className="atl-rule-line" />
+          <span className="atl-rule-meta is-loud">{fmt(totalIdle)} FTE-mies. bezczynnych</span>
         </div>
         <div className="atl-rows">
           {CAPABILITY_ORDER.map((capability) => {
             const pool = schedule.pools[capability] ?? 0;
             const idleSpans = schedule.idleSpans.filter((s) => s.capability === capability);
             return (
-              <div className="atl-row atl-util-row" key={capability} style={{ height: D.row }}>
-                <div className="atl-row-name" style={{ width: nameW, background: "var(--band)" }}>
-                  <span className="atl-row-id" style={{ fontSize: D.fsMono }}>
-                    {CAPABILITY_LABELS[capability]}
-                  </span>
-                  {showNames && <span className="atl-band-people">{fmt(pool)} FTE</span>}
+              <div className="atl-row atl-util-row" key={capability} style={{ height: ROW_H }}>
+                <div className="atl-row-name" style={{ width: nameW, background: "var(--bg)" }}>
+                  <span className="atl-util-cap">{CAPABILITY_LABELS[capability]}</span>
+                  {showNames && <span className="atl-util-pool">{fmt(pool)} FTE</span>}
                 </div>
-                <div className="atl-row-track" style={{ width: totalW, height: D.row }}>
+                <div className="atl-row-track" style={{ width: totalW, height: ROW_H }}>
                   {gridlines.map((x) => (
-                    <div key={x} className="atl-grid" style={{ left: x, height: D.row, background: "var(--line)" }} />
+                    <div key={x} className="atl-grid" style={{ left: x, height: ROW_H }} />
                   ))}
                   {pool > 0 && (
                     <div
                       className="atl-util-used"
                       style={{
                         left: 0,
-                        top: barTop,
+                        top: BAR_TOP,
                         width: Math.round(schedule.horizonMonths * ppm),
-                        height: D.bar,
+                        height: BAR_H,
                         background: soft(HUES[0]),
                       }}
                     />
                   )}
-                  {idleSpans.map((span, i) => {
-                    const spanLeft = Math.round(span.startMonths * ppm);
-                    const spanW = Math.max(2, Math.round((span.endMonths - span.startMonths) * ppm));
-                    const idleRatio = pool > 0 ? span.idleFte / pool : 1;
-                    return (
-                      <div
-                        key={i}
-                        className="atl-util-idle"
-                        style={{
-                          left: spanLeft,
-                          top: barTop,
-                          width: spanW,
-                          height: Math.max(3, Math.round(idleRatio * D.bar)),
-                        }}
-                        title={`${fmt(span.idleFte)} FTE wolnych`}
-                      />
-                    );
-                  })}
-                  {pool > 0 && (
+                  {/* Idle capacity is a wash over the used bar, full height —
+                      where it sits and for how long, not a second data axis. */}
+                  {idleSpans.map((span, i) => (
                     <div
+                      key={i}
                       className="atl-util-idle"
                       style={{
-                        left: Math.round(schedule.horizonMonths * ppm),
-                        top: barTop,
-                        width: Math.max(2, totalW - Math.round(schedule.horizonMonths * ppm)),
-                        height: D.bar,
+                        left: Math.round(span.startMonths * ppm),
+                        top: BAR_TOP,
+                        width: Math.max(2, Math.round((span.endMonths - span.startMonths) * ppm)),
+                        height: BAR_H,
                       }}
+                      title={`${fmt(span.idleFte)} FTE wolnych`}
                     />
-                  )}
+                  ))}
                 </div>
               </div>
             );
@@ -604,76 +563,38 @@ export function AdvancedTimeline({ projects, pools, onOpenMatrix, theme }: Advan
         value={landLabel}
         unit="koniec całej pracy"
         actions={
-          <div className="atl-group">
-          <span className="atl-eyebrow">gęstość</span>
-          <div className="atl-seg" role="tablist" aria-label="Gęstość wierszy" onKeyDown={groupArrowNav}>
-            {DENSITIES.map((d) => (
-              <button
-                key={d.id}
-                type="button"
-                role="tab"
-                aria-selected={d.id === D.id}
-                tabIndex={d.id === D.id ? 0 : -1}
-                aria-label={`Gęstość ${d.label}`}
-                className={`atl-seg-icon ${d.id === D.id ? "is-active" : ""}`}
-                onClick={() => setDensityId(d.id)}
-              >
-                {d.label}
-              </button>
-            ))}
-          </div>
-          <span className="atl-eyebrow" style={{ paddingLeft: 3 }}>
-            zoom
-          </span>
-          <div className="atl-seg" role="tablist" aria-label="Miesięcy na ekran" onKeyDown={groupArrowNav}>
-            {ZOOMS.map((z) => (
-              <button
-                key={z.id}
-                type="button"
-                role="tab"
-                aria-selected={Math.abs(z.ppm - ppm) < 0.5}
-                tabIndex={Math.abs(z.ppm - ppm) < 0.5 ? 0 : -1}
-                aria-label={`Zoom ${z.label}`}
-                className={`atl-seg-icon ${Math.abs(z.ppm - ppm) < 0.5 ? "is-active" : ""}`}
-                onClick={() => setPpm(z.ppm)}
-              >
-                {z.label}
-              </button>
-            ))}
-          </div>
+          <>
+            <UnderlineTabs
+              label="Skala czasu"
+              value={ZOOMS.reduce((best, z) =>
+                Math.abs(z.ppm - ppm) < Math.abs(best.ppm - ppm) ? z : best,
+              ).id}
+              onChange={(id) => {
+                const zoom = ZOOMS.find((z) => z.id === id);
+                if (zoom) setPpm(zoom.ppm);
+              }}
+              items={ZOOMS.map((z) => ({ id: z.id, label: z.label }))}
+            />
             <PillButton
-              active={keyOpen}
-              onClick={() => setKeyOpen((v) => !v)}
-              aria-expanded={keyOpen}
+              icon={
+                nameCollapsed ? (
+                  <ChevronsRight size={13} strokeWidth={1.75} />
+                ) : (
+                  <ChevronsLeft size={13} strokeWidth={1.75} />
+                )
+              }
+              active={nameCollapsed}
+              onClick={() => setNameCollapsed((v) => !v)}
+              aria-pressed={nameCollapsed}
             >
-              Legenda
+              {nameCollapsed ? "Rozwiń nazwy" : "Zwiń nazwy"}
             </PillButton>
-          </div>
+          </>
         }
       >
         Jasny odcień to inicjacja, pełny to wytwarzanie. Pas na dole pokazuje, ile mocy każdej
         kompetencji zostaje niewykorzystane.
       </ScreenHeader>
-
-      {keyOpen && (
-        <div className="atl-key">
-          <div className="atl-key-item">
-            <div className="atl-key-bar">
-              <i style={{ left: 0, width: 16, height: 13, background: "var(--accent-soft)", borderRadius: 1 }} />
-              <i style={{ left: 16, width: 18, height: 13, background: "var(--accent)" }} />
-            </div>
-            <span>jaśniejszy odcień = faza 1 (inicjacja) · pełny odcień = faza 2 (wytwarzanie) · kreska = przełączenie</span>
-          </div>
-          <div className="atl-key-item">
-            <div className="atl-key-warn" />
-            <span>przeciążone lub nigdy się nie kończy — brak puli lub docelowego FTE dla jakiejś kompetencji</span>
-          </div>
-          <div className="atl-key-item">
-            <span>kliknij pasek</span>
-            <span>aby ustawić docelowe FTE poszczególnych kompetencji</span>
-          </div>
-        </div>
-      )}
 
       <div
         className="atl-scroll"
@@ -681,24 +602,10 @@ export function AdvancedTimeline({ projects, pools, onOpenMatrix, theme }: Advan
         onClick={() => popover && setPopover(null)}
         onScroll={() => tip && setTip(null)}
       >
-        <div className="atl-axis" style={{ height: D.axis }}>
-          <div className="atl-axis-corner" style={{ width: nameW }}>
-            <span className="atl-eyebrow">{nameCollapsed ? "id" : "projekt"}</span>
-            <button
-              type="button"
-              className="atl-collapse"
-              title={nameCollapsed ? "rozwiń kolumnę projektu" : "zwiń kolumnę projektu"}
-              aria-label={nameCollapsed ? "Rozwiń kolumnę projektu" : "Zwiń kolumnę projektu"}
-              aria-pressed={nameCollapsed}
-              onClick={() => setNameCollapsed((v) => !v)}
-            >
-              {nameCollapsed ? <ChevronsRight size={11} /> : <ChevronsLeft size={11} />}
-            </button>
-          </div>
-          <div className="atl-track" style={{ width: totalW, height: D.axis }}>
-            {ticks.map((t, i) => (
-              <div key={i} className="atl-tick" style={{ left: t.x, height: t.h, background: t.color }} />
-            ))}
+        {/* v5's axis is a bare label strip — no ticks, no rule under it. */}
+        <div className="atl-axis" style={{ height: AXIS_H }}>
+          <div className="atl-axis-corner" style={{ width: nameW }} />
+          <div className="atl-track" style={{ width: totalW, height: AXIS_H }}>
             {tickLabels.map((t, i) => (
               <div key={i} className="atl-tick-label" style={{ left: t.x, color: t.color }}>
                 {t.label}
@@ -709,28 +616,12 @@ export function AdvancedTimeline({ projects, pools, onOpenMatrix, theme }: Advan
 
         {bands.map((band) => renderBand(band))}
         {renderUtilizationBand()}
-
-        <div style={{ display: "flex", height: D.axis }}>
-          <div
-            style={{
-              position: "sticky",
-              left: 0,
-              zIndex: 4,
-              flex: "none",
-              width: nameW,
-              background: "var(--surface)",
-              borderRight: "1px solid var(--line-strong)",
-            }}
-          />
-          <div style={{ flex: "none", width: totalW }} />
-        </div>
       </div>
 
       <ScreenFooter>
         <Legend color="var(--accent-soft)">inicjacja</Legend>
         <Legend color="var(--accent)">wytwarzanie</Legend>
         <Legend color="var(--idle-wash)">bezczynne</Legend>
-        <span>{fmt(totalIdle)} FTE-mies. bezczynnych</span>
         <Gap />
         {overPoolCount > 0 && <span className="is-warn">{overPoolCount} przeciążonych</span>}
         {impossibleCount > 0 && (

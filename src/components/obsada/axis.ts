@@ -18,6 +18,23 @@ export const UNIT_ORDER: ObsadaUnit[] = ["months", "weeks", "days"];
 
 export const MON_SHORT = ["sty", "lut", "mar", "kwi", "maj", "cze", "lip", "sie", "wrz", "paź", "lis", "gru"];
 
+export const MON_FULL = [
+  "styczeń",
+  "luty",
+  "marzec",
+  "kwiecień",
+  "maj",
+  "czerwiec",
+  "lipiec",
+  "sierpień",
+  "wrzesień",
+  "październik",
+  "listopad",
+  "grudzień",
+];
+
+const DOW_SHORT = ["nd", "pn", "wt", "śr", "cz", "pt", "sb"];
+
 export function pxPerDayFor(unit: ObsadaUnit): number {
   const u = UNITS[unit];
   return u.px / u.days;
@@ -28,6 +45,10 @@ export interface AxisCell {
   left: number;
   width: number;
   text: string;
+  /** Days only: the weekday abbreviation stacked over the day number. */
+  sub?: string;
+  /** Days only: how the number is coloured — a holiday outranks a weekend. */
+  tone?: "holiday" | "weekend";
   isNow: boolean;
   /** Heavier tick at a quarter / month / week boundary, depending on unit. */
   strongTick: boolean;
@@ -176,17 +197,19 @@ export function buildObsadaAxis(window: StaffingWindow, unit: ObsadaUnit): Obsad
     for (let i = 0; i < N; i++) {
       const t = dateOf(i);
       const dow = t.getDay();
+      const iso = isoOfIndex(window.originIso, i);
+      const holiday = isPolishHoliday(iso);
       cells.push({
         key: i,
         left: X(i),
         width: Math.max(1, X(i + 1) - X(i)),
         text: String(t.getDate()),
+        sub: DOW_SHORT[dow],
+        tone: holiday ? "holiday" : dow === 0 || dow === 6 ? "weekend" : undefined,
         isNow: i === window.todayIndex,
         strongTick: dow === 1,
       });
       if (dow === 1) lines.push(X(i));
-      const iso = isoOfIndex(window.originIso, i);
-      const holiday = isPolishHoliday(iso);
       if (dow === 0 || dow === 6 || holiday) {
         shades.push({ key: i, left: X(i), width: Math.max(1, X(i + 1) - X(i)), holiday });
       }
@@ -196,7 +219,7 @@ export function buildObsadaAxis(window: StaffingWindow, unit: ObsadaUnit): Obsad
         key: m.a,
         left: X(m.a),
         width: X(m.b) - X(m.a),
-        label: `${MON_SHORT[m.date.getMonth()]} ${m.date.getFullYear()}`,
+        label: `${MON_FULL[m.date.getMonth()]} ${m.date.getFullYear()}`,
         isNow: window.todayIndex >= m.a && window.todayIndex < m.b,
       });
     }
